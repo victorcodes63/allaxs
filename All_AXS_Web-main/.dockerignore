@@ -1,0 +1,26 @@
+# Node/Next.js ignores
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.next
+out
+.DS_Store
+
+# Local env and config
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# Editor/OS
+.vscode
+.idea
+*.swp
+
+# Docker
+Dockerfile.dev

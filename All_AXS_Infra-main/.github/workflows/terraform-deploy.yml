@@ -1,0 +1,58 @@
+name: Terraform Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - bootstrap
+          - staging
+          - prod
+
+jobs:
+  deploy:
+    name: "Terraform (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+
+    environment: ${{ inputs.environment }}
+
+    env:
+      DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+      # S3 backend auth (DO Spaces uses the same keys as AWS_ACCESS_KEY_ID/SECRET)
+      AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.6"
+
+      - name: Resolve working directory
+        id: dir
+        run: |
+          case "${{ inputs.environment }}" in
+            bootstrap) echo "path=infra/bootstrap-tfstate" >> "$GITHUB_OUTPUT" ;;
+            staging)   echo "path=envs/staging"            >> "$GITHUB_OUTPUT" ;;
+            prod)      echo "path=envs/prod"               >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Terraform Init
+        run: terraform -chdir=${{ steps.dir.outputs.path }} init
+
+      - name: Terraform Validate
+        run: terraform -chdir=${{ steps.dir.outputs.path }} validate
+
+      - name: Terraform Plan
+        run: terraform -chdir=${{ steps.dir.outputs.path }} plan -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform -chdir=${{ steps.dir.outputs.path }} apply -auto-approve tfplan

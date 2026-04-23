@@ -1,0 +1,20 @@
+# Development Dockerfile (with hot reload)
+
+ARG NODE_VERSION=20
+FROM node:${NODE_VERSION}-alpine
+WORKDIR /app
+ENV NODE_ENV=development
+RUN apk add --no-cache libc6-compat
+
+# Install deps early for better caching
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# Copy the rest of the app
+COPY . .
+
+EXPOSE 3000
+ENV PORT=3000
+CMD ["npm", "run", "dev"]
+
+

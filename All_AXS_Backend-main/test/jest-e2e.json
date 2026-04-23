@@ -1,0 +1,26 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".e2e-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "moduleNameMapper": {
+    "^src/(.*)$": "<rootDir>/../src/$1"
+  },
+  "globals": {
+    "ts-jest": {
+      "tsconfig": {
+        "baseUrl": ".",
+        "paths": {
+          "src/*": ["src/*"]
+        }
+      }
+    }
+  },
+  "globalSetup": "<rootDir>/global-setup.ts",
+  "globalTeardown": "<rootDir>/global-teardown.ts",
+  "testTimeout": 30000,
+  "maxWorkers": 1
+}

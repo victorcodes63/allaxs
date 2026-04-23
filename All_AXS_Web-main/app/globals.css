@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+/* All AXS brand palette — page shell is pure white */
+:root {
+  --background: #ffffff;
+  --foreground: #333333;
+  --primary: #f07241;
+  --primary-dark: #c02942;
+  --accent-purple: #601848;
+  --muted: rgba(51, 51, 51, 0.65);
+  --surface: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --wash: rgba(0, 0, 0, 0.045);
+  --axs-page-gutter: 50px;
+  /* Softer corners than rounded-2xl / pill — apply consistently across cards & CTAs */
+  --radius-button: 10px;
+  /* Site-wide CTA / button rhythm — use on ArrowCta, SwapCtaLink (button), Button */
+  --btn-min-h: 3.25rem;
+  --btn-pad-x: 2rem;
+  --btn-pad-y: 0.875rem;
+  /* Single-line clip for SwapCtaLink hover swap (inside padded min-height box) */
+  --btn-swap-clip: calc(var(--btn-min-h) - 2 * var(--btn-pad-y));
+  --btn-pad-x-compact: 1rem;
+  --btn-text: 0.875rem;
+  --btn-shadow-primary:
+    0 4px 16px -6px rgba(192, 41, 66, 0.35),
+    0 2px 8px -4px rgba(0, 0, 0, 0.08);
+  --btn-shadow-outline: 0 2px 10px -4px rgba(0, 0, 0, 0.07);
+  --radius-card: 12px;
+  --radius-panel: 14px;
+  /* Marketing footer panel: white warmed slightly with brand orange */
+  --footer-panel-bg: color-mix(in srgb, var(--primary) 5%, var(--background) 95%);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-accent-purple: var(--accent-purple);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-wash: var(--wash);
+  /* Figtree via next/font on <html> (`--font-figtree`). */
+  --font-sans: var(--font-figtree), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-sans);
+}
+
+html {
+  overflow-x: clip;
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-feature-settings:
+    "kern" 1,
+    "liga" 1;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: inherit;
+  font-weight: inherit;
+  overflow-x: clip;
+}
+
+@layer components {
+  /*
+   * Display / marketing (Figtree): default 500; add `font-semibold` for 600 — utilities override this block.
+   */
+  .font-display {
+    font-family: var(--font-sans);
+    font-weight: 500;
+  }
+
+  /**
+   * Plain controls that should match CTA height/padding but without the arrow motion
+   * (e.g. header “Log out”, compact icon rows).
+   */
+  .axs-btn-surface {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--btn-min-h);
+    padding: var(--btn-pad-y) var(--btn-pad-x);
+    font-size: var(--btn-text);
+    font-weight: 600;
+    border-radius: var(--radius-button);
+    transition:
+      color 0.2s ease,
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+}
+
+/*
+ * Page shell: full width with a fixed horizontal gutter (header, main, footer).
+ */
+.axs-page-shell {
+  box-sizing: border-box;
+  width: 100%;
+  padding-inline: var(--axs-page-gutter);
+}
+
+/* Marketing footer: light panel + subtle film grain (reference: Effica-style contact band) */
+.axs-footer-panel::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.055;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='a'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23a)'/%3E%3C/svg%3E");
+}
+
+/* Animated-arrow CTA: arrow exits right, duplicate enters from left */
+.arrow-cta .arrow-cta-out {
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arrow-cta .arrow-cta-in {
+  transform: translateX(-100%);
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arrow-cta:hover .arrow-cta-out {
+  transform: translateX(100%);
+}
+.arrow-cta:hover .arrow-cta-in {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrow-cta .arrow-cta-out,
+  .arrow-cta .arrow-cta-in {
+    transition: none;
+    transform: none;
+  }
+  .arrow-cta .arrow-cta-in {
+    display: none;
+  }
+}

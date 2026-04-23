@@ -1,0 +1,29 @@
+project  = "all-axs"
+env      = "dev"
+region   = "ams3"
+
+docr_name = "all-axs-registry"
+
+db_pg_size    = "db-s-1vcpu-2gb"
+db_pg_version = "15"
+db_pg_nodes   = 1
+db_name       = "allaxs"
+db_user       = "allaxs_app"
+db_password   = "REPLACE_ME"   # required -- no default; set via tfvars or TF_VAR_db_password
+
+redis_size    = "db-s-1vcpu-1gb"
+redis_version = "7"
+
+spaces_bucket_suffix = "assets"
+
+domain    = "example.com"
+subdomain = "dev"
+
+docr_subscription_tier = "basic"    # use "professional" for production
+admin_ip               = ""         # e.g. "203.0.113.5/32" for dev DB access
+
+app_platform_stub_images = {
+  web    = "nginx:stable-alpine"
+  api    = "nginxdemos/hello:plain-text"
+  worker = "bash:latest"
+}

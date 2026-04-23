@@ -1,0 +1,247 @@
+# Alert Rules Example Configuration
+# Vendor-agnostic alert rules for All AXS metrics
+# 
+# This file shows example alert rules that can be adapted for:
+# - Prometheus + Alertmanager
+# - Grafana Alerting
+# - Datadog Monitors
+# - New Relic Alerts
+# - DigitalOcean Monitoring
+#
+# TODO: Configure real contact points (email, Slack, PagerDuty) in your alerting backend
+
+---
+# Payment Failure Alerts
+# Based on: allaxs_payments_success_total, allaxs_payments_failure_total
+
+- name: PaymentFailureRateWarning
+  description: "Payment failure rate exceeds 5% for 5 minutes"
+  severity: warning
+  condition: |
+    (
+      sum(rate(allaxs_payments_failure_total[5m])) 
+      / (sum(rate(allaxs_payments_success_total[5m])) + sum(rate(allaxs_payments_failure_total[5m])))
+    ) > 0.05
+  duration: 5m
+  labels:
+    service: all-axs-api
+    alert_type: payment_failure
+    severity: warning
+  annotations:
+    summary: "Payment failure rate is elevated"
+    description: "Payment failure rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/payments.md"
+  # TODO: Configure notification channel
+  # notify:
+  #   - slack: "#alerts-warning"
+  #   - email: "oncall@example.com"
+
+- name: PaymentFailureRateCritical
+  description: "Payment failure rate exceeds 10% for 5 minutes"
+  severity: critical
+  condition: |
+    (
+      sum(rate(allaxs_payments_failure_total[5m])) 
+      / (sum(rate(allaxs_payments_success_total[5m])) + sum(rate(allaxs_payments_failure_total[5m])))
+    ) > 0.10
+  duration: 5m
+  labels:
+    service: all-axs-api
+    alert_type: payment_failure
+    severity: critical
+  annotations:
+    summary: "Payment failure rate is critical"
+    description: "Payment failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/payments.md"
+  # TODO: Configure notification channel
+  # notify:
+  #   - pagerduty: "payment-failure-critical"
+  #   - sms: "+1234567890"
+
+---
+# Webhook Lag Alerts
+# Based on: allaxs_payments_webhook_lag_ms (histogram)
+
+- name: WebhookLagWarning
+  description: "Webhook processing p95 lag exceeds 120 seconds for 10 minutes"
+  severity: warning
+  condition: |
+    histogram_quantile(0.95, 
+      sum(rate(allaxs_payments_webhook_lag_ms_bucket[10m])) by (le, gateway, environment)
+    ) > 120000
+  duration: 10m
+  labels:
+    service: all-axs-api
+    alert_type: webhook_lag
+    severity: warning
+  annotations:
+    summary: "Webhook processing lag is high"
+    description: "p95 webhook lag is {{ $value | humanizeDuration }} (threshold: 120s)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/webhooks.md"
+  # TODO: Configure notification channel
+
+- name: WebhookLagCritical
+  description: "Webhook processing p95 lag exceeds 300 seconds for 10 minutes"
+  severity: critical
+  condition: |
+    histogram_quantile(0.95, 
+      sum(rate(allaxs_payments_webhook_lag_ms_bucket[10m])) by (le, gateway, environment)
+    ) > 300000
+  duration: 10m
+  labels:
+    service: all-axs-api
+    alert_type: webhook_lag
+    severity: critical
+  annotations:
+    summary: "Webhook processing lag is critical"
+    description: "p95 webhook lag is {{ $value | humanizeDuration }} (threshold: 300s)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/webhooks.md"
+  # TODO: Configure notification channel
+
+---
+# Queue Depth / Backlog Alerts
+# Based on: allaxs_tickets_pending_pdf_count, allaxs_installments_overdue_reminders_count
+
+- name: TicketPdfBacklogWarning
+  description: "Ticket PDF backlog exceeds 20 for 15 minutes"
+  severity: warning
+  condition: |
+    allaxs_tickets_pending_pdf_count > 20
+  duration: 15m
+  labels:
+    service: all-axs-api
+    alert_type: backlog
+    severity: warning
+  annotations:
+    summary: "Ticket PDF backlog is growing"
+    description: "{{ $value }} tickets are pending PDF generation (threshold: 20)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/backlog.md"
+  # TODO: Configure notification channel
+
+- name: TicketPdfBacklogCritical
+  description: "Ticket PDF backlog exceeds 100 for 15 minutes"
+  severity: critical
+  condition: |
+    allaxs_tickets_pending_pdf_count > 100
+  duration: 15m
+  labels:
+    service: all-axs-api
+    alert_type: backlog
+    severity: critical
+  annotations:
+    summary: "Ticket PDF backlog is critical"
+    description: "{{ $value }} tickets are pending PDF generation (threshold: 100)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/backlog.md"
+  # TODO: Configure notification channel
+
+- name: InstallmentRemindersBacklogWarning
+  description: "Overdue installment reminders backlog exceeds 50 for 60 minutes"
+  severity: warning
+  condition: |
+    allaxs_installments_overdue_reminders_count > 50
+  duration: 60m
+  labels:
+    service: all-axs-api
+    alert_type: backlog
+    severity: warning
+  annotations:
+    summary: "Installment reminders backlog is growing"
+    description: "{{ $value }} overdue installments need reminders (threshold: 50)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/backlog.md"
+  # TODO: Configure notification channel
+
+---
+# Check-in Error Alerts
+# Based on: allaxs_checkin_attempts_total, allaxs_checkin_errors_total
+
+- name: CheckInErrorRateWarning
+  description: "Check-in error rate exceeds 1% for 5 minutes"
+  severity: warning
+  condition: |
+    (
+      sum(rate(allaxs_checkin_errors_total[5m]))
+      / sum(rate(allaxs_checkin_attempts_total[5m]))
+    ) > 0.01
+  duration: 5m
+  labels:
+    service: all-axs-api
+    alert_type: checkin_error
+    severity: warning
+  annotations:
+    summary: "Check-in error rate is elevated"
+    description: "Check-in error rate is {{ $value | humanizePercentage }} (threshold: 1%)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/checkin.md"
+  # TODO: Configure notification channel
+  # NOTE: Consider gating by event time window or manual trigger during events
+
+- name: CheckInErrorRateCritical
+  description: "Check-in error rate exceeds 5% for 5 minutes"
+  severity: critical
+  condition: |
+    (
+      sum(rate(allaxs_checkin_errors_total[5m]))
+      / sum(rate(allaxs_checkin_attempts_total[5m]))
+    ) > 0.05
+  duration: 5m
+  labels:
+    service: all-axs-api
+    alert_type: checkin_error
+    severity: critical
+  annotations:
+    summary: "Check-in error rate is critical"
+    description: "Check-in error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+    runbook: "https://github.com/YouthPlus/all-axs-api/blob/main/docs/observability/runbooks/checkin.md"
+  # TODO: Configure notification channel
+  # NOTE: Consider gating by event time window or manual trigger during events
+
+---
+# Environment Configuration
+# TODO: Configure environment labels and filtering
+
+environments:
+  production:
+    enabled: true
+    severity_filter: [warning, critical]
+  staging:
+    enabled: true
+    severity_filter: [critical]  # Only critical alerts in staging
+  development:
+    enabled: false  # Disable alerts in development, or log only
+
+---
+# Notification Channels (Example)
+# TODO: Configure real contact points
+
+notification_channels:
+  slack:
+    warning: "#alerts-warning"
+    critical: "#alerts-critical"
+  email:
+    warning: "oncall@example.com"
+    critical: "oncall-critical@example.com"
+  pagerduty:
+    critical: "payment-failure-critical"  # PagerDuty integration key
+  sms:
+    critical: "+1234567890"  # On-call phone number
+
+---
+# Terraform Example (Commented Out)
+# Uncomment and adapt for your Terraform setup
+
+# resource "digitalocean_monitoring_alert" "payment_failure_warning" {
+#   type    = "v1/insights/droplet/cpu"
+#   compare = "GreaterThan"
+#   value   = 0.05
+#   window  = "5m"
+#   entities = [digitalocean_droplet.api.id]
+#   enabled = true
+#   description = "Payment failure rate exceeds 5%"
+#   tags = ["payment", "warning"]
+# }
+
+# TODO: Add Terraform resources for:
+# - Payment failure alerts
+# - Webhook lag alerts
+# - Backlog alerts
+# - Check-in error alerts
+

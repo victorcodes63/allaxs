@@ -1,0 +1,79 @@
+# OpenTelemetry Collector Configuration
+# This config receives traces and metrics from all-axs-api and all_axs_web
+# and forwards them to an observability backend (Grafana Cloud, Tempo, Honeycomb, etc.)
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Resource processor: add common attributes
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: ${OTEL_ENVIRONMENT}
+        action: upsert
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    limit_mib: 512
+    check_interval: 1s
+
+exporters:
+  # Development: stdout exporter (for local dev/testing)
+  logging:
+    loglevel: info
+
+  # Production: OTLP exporter to observability backend
+  # TODO: Configure with your observability vendor endpoint
+  # Examples:
+  # - Grafana Cloud: https://tempo-us-central1.grafana.net:443
+  # - Honeycomb: https://api.honeycomb.io
+  # - Datadog: https://trace-intake.datadoghq.com
+  # - Custom OTLP endpoint
+  otlp/production:
+    endpoint: ${OTEL_EXPORTER_ENDPOINT}
+    headers:
+      # TODO: Add API key/authentication headers
+      # Example for Grafana Cloud:
+      # Authorization: "Basic <base64(user:password)>"
+      # Example for Honeycomb:
+      # x-honeycomb-team: "${HONEYCOMB_API_KEY}"
+      # x-honeycomb-dataset: "all-axs"
+      ${OTEL_EXPORTER_HEADERS}
+
+  # Metrics exporter (if separate from traces)
+  otlp/metrics:
+    endpoint: ${OTEL_METRICS_ENDPOINT}
+    headers:
+      ${OTEL_METRICS_HEADERS}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters:
+        # In dev, use logging; in prod, use otlp/production
+        - ${OTEL_TRACES_EXPORTER:-logging}
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters:
+        # In dev, use logging; in prod, use otlp/metrics
+        - ${OTEL_METRICS_EXPORTER:-logging}
+
+  extensions: []
+
+# TODO: Add extensions as needed (health check, pprof, etc.)
+

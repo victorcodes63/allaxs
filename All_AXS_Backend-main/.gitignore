@@ -1,0 +1,78 @@
+# compiled output
+/dist
+/node_modules
+/build
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+env.example
+.env.test
+
+# temp directory
+.temp
+.tmp
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# READMEs
+AUTH_GUIDE.md
+AUTH_ADVANCED_FEATURES.md
+ENV_SETUP.md
+POSTMAN_TESTING_GUIDE.md
+REFRESH_TOKEN_GUIDE.md
+CI_SETUP.md
+MIGRATION_GUIDE.md
+WEEK2_MONDAY_SUMMARY.md
+LOCAL_DEVELOPMENT.md
+DEPLOYMENT_GUIDE.md
+IMPLEMENTATION_SUMMARY.md
+ORGANIZER_ONBOARDING.md
+EVENTS_CRUD_IMPLEMENTATION_GUIDE.md
+Week3-Monday-Verification.md
+QA_E2E.md
+EVENTS_CRUD_IMPLEMENTATION.md
+DB_UPDATE_SUMMARY.md
+DB_ISOLATION.md
