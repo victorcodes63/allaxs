@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -40,6 +40,28 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "same-origin" });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as {
+          user?: { email?: string; name?: string };
+        };
+        const u = data.user;
+        if (!u) return;
+        setEmail((prev) => (prev.trim() ? prev : u.email ?? ""));
+        setName((prev) => (prev.trim() ? prev : u.name ?? ""));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const lineItems: CheckoutLineItem[] = useMemo(() => {
     return tiers
@@ -141,8 +163,8 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
           Checkout
         </h1>
         <p className="text-muted mt-2 max-w-xl">
-          Review your tiers, tell us who to send the QR to, and confirm. Payment rails plug in here
-          next—today we complete your reservation locally for UI flow.
+          Demo checkout: no card or wallet is charged. Confirming issues your passes immediately and
+          stores them in this browser—open <strong>My tickets</strong> for the QR entry code.
         </p>
 
         <form onSubmit={onSubmit} className="mt-10 space-y-10">
@@ -254,7 +276,11 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
             disabled={submitting || tiers.length === 0}
             className="w-full sm:w-auto"
           >
-            {submitting ? "Processing…" : `Pay ${subtotal / 100} ${currency}`}
+            {submitting
+              ? "Processing…"
+              : subtotal === 0
+                ? "Complete demo — free pass"
+                : `Complete demo payment — ${subtotal / 100} ${currency}`}
           </ArrowButton>
           <p className="text-xs text-muted max-w-md">
             By continuing you agree to our{" "}

@@ -46,8 +46,10 @@ export const config = {
     "/dashboard/:path*",
     "/organizer/:path*",
     "/admin/:path*",
-    /* /tickets is public so guests can view session-stored passes after checkout */
     "/account/:path*",
+    /* Checkout requires an account so the demo matches signup → pay → ticket */
+    "/events/:eventId/checkout",
+    /* /tickets stays public so session-stored passes work after checkout */
   ],
 };
 

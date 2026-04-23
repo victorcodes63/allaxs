@@ -266,6 +266,9 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 >
                   Continue to checkout
                 </ArrowCtaLink>
+                <p className="mt-3 text-center text-xs text-muted">
+                  Sign in required at checkout (demo payment, instant QR passes).
+                </p>
                 <Link
                   href="/events"
                   className="mt-3 block text-center text-sm font-medium text-muted hover:text-foreground transition-colors"

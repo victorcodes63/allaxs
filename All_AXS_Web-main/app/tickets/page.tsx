@@ -14,7 +14,8 @@ export default function TicketsPage() {
           My tickets
         </h1>
         <p className="text-muted text-lg mt-3 leading-relaxed">
-          Tap a pass for QR preview and details. In production this syncs with your account and email.
+          Tap a pass for a scannable QR code (demo data in this browser). Create an account and use
+          checkout to add passes.
         </p>
       </div>
       <TicketsList />

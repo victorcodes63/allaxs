@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import QRCode from "react-qr-code";
 import { findTicketById, type StoredTicket } from "@/lib/checkout-storage";
+import { buildTicketQrPayload } from "@/lib/ticket-qr";
 
 export default function TicketDetailPage() {
   const params = useParams();
@@ -13,6 +15,11 @@ export default function TicketDetailPage() {
   useEffect(() => {
     setTicket(findTicketById(ticketId));
   }, [ticketId]);
+
+  const qrValue = useMemo(() => {
+    if (ticket === undefined || ticket === null) return "";
+    return buildTicketQrPayload(ticket);
+  }, [ticket]);
 
   if (ticket === undefined) {
     return (
@@ -46,13 +53,15 @@ export default function TicketDetailPage() {
         </div>
         <div className="p-8 flex flex-col items-center gap-6">
           <div
-            className="w-48 h-48 rounded-[var(--radius-card)] bg-background border-2 border-dashed border-border flex items-center justify-center text-xs text-muted text-center px-4 leading-relaxed"
-            aria-label="QR code placeholder"
+            className="rounded-[var(--radius-card)] bg-white p-4 border border-border shadow-inner"
+            aria-label="Ticket QR code"
           >
-            QR preview
-            <br />
-            (integrate encoder)
+            <QRCode value={qrValue} size={200} level="M" />
           </div>
+          <p className="text-xs text-muted text-center max-w-xs">
+            Demo payload: scanners see ticket metadata as JSON. Production would use a signed token
+            and server validation.
+          </p>
           <dl className="w-full text-sm space-y-2 text-muted">
             <div className="flex justify-between gap-4">
               <dt>Email</dt>

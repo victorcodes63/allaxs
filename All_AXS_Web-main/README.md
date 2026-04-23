@@ -8,6 +8,15 @@ npm install
 npm run dev
 ```
 
+### Demo attendee journey (signup → demo pay → QR)
+
+1. **Register** at `/register`, then browse **`/events`** (or open an event from the home page).
+2. Choose **Continue to checkout** — you must be **signed in**; checkout pre-fills name and email from your session.
+3. Select tickets and **Complete demo payment** (no card or Paystack call; totals are for display only).
+4. On the confirmation screen, open **My tickets**, then a pass to view a **real QR code** (JSON payload for scanners in demo mode).
+
+Passes are stored in **sessionStorage** on this device until you clear site data.
+
 ### Deploy on Vercel
 
 See **[docs/VERCEL.md](docs/VERCEL.md)** for environment variables and how to connect this app to the Nest API (also deployable on Vercel as a second project).

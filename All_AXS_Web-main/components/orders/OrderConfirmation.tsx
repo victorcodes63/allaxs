@@ -46,11 +46,11 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         </h1>
         <p className="text-muted leading-relaxed">
           Order <span className="font-mono text-foreground text-sm">{order.orderId.slice(0, 8)}…</span>{" "}
-          is confirmed. We&apos;ve saved your passes—open{" "}
+          is confirmed (demo—no real charge). Your passes are saved in this browser—open{" "}
           <Link href="/tickets" className="text-primary font-semibold hover:underline">
             My tickets
           </Link>{" "}
-          on this device to see QR placeholders until payment rails go live.
+          to open each pass and scan the QR code.
         </p>
       </div>
 
