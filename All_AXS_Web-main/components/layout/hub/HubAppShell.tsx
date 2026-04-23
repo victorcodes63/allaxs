@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -73,6 +73,28 @@ export function HubAppShell({
   const title = getPageTitle(pathname);
   const initials = userInitials(user);
   const closeDrawer = () => setDrawerOpen(false);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDrawerOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
 
   const onLogout = async () => {
     setLoggingOut(true);
@@ -220,9 +242,10 @@ export function HubAppShell({
 
       <aside
         id="hub-mobile-drawer"
+        inert={!drawerOpen}
         className={[
           "fixed inset-y-0 left-0 z-50 flex w-[min(20rem,92vw)] max-w-full flex-col border-r border-border bg-surface pt-[env(safe-area-inset-top,0px)] shadow-[8px_0_32px_-12px_rgba(0,0,0,0.45)] transition-transform duration-200 lg:hidden",
-          drawerOpen ? "translate-x-0" : "-translate-x-full",
+          drawerOpen ? "translate-x-0" : "-translate-x-full pointer-events-none",
         ].join(" ")}
       >
         <div

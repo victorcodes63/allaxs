@@ -31,6 +31,15 @@ export function LoggedInBrowseChrome() {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   if (!user) return null;
 
   const closeMenu = () => setOpen(false);
@@ -81,6 +90,7 @@ export function LoggedInBrowseChrome() {
   );
 
   return (
+    <>
     <header className="sticky top-0 z-50 border-b border-border/80 bg-background/95 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md supports-[backdrop-filter]:bg-background/88">
       <div className="axs-page-shell flex min-h-[4.25rem] items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-5">
@@ -143,18 +153,19 @@ export function LoggedInBrowseChrome() {
           </button>
         </div>
       </div>
+    </header>
 
       {open ? (
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 bg-foreground/20 md:hidden"
+            className="fixed inset-0 z-[60] bg-foreground/20 md:hidden"
             aria-label="Close menu"
             onClick={closeMenu}
           />
           <div
             id="browse-drawer"
-            className="fixed inset-y-0 right-0 z-50 flex w-[min(100%,20rem)] flex-col border-l border-border bg-surface pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] shadow-[-12px_0_40px_-12px_rgba(0,0,0,0.35)] md:hidden"
+            className="fixed inset-y-0 right-0 z-[70] flex w-[min(100%,20rem)] flex-col border-l border-border bg-surface pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] shadow-[-12px_0_40px_-12px_rgba(0,0,0,0.35)] md:hidden"
             role="dialog"
             aria-modal="true"
             aria-label="Account menu"
@@ -232,6 +243,6 @@ export function LoggedInBrowseChrome() {
           </div>
         </>
       ) : null}
-    </header>
+    </>
   );
 }

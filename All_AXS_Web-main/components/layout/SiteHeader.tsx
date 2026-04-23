@@ -90,6 +90,15 @@ export function SiteHeader() {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const closeMenu = () => setOpen(false);
 
   const onAuthClick = async () => {
@@ -131,6 +140,7 @@ export function SiteHeader() {
     "axs-bg-brand-gradient inline-flex items-center justify-center rounded-[var(--radius-button)] px-4 py-2.5 text-sm font-semibold text-white shadow-[var(--btn-shadow-primary)] transition hover:brightness-105 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-5";
 
   return (
+    <>
     <header
       className="sticky top-0 z-50 shrink-0 border-b border-white/10 bg-zinc-950/70 pt-[env(safe-area-inset-top,0px)] shadow-[0_12px_40px_-20px_rgba(0,0,0,0.55)] backdrop-blur-2xl backdrop-saturate-150 supports-backdrop-filter:bg-zinc-950/55"
     >
@@ -222,18 +232,19 @@ export function SiteHeader() {
           </div>
         </div>
       </div>
+    </header>
 
       {open && (
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 bg-foreground/20 lg:hidden"
+            className="fixed inset-0 z-[60] bg-foreground/20 lg:hidden"
             aria-label="Close menu"
             onClick={closeMenu}
           />
           <div
             id="site-drawer"
-            className="fixed inset-y-0 right-0 z-50 flex w-[min(100%,20rem)] flex-col border-l border-border bg-surface pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] shadow-[-12px_0_40px_-12px_rgba(0,0,0,0.35)] lg:hidden"
+            className="fixed inset-y-0 right-0 z-[70] flex w-[min(100%,20rem)] flex-col border-l border-border bg-surface pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] shadow-[-12px_0_40px_-12px_rgba(0,0,0,0.35)] lg:hidden"
             role="dialog"
             aria-modal="true"
             aria-label="Site menu"
@@ -300,6 +311,6 @@ export function SiteHeader() {
           </div>
         </>
       )}
-    </header>
+    </>
   );
 }
