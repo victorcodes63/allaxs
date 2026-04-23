@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -72,6 +77,38 @@ export class AuthService {
     }
 
     // Issue tokens with device fingerprint
+    const tokens = await this.issueTokensForUser(user, metadata);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name || '',
+        roles: user.roles,
+      },
+      tokens,
+    };
+  }
+
+  /**
+   * Demo / dev: grant ORGANIZER role and return fresh tokens so JWT claims stay in sync.
+   * In production, set ENABLE_PROMOTE_ORGANIZER_ROLE=true to allow.
+   */
+  async promoteOrganizerDemo(
+    userId: string,
+    metadata?: TokenMetadata,
+  ): Promise<AuthResponse> {
+    const allow =
+      this.configService.get<string>('NODE_ENV') !== 'production' ||
+      this.configService.get<string>('ENABLE_PROMOTE_ORGANIZER_ROLE') === 'true';
+    if (!allow) {
+      throw new ForbiddenException(
+        'Organizer self-promotion is disabled. Set ENABLE_PROMOTE_ORGANIZER_ROLE=true to enable in production.',
+      );
+    }
+
+    await this.usersService.addOrganizerRole(userId);
+    const user = await this.usersService.findByIdOrFail(userId);
     const tokens = await this.issueTokensForUser(user, metadata);
 
     return {

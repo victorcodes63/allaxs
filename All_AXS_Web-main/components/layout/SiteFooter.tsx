@@ -7,13 +7,22 @@ import { FooterStayInTheLoop } from "@/components/layout/FooterStayInTheLoop";
 const FOOTER_NAV = [
   ["/", "Home"],
   ["/events", "Events"],
-  ["/tickets", "Tickets"],
   ["/organizers", "For organizers"],
-  ["/register", "Sell tickets"],
+  ["/register", "Sign up"],
   ["/login", "Sign in"],
 ] as const;
 
+/** Slim footer under fixed-viewport auth pages (login, register, recovery). */
+const AUTH_COMPACT_NAV = [
+  ["/", "Home"],
+  ["/events", "Events"],
+  ["/organizers", "Organizers"],
+] as const;
+
 const CONTACT_EMAIL = "hello@allaxs.com";
+
+/** Served from `public/brand/logo-on-dark.png` (use `/brand/…` in `next/image`). */
+const FOOTER_LOGO_SRC = "/brand/logo-on-dark.png" as const;
 
 /** Soft, full-width blurred arc (orange → red → purple); eased with white + lower opacity. */
 function GradientArc() {
@@ -31,12 +40,61 @@ function GradientArc() {
   );
 }
 
-export function SiteFooter() {
+export function SiteFooter({ authContinuation }: { authContinuation?: boolean }) {
   const year = new Date().getFullYear();
 
+  if (authContinuation) {
+    return (
+      <footer className="mt-auto shrink-0 border-t border-white/10 bg-[color:var(--footer-panel-bg)] font-sans text-foreground">
+        <div className="axs-page-shell flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-2 sm:px-6 md:px-8 lg:px-10">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-foreground/55">
+              Contact
+            </p>
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="truncate text-sm font-medium text-foreground/80 transition-colors hover:text-primary/90"
+            >
+              {CONTACT_EMAIL}
+            </a>
+          </div>
+          <nav
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
+            aria-label="Footer"
+          >
+            {AUTH_COMPACT_NAV.map(([href, label]) => (
+              <Link
+                key={href + label}
+                href={href}
+                className="text-foreground/55 transition-colors hover:text-primary/85"
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <div className="border-t border-[color:var(--footer-legal-border)] bg-[color:var(--footer-legal-bg)] text-white">
+          <div className="axs-page-shell flex flex-col gap-2 px-4 py-2.5 pb-[max(0.5rem,calc(0.5rem+env(safe-area-inset-bottom)))] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 md:px-8 lg:px-10">
+            <div className="flex flex-wrap gap-x-5 gap-y-1">
+              <Link href="/privacy" className="text-[10px] uppercase tracking-[0.2em] text-white/75 transition-colors hover:text-primary/85">
+                Privacy policy
+              </Link>
+              <Link href="/terms" className="text-[10px] uppercase tracking-[0.2em] text-white/75 transition-colors hover:text-primary/85">
+                Terms of service
+              </Link>
+            </div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-white/55">
+              © {year} All AXS
+            </p>
+          </div>
+        </div>
+      </footer>
+    );
+  }
+
   return (
-    <footer className="mt-auto font-sans">
-      <div className="axs-footer-panel relative overflow-hidden bg-(--footer-panel-bg) text-foreground">
+    <footer className="mt-auto shrink-0 font-sans">
+      <div className="axs-footer-panel axs-footer-panel-blend relative overflow-hidden bg-(--footer-panel-bg) text-foreground">
         <GradientArc />
 
         <div className="axs-page-shell relative z-10 py-12 md:py-16 lg:py-20">
@@ -112,11 +170,11 @@ export function SiteFooter() {
             <div className="flex flex-col items-end gap-3 md:justify-self-end md:text-right">
               <Link href="/" className="inline-block opacity-95 transition-opacity hover:opacity-100">
                 <Image
-                  src="/brand/logo-header.png"
+                  src={FOOTER_LOGO_SRC}
                   alt="All AXS"
                   width={220}
                   height={52}
-                  className="h-10 w-auto max-w-[min(100%,220px)] object-contain object-right sm:h-11 sm:max-w-[240px]"
+                  className="axs-footer-brand-logo h-10 w-auto max-w-[min(100%,220px)] object-contain object-right sm:h-11 sm:max-w-[240px]"
                 />
               </Link>
               <FooterBackToTop className="text-[10px] font-semibold uppercase tracking-[0.22em] text-foreground/55 underline decoration-foreground/25 underline-offset-4 transition-colors hover:text-foreground" />
@@ -125,8 +183,8 @@ export function SiteFooter() {
         </div>
       </div>
 
-      <div className="bg-foreground text-white">
-        <div className="axs-page-shell flex flex-col gap-4 py-4 text-[10px] uppercase tracking-[0.2em] sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="border-t border-[color:var(--footer-legal-border)] bg-[color:var(--footer-legal-bg)] text-white">
+        <div className="axs-page-shell flex flex-col gap-4 pt-4 pb-[max(1rem,calc(1rem+env(safe-area-inset-bottom)))] text-[10px] uppercase tracking-[0.2em] sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <div className="flex flex-wrap gap-x-6 gap-y-2">
             <Link href="/privacy" className="text-white/75 transition-colors hover:text-primary/85">
               Privacy policy

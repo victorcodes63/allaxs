@@ -32,7 +32,10 @@
     "migrate:run": "npm run typeorm -- migration:run",
     "migrate:revert": "npm run typeorm -- migration:revert",
     "migrate:run:test": "cross-env NODE_ENV=test npm run typeorm -- migration:run",
-    "migrate:revert:test": "cross-env NODE_ENV=test npm run typeorm -- migration:revert"
+    "migrate:revert:test": "cross-env NODE_ENV=test npm run typeorm -- migration:revert",
+    "seed:demo": "ts-node -r tsconfig-paths/register scripts/seed-demo-flow.ts",
+    "shift:events:3w": "ts-node -r tsconfig-paths/register scripts/shift-events-into-upcoming-window.ts",
+    "fix:ticket-prices": "ts-node -r tsconfig-paths/register scripts/sync-zero-ticket-prices-from-catalogue.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.927.0",

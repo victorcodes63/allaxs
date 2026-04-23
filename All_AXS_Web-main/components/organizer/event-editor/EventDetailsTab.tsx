@@ -13,6 +13,8 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { nativeDarkControlClass } from "@/components/ui/nativeDarkField";
+import { organizerEventStatusChipClass } from "@/lib/organizer-event-status-chip";
 
 interface Event {
   id: string;
@@ -186,43 +188,28 @@ export function EventDetailsTab({
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case EventStatus.DRAFT:
-        return "bg-gray-100 text-gray-800";
-      case EventStatus.PENDING_REVIEW:
-        return "bg-yellow-100 text-yellow-800";
-      case EventStatus.APPROVED:
-        return "bg-blue-100 text-blue-800";
-      case EventStatus.PUBLISHED:
-        return "bg-green-100 text-green-800";
-      case EventStatus.REJECTED:
-        return "bg-red-100 text-red-800";
-      case EventStatus.ARCHIVED:
-        return "bg-gray-100 text-gray-600";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Status Display */}
-      <div className="bg-black/5 rounded-lg p-4">
-        <div className="flex items-center justify-between">
+      <div className="rounded-[var(--radius-panel)] border border-border bg-surface/60 p-4 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm text-black/60 mb-1">Status</p>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+              Status
+            </p>
             <span
-              className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
-                event.status
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${organizerEventStatusChipClass(
+                event.status,
               )}`}
             >
               {event.status.replace(/_/g, " ")}
             </span>
           </div>
-          <div>
-            <p className="text-sm text-black/60 mb-1">Slug</p>
-            <p className="text-sm font-mono text-black/80">{event.slug}</p>
+          <div className="min-w-0 sm:text-right">
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
+              Slug
+            </p>
+            <p className="truncate font-mono text-sm text-foreground/90">{event.slug}</p>
           </div>
         </div>
       </div>
@@ -234,7 +221,7 @@ export function EventDetailsTab({
       )}
 
       {success && (
-        <div className="bg-green-100 border border-green-300 text-green-800 rounded-lg p-3 text-sm">
+        <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/12 p-3 text-sm text-emerald-100">
           {success}
         </div>
       )}
@@ -252,7 +239,7 @@ export function EventDetailsTab({
         <div>
           <label
             htmlFor="event-type"
-            className="block font-medium mb-1 text-sm text-black"
+            className="mb-1 block text-sm font-medium text-foreground"
           >
             Type *
           </label>
@@ -261,11 +248,7 @@ export function EventDetailsTab({
             {...register("type")}
             aria-invalid={errors.type ? "true" : "false"}
             aria-describedby={errors.type ? "event-type-error" : undefined}
-            className={`w-full border ${
-              errors.type ? "border-primary" : "border-black/20"
-            } rounded-lg px-4 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${
-              !isEditable ? "opacity-50 cursor-not-allowed" : ""
-            }`}
+            className={nativeDarkControlClass(!!errors.type)}
             disabled={!isEditable}
           >
             <option value={EventType.IN_PERSON}>In Person</option>
@@ -338,7 +321,7 @@ export function EventDetailsTab({
         </div>
 
         {!isEditable && (
-          <p className="text-sm text-black/60">
+          <p className="text-sm text-muted">
             This event cannot be edited in its current status. Only events in
             DRAFT or PENDING_REVIEW status can be edited.
           </p>

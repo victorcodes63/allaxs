@@ -12,7 +12,7 @@ describe('Navigation', () => {
   it('should navigate to events page from header', () => {
     cy.contains('a', 'Events').click();
     cy.url().should('include', '/events');
-    cy.contains('h1', 'Find your next live moment').should('be.visible');
+    cy.contains('h1', 'Browse the full catalogue').should('be.visible');
   });
 
   it('should navigate to login page from header', () => {

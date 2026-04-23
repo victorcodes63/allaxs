@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import axios from "axios";
 import { Tabs } from "@/components/ui/Tabs";
 import { EventDetailsTab } from "@/components/organizer/event-editor/EventDetailsTab";
 import { EventMediaTab } from "@/components/organizer/event-editor/EventMediaTab";
 import { EventTicketTiersTab } from "@/components/organizer/event-editor/EventTicketTiersTab";
+import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab";
+import { EventStatus } from "@/lib/validation/event";
 
 interface TicketType {
   id: string;
@@ -37,6 +45,51 @@ interface Event {
   bannerUrl?: string | null;
   ticketTypes?: TicketType[];
   [key: string]: unknown; // Allow additional properties to match child component interfaces
+}
+
+const EDITOR_TAB_IDS = [
+  "details",
+  "media",
+  "ticket-tiers",
+  "sales",
+] as const;
+type EditorTabId = (typeof EDITOR_TAB_IDS)[number];
+
+function isEditorTabId(value: string | null): value is EditorTabId {
+  return !!value && (EDITOR_TAB_IDS as readonly string[]).includes(value);
+}
+
+function EventEditorTabsSection({
+  event,
+  tabs,
+}: {
+  event: Event;
+  tabs: {
+    id: string;
+    label: string;
+    content: ReactNode;
+  }[];
+}) {
+  const searchParams = useSearchParams();
+  const qs = searchParams.toString();
+
+  const defaultTab = useMemo((): EditorTabId => {
+    const raw = searchParams.get("tab");
+    if (isEditorTabId(raw)) return raw;
+    const canUpload =
+      event.status === EventStatus.DRAFT ||
+      event.status === EventStatus.PENDING_REVIEW;
+    if (!event.bannerUrl && canUpload) return "media";
+    return "details";
+  }, [searchParams, event.bannerUrl, event.status]);
+
+  return (
+    <Tabs
+      key={`${event.id}-${qs}`}
+      tabs={tabs}
+      defaultTab={defaultTab}
+    />
+  );
 }
 
 export default function EventEditorPage() {
@@ -96,26 +149,22 @@ export default function EventEditorPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-black/60">Loading event...</p>
-        </div>
+      <div className="flex min-h-[30vh] items-center justify-center">
+        <p className="text-muted">Loading event…</p>
       </div>
     );
   }
 
   if (error || !event) {
     return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-primary">{error || "Event not found"}</p>
-          <Link
-            href="/organizer/events"
-            className="mt-4 inline-block text-sm text-black/60 hover:text-black"
-          >
-            Back to Events
-          </Link>
-        </div>
+      <div className="flex min-h-[30vh] flex-col items-center justify-center gap-3 text-center">
+        <p className="text-primary">{error || "Event not found"}</p>
+        <Link
+          href="/organizer/events"
+          className="text-sm text-muted hover:text-foreground"
+        >
+          Back to events
+        </Link>
       </div>
     );
   }
@@ -145,24 +194,37 @@ export default function EventEditorPage() {
         />
       ),
     },
+    {
+      id: "sales",
+      label: "Sales",
+      content: <EventSalesTab eventId={event.id} eventTitle={event.title} />,
+    },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Edit Event</h1>
-          <p className="text-lg text-black/60">{event.title}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">
+            Editing
+          </p>
+          <p className="text-lg font-semibold text-foreground">{event.title}</p>
         </div>
         <Link
           href="/organizer/events"
-          className="text-sm text-black/60 hover:text-black transition-colors"
+          className="shrink-0 text-sm font-medium text-primary hover:underline"
         >
-          ← Back to Events
+          ← Back to events
         </Link>
       </div>
 
-      <Tabs tabs={tabs} defaultTab="details" />
+      <Suspense
+        fallback={
+          <div className="min-h-[12rem] rounded-[var(--radius-panel)] border border-border bg-surface/40" />
+        }
+      >
+        <EventEditorTabsSection event={event} tabs={tabs} />
+      </Suspense>
     </div>
   );
 }

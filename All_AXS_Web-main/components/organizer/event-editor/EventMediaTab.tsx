@@ -161,7 +161,7 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
         // Update event with new banner URL (direct upload auto-commits)
         onEventUpdate(uploadResponse.data.event);
         setPreviewUrl(uploadResponse.data.finalUrl);
-        setSuccess("Banner uploaded successfully");
+        setSuccess("Poster uploaded successfully");
         setTimeout(() => setSuccess(null), 3000);
       } else {
         // For presigned URLs (e.g., Spaces), we would need to implement the upload flow
@@ -239,17 +239,23 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
       )}
 
       {success && (
-        <div className="bg-green-100 border border-green-300 text-green-800 rounded-lg p-3 text-sm">
+        <div className="rounded-lg border border-emerald-600/35 bg-emerald-500/10 p-3 text-sm text-emerald-100">
           {success}
         </div>
       )}
 
-      <div className="bg-black/5 rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">Event Banner</h3>
+      <div className="rounded-lg border border-border bg-surface/60 p-6">
+        <h3 className="mb-4 text-lg font-semibold text-foreground">
+          Poster / banner
+        </h3>
+        <p className="mb-4 text-sm text-muted">
+          This image appears on your public listing, checkout, and organizer list.
+          Use a wide image (about 2:1) or a tall poster — it will be cropped to fit.
+        </p>
 
         {previewUrl ? (
           <div className="space-y-4">
-            <div className="relative w-full h-64 bg-black/5 rounded-lg overflow-hidden">
+            <div className="relative h-64 w-full overflow-hidden rounded-lg bg-wash">
               <Image
                 src={getBannerUrl(previewUrl) || ""}
                 alt="Event banner preview"
@@ -269,7 +275,7 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                 >
-                  {uploading ? "Uploading..." : "Replace Banner"}
+                  {uploading ? "Uploading..." : "Replace poster"}
                 </Button>
                 <Button
                   type="button"
@@ -284,12 +290,14 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="relative w-full h-64 bg-black/5 rounded-lg border-2 border-dashed border-black/20 flex items-center justify-center">
-              <div className="text-center">
-                <p className="text-black/60 mb-2">No banner uploaded</p>
+            <div className="relative flex h-64 w-full items-center justify-center rounded-lg border-2 border-dashed border-border bg-wash">
+              <div className="text-center px-4">
+                <p className="mb-2 text-sm font-medium text-foreground">
+                  No poster yet
+                </p>
                 {isEditable && (
-                  <p className="text-sm text-black/40">
-                    Upload an image to set as the event banner
+                  <p className="text-sm text-muted">
+                    JPEG, PNG, or WebP — up to 10MB
                   </p>
                 )}
               </div>
@@ -300,7 +308,7 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
               >
-                {uploading ? "Uploading..." : "Upload Banner"}
+                {uploading ? "Uploading..." : "Upload poster"}
               </Button>
             )}
           </div>
@@ -317,18 +325,18 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
       </div>
 
       {!isEditable && (
-        <p className="text-sm text-black/60">
-          Banner cannot be edited in the current event status. Only events in
-          DRAFT or PENDING_REVIEW status can have their banners updated.
+        <p className="text-sm text-muted">
+          Posters cannot be edited in the current event status. Only events in
+          DRAFT or PENDING_REVIEW can be updated.
         </p>
       )}
 
-      <div className="bg-black/5 rounded-lg p-4">
-        <h4 className="font-semibold mb-2">Upload Guidelines</h4>
-        <ul className="text-sm text-black/60 space-y-1 list-disc list-inside">
+      <div className="rounded-lg border border-border bg-surface/40 p-4">
+        <h4 className="mb-2 font-semibold text-foreground">Guidelines</h4>
+        <ul className="list-inside list-disc space-y-1 text-sm text-muted">
           <li>Supported formats: JPEG, PNG, WebP</li>
           <li>Maximum file size: 10MB</li>
-          <li>Recommended dimensions: 1200x600 pixels</li>
+          <li>Recommended: wide hero ~1200×600, or a tall poster (min. 800px on the short edge)</li>
         </ul>
       </div>
     </div>

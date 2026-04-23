@@ -7,11 +7,11 @@ interface AuthCardProps {
 export function AuthCard({ title, subtitle, children }: AuthCardProps) {
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="bg-white border border-black/10 rounded-lg shadow-sm p-8 space-y-6">
+      <div className="space-y-5 rounded-lg border border-border bg-surface p-6 shadow-[0_12px_40px_-24px_rgba(0,0,0,0.45)] sm:p-7 sm:space-y-6">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-black">{title}</h1>
+          <h1 className="text-3xl font-bold text-foreground">{title}</h1>
           {subtitle && (
-            <p className="text-sm text-black/60">{subtitle}</p>
+            <p className="text-sm text-muted">{subtitle}</p>
           )}
         </div>
         {children}

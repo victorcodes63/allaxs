@@ -9,6 +9,7 @@ import { fetchPublicEvents } from "@/lib/utils/api-server";
 import { PublicEventCard } from "@/components/events/PublicEventCard";
 import { EventsSearchSubmitButton } from "@/components/events/EventsSearchSubmitButton";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
+import { buildEventsCatalogQueryString } from "@/lib/events/build-events-catalog-query";
 
 export const revalidate = 60;
 
@@ -75,104 +76,160 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
 
   const quickFilterLinks = buildQuickFilterLinks();
 
+  const catalogQueryBase = {
+    q: params.q,
+    type: params.type,
+    city: params.city,
+    dateFrom: params.dateFrom,
+    dateTo: params.dateTo,
+    size: params.size,
+  };
+
+  const hasActiveFilters = Boolean(
+    params.q?.trim() ||
+      params.type ||
+      params.city ||
+      params.dateFrom ||
+      params.dateTo
+  );
+
   return (
-    <div className="space-y-12 pb-8">
-      <div className="max-w-2xl space-y-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Catalogue</p>
-        <h1 className="font-display text-4xl md:text-5xl tracking-tight text-foreground">
-          Find your next live moment
-        </h1>
-        <p className="text-lg text-muted leading-relaxed">
-          Search by name or scroll the grid. Every card shows date, venue, and the lowest tier—so you
-          know where you stand before you tap through.
-        </p>
+    <div className="axs-content-inner pb-16 md:pb-24">
+      {/* One marketing shell: headline + filters + search share the same surface */}
+      <div className="relative overflow-hidden rounded-[var(--radius-panel)] border border-white/[0.09] bg-surface/35 ring-1 ring-white/[0.05]">
+        <div
+          className="pointer-events-none absolute inset-0 axs-hero-brand-glow opacity-[0.38]"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/[0.07] via-transparent to-transparent"
+          aria-hidden
+        />
+
+        <div className="relative z-10">
+          <div className="grid gap-8 p-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-end md:gap-12 md:p-9 lg:p-11">
+            <header className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Events</p>
+              <h1 className="mt-2 font-display text-[clamp(1.65rem,4vw+0.4rem,2.65rem)] font-semibold leading-[1.08] tracking-tight text-foreground md:mt-2.5 md:leading-[1.06]">
+                <span className="block">Browse the full catalogue</span>
+                <span className="axs-text-brand-gradient mt-1.5 block text-[clamp(1.85rem,5vw+0.2rem,3rem)] md:mt-2">
+                  All AXS
+                </span>
+              </h1>
+              <p className="mt-4 max-w-2xl text-pretty text-base leading-relaxed text-muted md:text-[17px]">
+                Refine with chips or search—each card shows format, date, venue, and the lowest tier.
+              </p>
+            </header>
+            {total > 0 ? (
+              <div className="flex flex-col items-start gap-0.5 rounded-[var(--radius-card)] border border-white/[0.08] bg-black/25 px-5 py-4 text-left md:items-end md:text-right">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted">
+                  Showing
+                </span>
+                <p className="font-display text-3xl font-semibold tabular-nums tracking-tight text-foreground sm:text-4xl">
+                  {events.length}
+                  <span className="text-lg font-medium text-muted sm:text-xl"> / {total}</span>
+                </p>
+                <span className="text-xs text-muted">on this page</span>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="border-t border-white/[0.08] px-6 py-6 md:px-9 md:py-7 lg:px-11">
+            <HomeQuickBrowseChips
+              quickFilterLinks={quickFilterLinks}
+              genreLinks={HOME_GENRE_LINKS}
+              eyebrow="Refine"
+              sectionClassName="mb-0"
+              variant="catalogue"
+            />
+          </div>
+
+          <div className="border-t border-white/[0.08] px-6 pb-7 pt-2 md:px-9 md:pb-8 lg:px-11">
+            <form
+              method="GET"
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3"
+              role="search"
+            >
+              <input type="hidden" name="page" value="1" />
+              <label className="sr-only" htmlFor="events-catalog-search">
+                Search events
+              </label>
+              <input
+                id="events-catalog-search"
+                type="text"
+                name="q"
+                placeholder="Artist, city, venue, keyword…"
+                defaultValue={params.q || ""}
+                className="min-h-12 w-full flex-1 rounded-[var(--radius-button)] border border-white/[0.1] bg-black/30 px-4 py-3 text-sm text-foreground shadow-inner shadow-black/20 placeholder:text-muted/80 focus:border-primary/45 focus:outline-none focus:ring-2 focus:ring-primary/20 sm:min-h-11 sm:px-5"
+                aria-label="Search events"
+              />
+              <EventsSearchSubmitButton />
+            </form>
+          </div>
+        </div>
       </div>
 
-      <HomeQuickBrowseChips
-        quickFilterLinks={quickFilterLinks}
-        genreLinks={HOME_GENRE_LINKS}
-      />
-
-      <form
-        method="GET"
-        className="flex flex-col sm:flex-row gap-3 max-w-xl"
-        role="search"
-      >
-        <input type="hidden" name="page" value="1" />
-        <input
-          type="text"
-          name="q"
-          placeholder="Artist, city, venue, keyword…"
-          defaultValue={params.q || ""}
-          className="flex-1 rounded-[var(--radius-button)] border border-border bg-surface px-5 py-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/30"
-          aria-label="Search events"
-        />
-        <EventsSearchSubmitButton />
-      </form>
-
       {events.length === 0 ? (
-        <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-20 text-center">
-          <p className="text-lg text-muted mb-2">
+        <div className="mt-10 rounded-[var(--radius-card)] border border-dashed border-white/[0.12] bg-surface/30 px-8 py-16 text-center ring-1 ring-white/[0.04] md:mt-12 md:py-20">
+          <p className="mb-2 text-lg text-muted">
             {params.q ? `Nothing matched “${params.q}” yet.` : "No published events right now."}
           </p>
           {params.q ? (
-            <Link href="/events" className="text-primary font-semibold hover:underline">
+            <Link href="/events" className="font-semibold text-primary hover:underline">
               Clear search
             </Link>
           ) : null}
         </div>
       ) : (
-        <>
-          <p className="text-sm text-muted">
-            Showing{" "}
-            <span className="font-medium text-foreground">
-              {events.length} of {total}
-            </span>{" "}
-            events
-          </p>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="mt-9 md:mt-11">
+          <div className="mb-6 flex flex-col gap-3 sm:mb-7 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted">
+              <span className="font-medium text-foreground">{total}</span>{" "}
+              {total === 1 ? "event" : "events"}
+              {hasActiveFilters ? " match your filters" : " in the catalogue"}
+              {totalPages > 1 ? (
+                <>
+                  {" "}
+                  · page{" "}
+                  <span className="font-medium text-foreground">
+                    {currentPage} of {totalPages}
+                  </span>
+                </>
+              ) : null}
+            </p>
+            {hasActiveFilters ? (
+              <Link
+                href="/events"
+                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Clear filters
+              </Link>
+            ) : null}
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 lg:gap-7">
             {events.map((event) => (
               <PublicEventCard key={event.id} event={event} />
             ))}
           </div>
 
           {totalPages > 1 && (
-            <nav className="flex items-center justify-center gap-3 pt-6" aria-label="Pagination">
+            <nav
+              className="mt-10 flex flex-wrap items-center justify-center gap-3 border-t border-white/[0.06] pt-9 md:mt-12 md:pt-10"
+              aria-label="Pagination"
+            >
               {currentPage > 1 && (
                 <ArrowCtaLink
-                  href={`/events?${(() => {
-                    const qs = new URLSearchParams();
-                    if (params.q) qs.set("q", params.q);
-                    if (params.type) qs.set("type", params.type);
-                    if (params.city) qs.set("city", params.city);
-                    if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
-                    if (params.dateTo) qs.set("dateTo", params.dateTo);
-                    if (params.size) qs.set("size", params.size);
-                    qs.set("page", String(currentPage - 1));
-                    return qs.toString();
-                  })()}`}
+                  href={`/events?${buildEventsCatalogQueryString(catalogQueryBase, currentPage - 1)}`}
                   variant="outline"
                   size="compact"
                 >
                   Previous
                 </ArrowCtaLink>
               )}
-              <span className="text-sm text-muted px-2">
-                Page {currentPage} / {totalPages}
-              </span>
               {currentPage < totalPages && (
                 <ArrowCtaLink
-                  href={`/events?${(() => {
-                    const qs = new URLSearchParams();
-                    if (params.q) qs.set("q", params.q);
-                    if (params.type) qs.set("type", params.type);
-                    if (params.city) qs.set("city", params.city);
-                    if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
-                    if (params.dateTo) qs.set("dateTo", params.dateTo);
-                    if (params.size) qs.set("size", params.size);
-                    qs.set("page", String(currentPage + 1));
-                    return qs.toString();
-                  })()}`}
+                  href={`/events?${buildEventsCatalogQueryString(catalogQueryBase, currentPage + 1)}`}
                   variant="outline"
                   size="compact"
                 >
@@ -181,7 +238,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
               )}
             </nav>
           )}
-        </>
+        </div>
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
 
@@ -49,7 +50,7 @@ function VerifyEmailContent() {
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
+    <AuthPageShell>
       <AuthCard
         title="Email Verification"
         subtitle={
@@ -97,19 +98,19 @@ function VerifyEmailContent() {
           )}
         </div>
       </AuthCard>
-    </div>
+    </AuthPageShell>
   );
 }
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-black/60">Loading...</p>
-        </div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <AuthPageShell>
+          <p className="text-lg text-muted">Loading…</p>
+        </AuthPageShell>
+      }
+    >
       <VerifyEmailContent />
     </Suspense>
   );

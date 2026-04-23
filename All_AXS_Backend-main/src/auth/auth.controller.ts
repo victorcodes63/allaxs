@@ -1,14 +1,14 @@
 import {
-  Controller,
-  Post,
-  Get,
   Body,
-  UseGuards,
+  Controller,
+  Get,
   HttpCode,
   HttpStatus,
+  Logger,
+  Post,
   Req,
   UnauthorizedException,
-  Logger,
+  UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
@@ -90,6 +90,17 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   getMe(@GetUser() user: CurrentUser) {
     return { user };
+  }
+
+  @Post('promote-organizer-demo')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async promoteOrganizerDemo(
+    @GetUser() user: CurrentUser,
+    @Req() req: Request,
+  ) {
+    const metadata = this.extractMetadata(req);
+    return this.authService.promoteOrganizerDemo(user.id, metadata);
   }
 
   @Public()

@@ -13,24 +13,7 @@ import {
 import { HomeParallaxBand } from "@/components/home/HomeParallaxBand";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { shouldUnoptimizeEventImage } from "@/lib/utils/image";
-
-const US = (id: string) =>
-  `https://images.unsplash.com/${id}?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=82`;
-
-/**
- * African live-culture context — matches home marketing picks where possible
- * (Johannesburg crowd, Lagos venue/club, market payments, mobile-first buyers).
- */
-const IMG = {
-  hero: US("photo-1709290823099-6ef925ca3ded"),
-  tiers: US("photo-1678693362793-e2fffac536d0"),
-  media: US("photo-1760092189954-5b2f6eb3ca88"),
-  gate: US("photo-1708367285460-4789deb6f8a2"),
-  payouts: US("photo-1569689725958-af8bb9f5486e"),
-  team: US("photo-1634954238233-3d1445638a0e"),
-  parallax: US("photo-1767656318315-83e47181704e"),
-  checklist: US("photo-1728905992073-b7a47319db20"),
-} as const;
+import { marketingImages } from "@/lib/marketing-images";
 
 /** Vertical rhythm between major page sections */
 const SECTION = "mb-16 md:mb-24";
@@ -60,29 +43,40 @@ function OrganizersParallaxHero() {
   return (
     <section
       ref={ref}
-      className={`relative left-1/2 ${SECTION} w-screen max-w-[100vw] -translate-x-1/2 overflow-hidden bg-foreground`}
+      className={`relative left-1/2 ${SECTION} w-screen max-w-[100vw] -translate-x-1/2 overflow-hidden -mt-[calc(2rem+4.25rem)] md:-mt-[calc(2.5rem+4.25rem)]`}
     >
       <div className="relative min-h-[min(88vh,720px)] w-full">
         <motion.div className="absolute inset-0 h-[115%] w-full -top-[8%]" style={{ y }}>
           <Image
-            src={IMG.hero}
-            alt="Concert crowd under lights in Johannesburg"
+            src={marketingImages.organizerHero}
+            alt="Professionals collaborating in a bright modern office before a flagship event"
             fill
             priority
-            unoptimized={shouldUnoptimizeEventImage(IMG.hero)}
-            className="object-cover object-center"
+            unoptimized={shouldUnoptimizeEventImage(marketingImages.organizerHero)}
+            className="object-cover object-center sm:object-[center_38%]"
             sizes="100vw"
+          />
+          <div className="absolute inset-0 bg-zinc-950/40" aria-hidden />
+          <div className="axs-hero-scrim-animated absolute inset-0 opacity-95" aria-hidden />
+          <div
+            className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(24,24,27,0.42)_0%,rgba(9,9,11,0.55)_32%,rgba(9,9,11,0.78)_58%,rgba(3,3,4,0.94)_100%)]"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent to-black/40"
+            aria-hidden
           />
         </motion.div>
         <div
-          className="absolute inset-0 bg-linear-to-t from-background via-background/75 to-background/20"
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-20 bg-linear-to-b from-transparent to-background md:h-24"
           aria-hidden
         />
         <motion.div
-          className="relative z-10 flex min-h-[min(88vh,720px)] flex-col justify-end pb-14 pt-28 md:pb-20 md:pt-32"
+          className="relative z-10 flex min-h-[min(88vh,720px)] flex-col justify-end pb-14 pt-24 md:pb-20 md:pt-28"
           style={{ opacity }}
         >
           <div className="axs-page-shell w-full">
+            <div className="axs-content-inner">
             <motion.div
               initial="hidden"
               animate="show"
@@ -100,17 +94,17 @@ function OrganizersParallaxHero() {
               </motion.p>
               <motion.h1
                 variants={fadeUp(reduce, 0.05)}
-                className="font-display text-4xl leading-[1.08] tracking-tight text-foreground sm:text-5xl md:text-[3.15rem]"
+                className="font-display text-4xl leading-[1.08] tracking-tight text-white sm:text-5xl md:text-[3.15rem]"
               >
-                Everything you need to publish a show and sell tickets on All AXS
+                Everything you need to publish a flagship event and sell tickets on All AXS
               </motion.h1>
               <motion.p
                 variants={fadeUp(reduce, 0.1)}
-                className="text-lg leading-relaxed text-muted md:text-xl max-w-2xl"
+                className="max-w-2xl text-lg leading-relaxed text-white/70 md:text-xl"
               >
                 One guided flow from first login to live listing: profile, event details, artwork,
-                ticket tiers, review, and gate-ready QR passes for your buyers—built for teams who
-                care about the door as much as the poster.
+                ticket tiers, review, and check-in–ready QR passes for your delegates—built for teams who
+                care about registration as much as the keynote story.
               </motion.p>
               <motion.div
                 variants={fadeUp(reduce, 0.15)}
@@ -122,14 +116,9 @@ function OrganizersParallaxHero() {
                 <ArrowCtaLink href="/login" variant="outline" className="justify-center">
                   Sign in
                 </ArrowCtaLink>
-                <a
-                  href="#journey"
-                  className="inline-flex items-center justify-center rounded-[var(--radius-button)] px-6 py-3.5 text-sm font-semibold text-foreground/80 underline-offset-4 hover:text-primary hover:underline"
-                >
-                  How setup works
-                </a>
               </motion.div>
             </motion.div>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -149,7 +138,7 @@ function ValueProps({ reduce }: { reduce: boolean }) {
     },
     {
       title: "Media & brand",
-      body: "Upload a banner and assets that match your drop—listings stay crisp on every screen size.",
+      body: "Upload a banner and assets that match your event—listings stay crisp on every screen size.",
     },
     {
       title: "Review before go-live",
@@ -160,6 +149,7 @@ function ValueProps({ reduce }: { reduce: boolean }) {
   return (
     <section className={SECTION} aria-labelledby="value-heading">
       <div className="axs-page-shell">
+        <div className="axs-content-inner">
         <motion.div
           initial="hidden"
           whileInView="show"
@@ -181,11 +171,11 @@ function ValueProps({ reduce }: { reduce: boolean }) {
             variants={fadeUp(reduce, 0.05)}
             className="font-display mt-3 text-3xl font-semibold tracking-tight text-foreground md:text-4xl"
           >
-            Built for real shows—not generic “events software”
+            Built for summits and forums—not generic “events software”
           </motion.h2>
           <motion.p variants={fadeUp(reduce, 0.1)} className="mt-4 text-muted text-lg leading-relaxed">
-            From independent promoters to venues and festivals, you get a focused toolkit for live
-            experiences and transparent buyer journeys.
+            From associations to venues and enterprise teams across Africa and beyond, you get a focused
+            toolkit for professional events and transparent delegate journeys.
           </motion.p>
         </motion.div>
         <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -203,6 +193,7 @@ function ValueProps({ reduce }: { reduce: boolean }) {
             </motion.li>
           ))}
         </ul>
+        </div>
       </div>
     </section>
   );
@@ -217,7 +208,7 @@ const JOURNEY_STEPS = [
   {
     n: "02",
     title: "Organizer profile",
-    body: "Tell us who’s behind the show—public name, contact, and payout instructions for settlements.",
+    body: "Tell us who’s behind the event—public name, contact, and payout instructions for settlements.",
   },
   {
     n: "03",
@@ -237,7 +228,7 @@ const JOURNEY_STEPS = [
   {
     n: "06",
     title: "Submit & go live",
-    body: "Submit for review; once approved, your public page and checkout go live. Share the link and scan QR at the door.",
+    body: "Submit for review; once approved, your public page and checkout go live. Share the link and scan QR at check-in.",
   },
 ] as const;
 
@@ -245,6 +236,7 @@ function JourneySection({ reduce }: { reduce: boolean }) {
   return (
     <section id="journey" className={`${SECTION} scroll-mt-28`}>
       <div className="axs-page-shell">
+        <div className="axs-content-inner">
         <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:gap-16 items-start">
           <motion.div
             initial="hidden"
@@ -269,12 +261,12 @@ function JourneySection({ reduce }: { reduce: boolean }) {
             <motion.div variants={fadeUp(reduce, 0.14)} className="mt-8 hidden lg:block">
               <div className="relative aspect-[4/5] max-h-[420px] overflow-hidden rounded-[var(--radius-panel)] border border-border shadow-sm">
                 <Image
-                  src={IMG.team}
-                  alt="Crowd gathered outside a Lagos venue"
+                  src={marketingImages.organizerTeam}
+                  alt="Diverse colleagues in a planning session with laptops"
                   fill
                   className="object-cover"
                   sizes="(min-width: 1024px) 40vw, 100vw"
-                  unoptimized={shouldUnoptimizeEventImage(IMG.team)}
+                  unoptimized={shouldUnoptimizeEventImage(marketingImages.organizerTeam)}
                 />
               </div>
             </motion.div>
@@ -301,6 +293,7 @@ function JourneySection({ reduce }: { reduce: boolean }) {
             ))}
           </ol>
         </div>
+        </div>
       </div>
     </section>
   );
@@ -311,32 +304,33 @@ function FeatureMosaic({ reduce }: { reduce: boolean }) {
     {
       title: "Checkout buyers trust",
       body: "A focused purchase flow with tier selection and clear totals—fewer surprises at payment.",
-      src: IMG.tiers,
-      alt: "Hands paying with cash at a market stall",
+      src: marketingImages.organizerTiers,
+      alt: "Small team gathered around a laptop reviewing work together",
     },
     {
       title: "Banners that travel",
       body: "Hero imagery scales from phones to desktops; your art stays legible in catalog and on the event page.",
-      src: IMG.media,
-      alt: "Fans at an outdoor live show",
+      src: marketingImages.organizerMedia,
+      alt: "Engineers or producers collaborating at a long desk with laptops",
     },
     {
       title: "QR-ready passes",
-      body: "Buyers get passes they can show at the door—optimized for quick scanning on show night.",
-      src: IMG.gate,
-      alt: "Woman on a phone call with mobile",
+      body: "Delegates get passes they can present at check-in—optimized for quick scanning on opening day.",
+      src: marketingImages.organizerGate,
+      alt: "Workshop or breakout session with a facilitator and participants",
     },
     {
       title: "Organizer-ready payouts",
       body: "Capture payout instructions in onboarding so finance has what they need for settlements.",
-      src: IMG.payouts,
-      alt: "Person holding a smartphone outdoors",
+      src: marketingImages.organizerPayouts,
+      alt: "Organizer focused on a laptop during a planning session with colleagues nearby",
     },
   ];
 
   return (
     <section className={SECTION} aria-labelledby="features-heading">
       <div className="axs-page-shell">
+        <div className="axs-content-inner">
         <motion.div
           initial="hidden"
           whileInView="show"
@@ -382,6 +376,7 @@ function FeatureMosaic({ reduce }: { reduce: boolean }) {
             </motion.article>
           ))}
         </div>
+        </div>
       </div>
     </section>
   );
@@ -389,18 +384,19 @@ function FeatureMosaic({ reduce }: { reduce: boolean }) {
 
 const CHECKLIST = [
   "A verified email and secure password for your organizer login.",
-  "Public-facing organizer name and short description fans will recognize.",
+  "Public-facing organizer name and short description delegates will recognize.",
   "Payout instructions (e.g. bank details) so we can route settlements correctly.",
   "High-resolution banner art (wide hero) plus any extra shots for the listing.",
   "Finalized venue, date, and time—buyers rely on these for travel planning.",
   "Ticket tier names, prices, and quantities aligned with your room capacity.",
-  "Refund and door policies you’re comfortable publishing on the event page.",
+  "Refund and entry policies you’re comfortable publishing on the event page.",
 ] as const;
 
 function ChecklistSection({ reduce }: { reduce: boolean }) {
   return (
     <section className={SECTION} aria-labelledby="checklist-heading">
       <div className="axs-page-shell">
+        <div className="axs-content-inner">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-14 items-center">
           <motion.div
             initial="hidden"
@@ -446,14 +442,15 @@ function ChecklistSection({ reduce }: { reduce: boolean }) {
             className="relative aspect-[4/5] max-h-[480px] overflow-hidden rounded-[var(--radius-panel)] border border-border shadow-md lg:max-h-none"
           >
             <Image
-              src={IMG.checklist}
-              alt="Organizer working on a laptop"
+              src={marketingImages.organizerChecklist}
+              alt="Professional presenter speaking to colleagues in a bright meeting room"
               fill
               className="object-cover"
               sizes="(min-width: 1024px) 38vw, 100vw"
-              unoptimized={shouldUnoptimizeEventImage(IMG.checklist)}
+              unoptimized={shouldUnoptimizeEventImage(marketingImages.organizerChecklist)}
             />
           </motion.div>
+        </div>
         </div>
       </div>
     </section>
@@ -483,20 +480,29 @@ const FAQ_ITEMS = [
   },
 ] as const;
 
+const FAQ_SIDE_QUOTE = {
+  text: "The clearest listings—complete media, honest tiers, and copy you would publish tomorrow—move fastest through review and convert best on the door.",
+  attribution: "All AXS · organizer success",
+} as const;
+
 function FaqSection({ reduce }: { reduce: boolean }) {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
     <section className={SECTION} aria-labelledby="faq-heading">
-      <div className="axs-page-shell max-w-3xl">
+      <div className="axs-page-shell">
+        <div className="axs-content-inner">
         <motion.div
           initial="hidden"
           whileInView="show"
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-40px" }}
           variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
-          className="mb-10"
+          className="mb-10 max-w-3xl md:mb-14"
         >
-          <motion.p variants={fadeUp(reduce)} className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+          <motion.p
+            variants={fadeUp(reduce)}
+            className="text-xs font-semibold uppercase tracking-[0.22em] text-primary"
+          >
             FAQ
           </motion.p>
           <motion.h2
@@ -506,12 +512,38 @@ function FaqSection({ reduce }: { reduce: boolean }) {
           >
             Organizer questions
           </motion.h2>
+          <motion.aside
+            variants={fadeUp(reduce, 0.1)}
+            aria-label="Why details matter"
+            className="mt-8 md:mt-10"
+          >
+            <blockquote className="relative border-l-2 border-primary/40 pl-6 md:pl-8">
+              <p className="font-display text-pretty text-2xl font-medium leading-snug tracking-tight text-foreground md:text-[1.65rem] md:leading-[1.2] lg:text-3xl">
+                {FAQ_SIDE_QUOTE.text}
+              </p>
+              <footer className="mt-6 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted md:text-xs">
+                {FAQ_SIDE_QUOTE.attribution}
+              </footer>
+            </blockquote>
+          </motion.aside>
         </motion.div>
-        <ul className="space-y-3">
+
+        <motion.ul
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-40px" }}
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
+          className="w-full space-y-3"
+          aria-label="Frequently asked questions"
+        >
           {FAQ_ITEMS.map((item, i) => {
             const isOpen = open === i;
             return (
-              <li key={item.q} className="rounded-[var(--radius-card)] border border-border bg-surface">
+              <motion.li
+                key={item.q}
+                variants={fadeUp(reduce)}
+                className="w-full rounded-[var(--radius-card)] border border-border bg-surface"
+              >
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? null : i)}
@@ -519,7 +551,7 @@ function FaqSection({ reduce }: { reduce: boolean }) {
                   aria-expanded={isOpen}
                 >
                   {item.q}
-                  <span className="text-primary text-xl leading-none" aria-hidden>
+                  <span className="text-xl leading-none text-primary" aria-hidden>
                     {isOpen ? "−" : "+"}
                   </span>
                 </button>
@@ -532,16 +564,17 @@ function FaqSection({ reduce }: { reduce: boolean }) {
                       transition={{ duration: 0.32, ease }}
                       className="overflow-hidden"
                     >
-                      <p className="px-5 pb-5 pt-0 text-muted leading-relaxed md:px-6 md:pb-6">
+                      <p className="px-5 pb-5 pt-0 leading-relaxed text-muted md:px-6 md:pb-6">
                         {item.a}
                       </p>
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </li>
+              </motion.li>
             );
           })}
-        </ul>
+        </motion.ul>
+        </div>
       </div>
     </section>
   );
@@ -550,7 +583,7 @@ function FaqSection({ reduce }: { reduce: boolean }) {
 function FinalCta({ reduce }: { reduce: boolean }) {
   return (
     <section className="mb-6 md:mb-10">
-      <div className="axs-page-shell">
+      <div className="axs-page-shell axs-content-inner">
         <motion.div
           initial="hidden"
           whileInView="show"
@@ -614,8 +647,9 @@ export function OrganizersMarketingPage() {
       >
         <HomeParallaxBand
           focal="left"
-          imageSrc={IMG.parallax}
-          alt="DJ with lighting at a Lagos nightclub"
+          overlayTone="dark"
+          imageSrc={marketingImages.organizerParallax}
+          alt="On-site event operations and check-in"
         >
           <motion.div
             initial={reduce ? false : { opacity: 0, x: -24 }}
@@ -624,10 +658,10 @@ export function OrganizersMarketingPage() {
             transition={{ duration: 0.65, ease }}
             className="max-w-xl space-y-4"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">At the venue</p>
-            <p className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-foreground [text-shadow:0_2px_24px_rgba(255,255,255,0.88)]">
-              Your listing, checkout, and door experience stay aligned—so the energy on site matches
-              the story you sold online.
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">On site</p>
+            <p className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-white [text-shadow:0_2px_28px_rgba(0,0,0,0.45)]">
+              Your listing, checkout, and check-in experience stay aligned—so what delegates experience
+              on the ground matches the event you sold online.
             </p>
           </motion.div>
         </HomeParallaxBand>
@@ -642,6 +676,7 @@ export function OrganizersMarketingPage() {
         variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
       >
         <div className="axs-page-shell">
+          <div className="axs-content-inner">
           <motion.div
             variants={fadeUp(reduce)}
             className="rounded-[var(--radius-panel)] border border-border bg-wash/80 px-6 py-8 md:px-10 md:py-10"
@@ -657,6 +692,7 @@ export function OrganizersMarketingPage() {
               comes back with notes—use the checklist above to sail through.
             </p>
           </motion.div>
+          </div>
         </div>
       </motion.section>
       <FaqSection reduce={reduce} />

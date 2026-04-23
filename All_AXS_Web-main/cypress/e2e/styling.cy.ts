@@ -10,18 +10,18 @@ describe('Styling and Theming', () => {
 
   it('should display the brand logo in the header', () => {
     cy.get('header').within(() => {
-      cy.get('img[src*="logo-header"]').should('be.visible');
+      cy.get('img[src*="logo-on-dark"]').should('be.visible');
     });
   });
 
   it('should apply primary color to key CTAs', () => {
     cy.get('.bg-primary').should('exist');
-    cy.contains('a', 'Explore events').should('have.class', 'bg-primary');
+    cy.contains('a', 'See all').should('be.visible');
   });
 
   it('should have hover states on navigation links', () => {
-    cy.get('nav a').each(($link) => {
-      cy.wrap($link).should('have.class', 'hover:text-primary');
+    cy.get('header nav[aria-label="Primary"] a').each(($link) => {
+      cy.wrap($link).invoke('attr', 'class').should('match', /hover:/);
     });
   });
 
@@ -35,7 +35,7 @@ describe('Styling and Theming', () => {
 
   it('should have border styling on header bar and footer', () => {
     cy.get('header').find('.border-b').should('exist');
-    cy.get('footer').should('have.class', 'border-t');
+    cy.get('footer').find('.border-t').should('exist');
   });
 
   it('should have rounded corners on buttons', () => {

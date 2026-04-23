@@ -25,6 +25,23 @@ export function ArrowSlot({ className = "" }: { className?: string }) {
   );
 }
 
+/** Left-pointing arrow slot for back links (pairs with `.arrow-cta-back` in `globals.css`). */
+export function ArrowBackSlot({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`relative mr-0.5 inline-flex size-4 shrink-0 items-center justify-center overflow-hidden ${className}`}
+      aria-hidden
+    >
+      <span className="arrow-cta-out absolute inset-0 flex items-center justify-center">
+        <CtaArrow className="size-3.5 rotate-180" />
+      </span>
+      <span className="arrow-cta-in absolute inset-0 flex items-center justify-center">
+        <CtaArrow className="size-3.5 rotate-180" />
+      </span>
+    </span>
+  );
+}
+
 export type ArrowCtaVariant = "primary" | "secondary" | "outline" | "ghost";
 
 const variantClass: Record<ArrowCtaVariant, string> = {
@@ -83,6 +100,43 @@ export function ArrowCtaLink({
     >
       {children}
       <ArrowSlot />
+    </Link>
+  );
+}
+
+/** Ghost-style back link with the same arrow micro-interaction as `ArrowCtaLink`, reversed. */
+export function ArrowBackCtaLink({
+  href,
+  children,
+  size = "default",
+  className = "",
+  fullWidth = false,
+  "aria-label": ariaLabel,
+}: {
+  href: string;
+  children: React.ReactNode;
+  size?: ArrowCtaSize;
+  className?: string;
+  fullWidth?: boolean;
+  "aria-label"?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={ariaLabel}
+      className={[
+        axsCtaBaseClass,
+        "arrow-cta-back",
+        sizeClass(size),
+        variantClass.ghost,
+        fullWidth ? "w-full" : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <ArrowBackSlot />
+      {children}
     </Link>
   );
 }

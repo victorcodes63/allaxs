@@ -2,19 +2,33 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { registerSchema, type RegisterInput } from "@/lib/validation/auth";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
+import { AuthIntentHint } from "@/components/auth/AuthIntentHint";
+import { AuthSessionEntryGate } from "@/components/auth/AuthSessionEntryGate";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
+import {
+  buildAuthQuery,
+  fetchPostAuthSnapshot,
+  parseIntent,
+  resolvePostAuthRedirect,
+} from "@/lib/auth/post-auth-redirect";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const loginHref = `/login${buildAuthQuery({
+    next: searchParams.get("next"),
+    intent: parseIntent(searchParams.get("intent")),
+  })}`;
 
   const {
     register,
@@ -31,14 +45,21 @@ export default function RegisterPage() {
 
     try {
       const response = await axios.post("/api/auth/register", data);
-      
-      if (response.status === 200) {
-        // Auto-login after registration, redirect to dashboard
-        router.push("/dashboard");
+
+      if (response.status === 200 || response.status === 201) {
+        const snapshot = await fetchPostAuthSnapshot();
+        const path = resolvePostAuthRedirect({
+          nextParam: searchParams.get("next"),
+          intent: parseIntent(searchParams.get("intent")),
+          roles: snapshot.roles,
+          hasOrganizerProfile: snapshot.hasOrganizerProfile,
+        });
+        router.push(path);
       }
     } catch (err) {
       const message =
-        (err as { response?: { data?: { message?: string } } }).response?.data?.message || "An error occurred during registration";
+        (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+        "An error occurred during registration";
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -46,11 +67,12 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
+    <AuthPageShell>
       <AuthCard
         title="Create an Account"
-        subtitle="Sign up to get started"
+        subtitle="One account for buying tickets and hosting events"
       >
+        <AuthIntentHint searchParams={searchParams} basePath="/register" />
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {error && (
             <div className="bg-primary/10 border border-primary/30 text-primary rounded-lg p-3 text-sm">
@@ -91,14 +113,33 @@ export default function RegisterPage() {
         </form>
 
         <div className="text-center">
-          <p className="text-sm text-black/60">
+          <p className="text-sm text-muted">
             Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href={loginHref} className="text-primary hover:underline">
               Sign in
             </Link>
           </p>
         </div>
       </AuthCard>
-    </div>
+    </AuthPageShell>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <AuthPageShell>
+          <p className="text-lg text-muted">Loading…</p>
+        </AuthPageShell>
+      }
+    >
+      <AuthSessionEntryGate
+        title="Create an Account"
+        subtitle="One account for buying tickets and hosting events"
+      >
+        <RegisterForm />
+      </AuthSessionEntryGate>
+    </Suspense>
   );
 }

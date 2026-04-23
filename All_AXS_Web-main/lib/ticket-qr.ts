@@ -16,5 +16,7 @@ export function buildTicketQrPayload(ticket: StoredTicket): string {
     tier: ticket.tierName,
     attendeeEmail: ticket.attendeeEmail,
     issuedAt: ticket.issuedAt,
+    qrNonce: ticket.qrNonce,
+    qrSignature: ticket.qrSignature,
   });
 }

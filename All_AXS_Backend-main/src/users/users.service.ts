@@ -56,4 +56,14 @@ export class UsersService {
   async updatePassword(userId: string, passwordHash: string): Promise<void> {
     await this.userRepository.update({ id: userId }, { passwordHash });
   }
+
+  /** Adds ORGANIZER to the user's role array (idempotent). */
+  async addOrganizerRole(userId: string): Promise<User> {
+    const user = await this.findByIdOrFail(userId);
+    if (!user.roles.includes(Role.ORGANIZER)) {
+      user.roles = [...user.roles, Role.ORGANIZER];
+      return this.userRepository.save(user);
+    }
+    return user;
+  }
 }

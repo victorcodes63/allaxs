@@ -7,11 +7,34 @@
   --primary: #f07241;
   --primary-dark: #c02942;
   --accent-purple: #601848;
+  /* Logo-aligned blends (orange → red → purple) */
+  --axs-brand-orange: #f07241;
+  --axs-brand-red: #c02942;
+  --axs-brand-purple: #601848;
+  --axs-gradient-brand: linear-gradient(
+    118deg,
+    var(--axs-brand-orange) 0%,
+    color-mix(in srgb, var(--axs-brand-orange) 28%, var(--axs-brand-red) 72%) 34%,
+    var(--axs-brand-red) 52%,
+    color-mix(in srgb, var(--axs-brand-red) 32%, var(--axs-brand-purple) 68%) 76%,
+    var(--axs-brand-purple) 100%
+  );
+  /* Hero / headlines on dark: light wash into brand */
+  --axs-gradient-brand-text: linear-gradient(
+    102deg,
+    #ffffff 0%,
+    #ffe8dc 38%,
+    color-mix(in srgb, #ffffff 55%, var(--axs-brand-orange) 45%) 68%,
+    color-mix(in srgb, var(--axs-brand-orange) 35%, var(--axs-brand-red) 65%) 100%
+  );
   --muted: rgba(51, 51, 51, 0.65);
   --surface: #ffffff;
   --border: rgba(0, 0, 0, 0.1);
   --wash: rgba(0, 0, 0, 0.045);
-  --axs-page-gutter: 50px;
+  /** Horizontal inset for `.axs-page-shell` — scales down on narrow viewports. */
+  --axs-page-gutter: 1rem;
+  /** Primary content column (matches Tailwind `max-w-6xl`) — catalogue, marketing grids, detail pages */
+  --axs-content-max: 72rem;
   /* Softer corners than rounded-2xl / pill — apply consistently across cards & CTAs */
   --radius-button: 10px;
   /* Site-wide CTA / button rhythm — use on ArrowCta, SwapCtaLink (button), Button */
@@ -30,6 +53,80 @@
   --radius-panel: 14px;
   /* Marketing footer panel: white warmed slightly with brand orange */
   --footer-panel-bg: color-mix(in srgb, var(--primary) 5%, var(--background) 95%);
+  /* Legal strip: never tie to `--foreground` (flips light on `.axs-marketing-dark`) */
+  --footer-legal-bg: #333333;
+  --footer-legal-border: rgba(255, 255, 255, 0.1);
+}
+
+/**
+ * Dark marketing shell: charcoal + logo palette (orange / red / purple).
+ * Applied on `<html>` in `app/layout.tsx` so tokens are consistent site-wide.
+ */
+@media (min-width: 480px) {
+  :root {
+    --axs-page-gutter: 1.125rem;
+  }
+}
+
+@media (min-width: 640px) {
+  :root {
+    --axs-page-gutter: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --axs-page-gutter: 1.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --axs-page-gutter: 2.25rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --axs-page-gutter: 50px;
+  }
+}
+
+.axs-marketing-dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --muted: rgba(250, 250, 250, 0.52);
+  --surface: #121214;
+  --border: rgba(255, 255, 255, 0.1);
+  --wash: rgba(255, 255, 255, 0.06);
+  --footer-panel-bg: #0c0c0f;
+  --primary: #f07241;
+  --primary-dark: #c02942;
+  --accent-purple: #601848;
+  --btn-shadow-primary:
+    0 10px 36px -12px rgba(240, 114, 65, 0.42),
+    0 6px 20px -10px rgba(96, 24, 72, 0.38);
+  --btn-shadow-outline: 0 2px 14px -4px rgba(0, 0, 0, 0.45);
+  --footer-legal-bg: #050506;
+  --footer-legal-border: rgba(255, 255, 255, 0.08);
+}
+
+/** Feather page background into the footer panel (works on light + dark tokens). */
+.axs-footer-panel-blend::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 5.5rem;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    to bottom,
+    var(--background) 0%,
+    color-mix(in srgb, var(--background) 40%, var(--footer-panel-bg) 60%) 48%,
+    transparent 100%
+  );
 }
 
 @theme inline {
@@ -49,6 +146,7 @@
 
 html {
   overflow-x: clip;
+  min-height: 100%;
   font-family: var(--font-sans);
   font-weight: 400;
   font-feature-settings:
@@ -57,6 +155,7 @@ html {
 }
 
 body {
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
   font-family: inherit;
@@ -92,6 +191,69 @@ body {
       border-color 0.2s ease,
       box-shadow 0.2s ease;
   }
+
+  /** Solid fill + hover brighten — uses `--axs-gradient-brand` */
+  .axs-bg-brand-gradient {
+    background-image: var(--axs-gradient-brand);
+    background-size: 120% 120%;
+    background-position: 30% 50%;
+    transition:
+      filter 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .axs-bg-brand-gradient:hover {
+    filter: brightness(1.06);
+  }
+
+  .axs-text-brand-gradient {
+    background-image: var(--axs-gradient-brand-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /** Soft colour wash over photography (hero) */
+  .axs-hero-brand-glow {
+    background: linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--axs-brand-purple) 42%, transparent) 0%,
+      transparent 38%,
+      color-mix(in srgb, var(--axs-brand-orange) 18%, transparent) 100%
+    );
+  }
+
+  /**
+   * Home hero: dark wash that slowly shifts along the horizontal axis
+   * so more of the photo peeks through on alternating sides.
+   */
+  .axs-hero-scrim-animated {
+    background: linear-gradient(
+      105deg,
+      rgba(9, 9, 11, 0.08) 0%,
+      rgba(9, 9, 11, 0.42) 32%,
+      rgba(9, 9, 11, 0.78) 58%,
+      rgba(9, 9, 11, 0.94) 100%
+    );
+    background-size: 240% 100%;
+    animation: axs-hero-scrim-shift 18s ease-in-out infinite alternate;
+  }
+
+  @keyframes axs-hero-scrim-shift {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .axs-hero-scrim-animated {
+      animation: none;
+      background-position: 35% 50%;
+    }
+  }
 }
 
 /*
@@ -100,7 +262,31 @@ body {
 .axs-page-shell {
   box-sizing: border-box;
   width: 100%;
-  padding-inline: var(--axs-page-gutter);
+  max-width: 100%;
+  padding-left: max(var(--axs-page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--axs-page-gutter), env(safe-area-inset-right, 0px));
+}
+
+/**
+ * Centered column inside `axs-page-shell` (or any full-width parent). Keeps grids and
+ * catalogue layouts aligned to the same max width as `/events`.
+ */
+.axs-content-inner {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--axs-content-max);
+  margin-inline: auto;
+}
+
+/*
+ * Footer wordmark: `public/brand/logo-on-dark.png` — light-on-transparent artwork.
+ * On light `--footer-panel-bg`, invert to dark marks; on `.axs-marketing-dark` dark panel, show as-authored.
+ */
+.axs-footer-brand-logo {
+  filter: brightness(0);
+}
+.axs-marketing-dark .axs-footer-brand-logo {
+  filter: none;
 }
 
 /* Marketing footer: light panel + subtle film grain (reference: Effica-style contact band) */
@@ -128,6 +314,21 @@ body {
   transform: translateX(0);
 }
 
+/* Back CTA: mirrored motion (arrow exits left, duplicate enters from right) */
+.arrow-cta-back .arrow-cta-out {
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arrow-cta-back .arrow-cta-in {
+  transform: translateX(100%);
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.arrow-cta-back:hover .arrow-cta-out {
+  transform: translateX(-100%);
+}
+.arrow-cta-back:hover .arrow-cta-in {
+  transform: translateX(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .arrow-cta .arrow-cta-out,
   .arrow-cta .arrow-cta-in {
@@ -135,6 +336,14 @@ body {
     transform: none;
   }
   .arrow-cta .arrow-cta-in {
+    display: none;
+  }
+  .arrow-cta-back .arrow-cta-out,
+  .arrow-cta-back .arrow-cta-in {
+    transition: none;
+    transform: none;
+  }
+  .arrow-cta-back .arrow-cta-in {
     display: none;
   }
 }

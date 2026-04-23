@@ -94,15 +94,15 @@ export function Dialog({
     >
       <div
         ref={dialogRef}
-        className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col"
+        className="rounded-lg border border-border bg-surface shadow-lg max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-black/10">
-          <h2 className="text-2xl font-bold text-black">{title}</h2>
+        <div className="border-b border-border p-6">
+          <h2 className="text-2xl font-bold text-foreground">{title}</h2>
         </div>
         <div className="p-6 overflow-y-auto flex-1">{children}</div>
         {footer && (
-          <div className="p-6 border-t border-black/10 flex justify-end gap-3">
+          <div className="flex justify-end gap-3 border-t border-border p-6">
             {footer}
           </div>
         )}

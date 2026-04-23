@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { nativeDarkControlClass } from "@/components/ui/nativeDarkField";
 import Link from "next/link";
 
 export default function CreateEventPage() {
@@ -47,7 +48,7 @@ export default function CreateEventPage() {
       const response = await axios.post("/api/events", createData);
       
       // Redirect to editor on success
-      router.push(`/organizer/events/${response.data.id}/edit`);
+      router.push(`/organizer/events/${response.data.id}/edit?tab=media`);
     } catch (err) {
       const axiosError = err as {
         response?: { status?: number; data?: { message?: string | string[] } };
@@ -74,29 +75,32 @@ export default function CreateEventPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Create Event</h1>
-          <p className="text-lg text-black/60">
-            Fill in the details to create a new event
-          </p>
-        </div>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <p className="max-w-xl text-sm leading-relaxed text-muted">
+          Fill in the basics. After you create the event, you&apos;ll land on{" "}
+          <span className="font-medium text-foreground/90">Media</span> to upload a
+          poster or banner, then add ticket types and submit for review from the
+          editor.
+        </p>
         <Link
           href="/organizer/events"
-          className="text-sm text-black/60 hover:text-black transition-colors"
+          className="shrink-0 text-sm font-medium text-primary hover:underline"
         >
-          ← Back to Events
+          ← Back to events
         </Link>
       </div>
 
       {error && (
-        <div className="bg-primary/10 border border-primary/30 text-primary rounded-lg p-3 text-sm">
+        <div className="rounded-lg border border-primary/35 bg-primary/10 p-3 text-sm text-primary">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-6 rounded-[var(--radius-panel)] border border-border bg-surface/55 p-6 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] sm:p-8"
+      >
         <Input
           label="Title *"
           type="text"
@@ -108,7 +112,7 @@ export default function CreateEventPage() {
         <div>
           <label
             htmlFor="event-type"
-            className="block font-medium mb-1 text-sm text-black"
+            className="mb-1 block text-sm font-medium text-foreground"
           >
             Type *
           </label>
@@ -117,9 +121,7 @@ export default function CreateEventPage() {
             {...register("type")}
             aria-invalid={errors.type ? "true" : "false"}
             aria-describedby={errors.type ? "event-type-error" : undefined}
-            className={`w-full border ${
-              errors.type ? "border-primary" : "border-black/20"
-            } rounded-lg px-4 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors`}
+            className={nativeDarkControlClass(!!errors.type)}
           >
             <option value={EventType.IN_PERSON}>In Person</option>
             <option value={EventType.VIRTUAL}>Virtual</option>
@@ -167,7 +169,7 @@ export default function CreateEventPage() {
           error={errors.description?.message}
         />
 
-        <div className="flex gap-3 pt-4">
+        <div className="flex gap-3 border-t border-border/80 pt-6">
           <Link href="/organizer/events" className="flex-1">
             <Button type="button" variant="secondary" className="w-full">
               Cancel

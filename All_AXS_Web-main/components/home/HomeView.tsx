@@ -1,45 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import type { PublicEvent } from "@/lib/utils/api-server";
 import HomeHero from "@/components/home/HomeHero";
+import { HomeAboutIntro } from "@/components/home/HomeAboutIntro";
 import { HomeParallaxBand } from "@/components/home/HomeParallaxBand";
-import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import {
   HomeOrganizerChecklistNewsletter,
+  HomeQuickBrowseChips,
   HomeQuotesAndBuyerSection,
   HomeStartingSoonAndCity,
 } from "@/components/home/HomeExtendedSections";
-import { FeaturedEventsHorizontalSection } from "@/components/home/FeaturedEventsHorizontalSection";
 import { shouldUnoptimizeEventImage } from "@/lib/utils/image";
-
-/** Hotlinked from Unsplash (free use under their license) — African venues, markets & live events. */
-const UNSPLASH = {
-  /** Wide parallax band — festival crowd & lights */
-  crowdLights:
-    "https://images.unsplash.com/photo-1709290823099-6ef925ca3ded?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=82",
-  /** Second band — stage & colour */
-  stage:
-    "https://images.unsplash.com/photo-1767656318315-83e47181704e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=82",
-  discover:
-    "https://images.unsplash.com/photo-1767661667474-4f2a197c9a51?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
-  checkout:
-    "https://images.unsplash.com/photo-1680878903102-92692799ef36?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
-  attend:
-    "https://images.unsplash.com/photo-1760092189954-5b2f6eb3ca88?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
-  /** Trust strip cards — ixlib for stable CDN behavior */
-  trustFees:
-    "https://images.unsplash.com/photo-1678693362793-e2fffac536d0?ixlib=rb-4.0.3&auto=format&fit=crop&w=900&q=82",
-  trustQr:
-    "https://images.unsplash.com/photo-1708367285460-4789deb6f8a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=900&q=82",
-  /** Maiye Jeremiah — man on floor with laptop (unsplash.com/photos/WiV1SPZRKoU) */
-  trustVetted:
-    "https://images.unsplash.com/photo-1728905992073-b7a47319db20?ixlib=rb-4.0.3&auto=format&fit=crop&w=900&q=82",
-  trustPay:
-    "https://images.unsplash.com/photo-1569689725958-af8bb9f5486e?ixlib=rb-4.0.3&auto=format&fit=crop&w=900&q=82",
-} as const;
+import { marketingImages } from "@/lib/marketing-images";
 
 function SectionTitle({
   eyebrow,
@@ -86,12 +60,18 @@ function SectionTitle({
   );
 }
 
+type HomeQuickLink = { label: string; href: string };
+
 export function HomeView({
   featuredEvents,
   startingSoonEvents,
+  quickFilterLinks,
+  genreLinks,
 }: {
   featuredEvents: PublicEvent[];
   startingSoonEvents: PublicEvent[];
+  quickFilterLinks: HomeQuickLink[];
+  genreLinks: HomeQuickLink[];
 }) {
   const reduce = useReducedMotion();
 
@@ -122,127 +102,70 @@ export function HomeView({
   };
 
   return (
-    <div className="space-y-0">
-      <HomeHero />
+    <div className="bg-background">
+      {/* 1. Promise + featured events */}
+      <HomeHero featuredEvents={featuredEvents} />
 
-      {/* 1 — Featured events first */}
-      <motion.section
-        className="mb-20 md:mb-28"
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true, margin: "-60px", amount: 0.08 }}
-        variants={sectionReveal}
-      >
-        <SectionTitle
-          id="events"
-          eyebrow="On sale now"
-          title="Featured events"
-          subtitle="Shows you can book right now—clear dates, venues, and tiers. Tap in, check out, and walk in with a QR that works."
-        />
-        {featuredEvents.length === 0 ? (
-          <motion.div
-            initial={reduce ? false : { opacity: 0, scale: 0.98 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="rounded-[var(--radius-card)] border border-dashed border-border bg-surface/50 p-16 text-center"
-          >
-            <p className="text-muted text-lg mb-4">No published events yet—check back soon.</p>
-            <Link href="/organizer/events/new" className="text-primary font-semibold hover:underline">
-              Organizers: list your first show →
-            </Link>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={reduce ? false : { opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.08 }}
-            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <FeaturedEventsHorizontalSection events={featuredEvents} />
-          </motion.div>
-        )}
-        <motion.div
-          className="mt-10 flex justify-center"
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <ArrowCtaLink href="/events" variant="outline">
-            View all events
-          </ArrowCtaLink>
-        </motion.div>
-      </motion.section>
+      {/* 2. Who we are */}
+      <HomeAboutIntro />
 
-      <HomeStartingSoonAndCity startingSoonEvents={startingSoonEvents} />
-
-      {/* Parallax mood strip */}
+      {/* 3. Paths into the catalogue + near-term listings (discovery before long story) */}
       <motion.div
-        className="mb-20 md:mb-28"
-        initial={reduce ? false : { opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.7 }}
-      >
-        <HomeParallaxBand
-          imageSrc={UNSPLASH.crowdLights}
-          alt="Concert crowd under lights in Johannesburg"
-          imageClassName="scale-105 sm:scale-100"
-        >
-          <motion.div
-            initial={reduce ? false : { opacity: 0, x: -32 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="max-w-xl space-y-4"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Live rooms</p>
-            <p className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-foreground [text-shadow:0_2px_24px_rgba(255,255,255,0.85)]">
-              Real venues, real energy—ticketing that keeps the focus on the night out.
-            </p>
-            <p className="text-foreground/75 text-base md:text-lg leading-relaxed [text-shadow:0_1px_16px_rgba(255,255,255,0.75)]">
-              From discover to door scan, we care about the moments where trust is earned: lineups you
-              can trust, fees you can see, and passes that actually work offline.
-            </p>
-          </motion.div>
-        </HomeParallaxBand>
-      </motion.div>
-
-      {/* Trust strip — buyer-first */}
-      <motion.section
-        className="mb-20 md:mb-28"
+        className="py-12 md:py-16"
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: "-40px" }}
         variants={sectionReveal}
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+        <div className="axs-content-inner">
+          <HomeQuickBrowseChips
+            quickFilterLinks={quickFilterLinks}
+            genreLinks={genreLinks}
+            eyebrow="Browse faster"
+            sectionClassName="mb-0"
+          />
+        </div>
+        <HomeStartingSoonAndCity
+          startingSoonEvents={startingSoonEvents}
+          stackAfterBrowse
+        />
+      </motion.div>
+
+      {/* 4. Buyer trust */}
+      <motion.section
+        className="py-14 md:py-20"
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-40px" }}
+        variants={sectionReveal}
+      >
+        <div className="axs-content-inner">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
           {(
             [
               {
                 v: "Fees up front",
                 l: "Know the total before you pay",
-                image: UNSPLASH.trustFees,
-                alt: "Hands paying with cash at a market stall",
+                image: marketingImages.trustFees,
+                alt: "Team reviewing charts on a laptop in an office",
               },
               {
                 v: "QR in your inbox",
                 l: "Instant delivery after checkout",
-                image: UNSPLASH.trustQr,
-                alt: "Woman on a mobile phone call",
+                image: marketingImages.trustQr,
+                alt: "Laptop on a desk showing product work",
               },
               {
                 v: "Vetted organizers",
                 l: "Listings reviewed before they go live",
-                image: UNSPLASH.trustVetted,
-                alt: "Man sitting on the floor using a laptop computer",
+                image: marketingImages.trustVetted,
+                alt: "Professional working on a laptop",
               },
               {
                 v: "Pay your way",
                 l: "Built for African payment realities",
-                image: UNSPLASH.trustPay,
-                alt: "Person holding a smartphone",
+                image: marketingImages.trustPay,
+                alt: "Hands typing on a laptop keyboard",
               },
             ] as const
           ).map((item, i) => (
@@ -253,7 +176,7 @@ export function HomeView({
               whileInView="visible"
               viewport={{ once: true, margin: "-30px", amount: 0.2 }}
               variants={reduce ? instant : fadeUp}
-              className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface shadow-sm transition-[box-shadow] duration-300 hover:shadow-md"
+              className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface/55 ring-1 ring-white/[0.06] transition-[box-shadow,background-color] duration-300 hover:bg-surface/70 hover:shadow-md"
             >
               <div className="relative aspect-[4/3] overflow-hidden bg-foreground/5 sm:aspect-[16/11]">
                 {/*
@@ -293,22 +216,22 @@ export function HomeView({
             </motion.article>
           ))}
         </div>
+        </div>
       </motion.section>
 
-      <HomeQuotesAndBuyerSection />
-
-      {/* How it works + Unsplash tiles */}
+      {/* 5. Product journey */}
       <motion.section
-        className="mb-20 md:mb-28"
+        className="py-14 md:py-20"
         initial="hidden"
         whileInView="show"
         viewport={{ once: true, margin: "-50px" }}
         variants={sectionReveal}
       >
+        <div className="axs-content-inner">
         <SectionTitle
           eyebrow="The experience"
-          title="Built for the full journey—from hype to gate scan"
-          subtitle="No fragmented tools or clunky forms. We obsess over discovery, checkout, and entry."
+          title="From listing to badge scan—one calm thread"
+          subtitle="Summits and forums move fast. We keep discovery, purchase, and entry aligned so delegates never lose the plot."
         />
         <div className="grid md:grid-cols-3 gap-6 md:gap-8">
           {(
@@ -317,22 +240,22 @@ export function HomeView({
                 step: "01",
                 title: "Discover",
                 body: "Curated listings, sharp imagery, and dates that scan in a heartbeat—mobile first.",
-                image: UNSPLASH.discover,
-                alt: "Crowd and DJ at a Lagos nightclub",
+                image: marketingImages.journeyDiscover,
+                alt: "Colleagues collaborating around a laptop in a meeting",
               },
               {
                 step: "02",
                 title: "Checkout",
                 body: "Transparent tiers, fees up front, and a calm flow that works on low bandwidth.",
-                image: UNSPLASH.checkout,
-                alt: "Woman in a green dress holding a phone",
+                image: marketingImages.journeyCheckout,
+                alt: "Desk with keyboard, notebook, and payment card",
               },
               {
                 step: "03",
                 title: "Attend",
                 body: "QR in your inbox, tickets in your account, and support when plans change.",
-                image: UNSPLASH.attend,
-                alt: "Crowd with hands raised at a live show",
+                image: marketingImages.journeyAttend,
+                alt: "Audience seated in a conference hall facing a stage",
               },
             ] as const
           ).map((b, i) => (
@@ -343,7 +266,7 @@ export function HomeView({
               whileInView="visible"
               viewport={{ once: true, margin: "-20px" }}
               variants={reduce ? instant : fadeUp}
-              className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface shadow-sm"
+              className="group relative flex flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface/55 ring-1 ring-white/[0.06] shadow-sm"
             >
               <div className="relative aspect-[16/10] overflow-hidden bg-foreground/5">
                 <Image
@@ -369,11 +292,15 @@ export function HomeView({
             </motion.article>
           ))}
         </div>
+        </div>
       </motion.section>
 
-      {/* Second parallax band */}
+      {/* 6. Social proof */}
+      <HomeQuotesAndBuyerSection />
+
+      {/* 7. On-site alignment */}
       <motion.div
-        className="mb-20 md:mb-28"
+        className="py-14 md:py-20"
         initial={reduce ? false : { opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true, amount: 0.15 }}
@@ -381,8 +308,8 @@ export function HomeView({
       >
         <HomeParallaxBand
           focal="right"
-          imageSrc={UNSPLASH.stage}
-          alt="DJ with blue lighting at a Lagos nightclub"
+          imageSrc={marketingImages.parallaxSession}
+          alt="Facilitator leading a workshop at a conference table"
         >
           <motion.div
             initial={reduce ? false : { opacity: 0, x: 28 }}
@@ -391,14 +318,16 @@ export function HomeView({
             transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="ml-auto max-w-xl space-y-4 text-right md:pl-8"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Design</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">At the venue</p>
             <p className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-foreground [text-shadow:0_2px_24px_rgba(255,255,255,0.88)]">
-              Listings that feel as intentional as the show poster on your wall.
+              Your listing, checkout, and door experience stay aligned—so on-site feels like the promise
+              you sold online.
             </p>
           </motion.div>
         </HomeParallaxBand>
       </motion.div>
 
+      {/* 8. Organizers */}
       <HomeOrganizerChecklistNewsletter />
     </div>
   );

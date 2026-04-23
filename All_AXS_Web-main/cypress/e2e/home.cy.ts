@@ -4,15 +4,20 @@ describe('Home Page', () => {
   });
 
   it('should load the homepage hero', () => {
-    cy.contains('Live culture').should('be.visible');
+    cy.contains('Corporate events').should('be.visible');
+    cy.get('#home-hero-heading').should('be.visible');
   });
 
   it('should display the header with logo and navigation', () => {
     cy.get('header').should('be.visible');
     cy.contains('All AXS').should('be.visible');
+    cy.get('header').within(() => {
+      cy.get('img[src*="logo-on-dark"]').should('be.visible');
+    });
     cy.contains('a', 'Home').should('be.visible');
     cy.contains('a', 'Events').should('be.visible');
     cy.contains('a', 'Sign in').should('be.visible');
+    cy.contains('a', 'Sign up').should('be.visible');
   });
 
   it('should display the footer with copyright and links', () => {
@@ -23,17 +28,15 @@ describe('Home Page', () => {
   });
 
   it('should surface the experience sections', () => {
-    cy.contains('Built for the full journey').should('be.visible');
-    cy.contains('Featured events').should('be.visible');
+    cy.contains('Upcoming events').should('be.visible');
   });
 
-  it('should have working primary CTAs', () => {
-    cy.contains('a', 'Explore events').first().should('have.attr', 'href', '/events');
-    cy.contains('a', 'Sell tickets').first().should('have.attr', 'href', '/register');
+  it('should link to events from the upcoming section', () => {
+    cy.contains('a', 'See all').should('have.attr', 'href', '/events');
   });
 
-  it('should navigate to events page from hero', () => {
-    cy.contains('a', 'Explore events').first().click();
+  it('should navigate to events page from See all', () => {
+    cy.contains('a', 'See all').click();
     cy.url().should('include', '/events');
   });
 

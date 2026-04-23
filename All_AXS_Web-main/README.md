@@ -8,6 +8,22 @@ npm install
 npm run dev
 ```
 
+### Organizer vs attendee (database)
+
+The API stores **roles** on `users` as a Postgres enum array: `ATTENDEE` (default at registration), `ORGANIZER`, and `ADMIN`. Organizers who use the dashboard also have a row in **`organizer_profiles`**. That is how the product differentiates an event creator from someone who only buys tickets.
+
+**Sign in as an attendee**
+
+- Register at `/register` (or use the seeded demo account from the API `npm run seed:demo` output in `docs/DEMO_ROLES_AND_CHECKOUT.md` on the backend repo).
+- Your JWT includes `roles: ["ATTENDEE"]`. Checkout and **My tickets** use the attendee APIs.
+
+**Sign in as an organizer**
+
+- Use the seeded organizer account from `seed:demo`, **or** while signed in as an attendee call **`POST /api/auth/promote-organizer`** (Next proxy) when the API allows it (`ENABLE_PROMOTE_ORGANIZER_ROLE=true` in production, or non-production by default). That adds `ORGANIZER` to `users.roles` and returns fresh cookies.
+- Complete **`/organizer/onboarding`** once so **`organizer_profiles`** exists; then **`/organizer/dashboard`** and event management work.
+
+You can hold **both** roles on one user (`ATTENDEE` + `ORGANIZER`) after promotion, or use two separate accounts for a clearer demo.
+
 ### Demo attendee journey (signup → demo pay → QR)
 
 1. **Register** at `/register`, then browse **`/events`** (or open an event from the home page).
@@ -15,7 +31,7 @@ npm run dev
 3. Select tickets and **Complete demo payment** (no card or Paystack call; totals are for display only).
 4. On the confirmation screen, open **My tickets**, then a pass to view a **real QR code** (JSON payload for scanners in demo mode).
 
-Passes are stored in **sessionStorage** on this device until you clear site data.
+**Storage:** With `NEXT_PUBLIC_USE_API_CHECKOUT=true` (and the API running with demo checkout enabled), orders and tickets are persisted in the database; the app still mirrors a snapshot in **sessionStorage** for the confirmation UI. Without that flag, passes live only in **sessionStorage** until you clear site data.
 
 ### Deploy on Vercel
 

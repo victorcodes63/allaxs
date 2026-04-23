@@ -19,8 +19,8 @@ import { PublicEventCard } from "@/components/events/PublicEventCard";
 const CARD =
   "w-[min(92vw,380px)] shrink-0 @[720px]:w-[calc((100cqi-5rem)/3)]";
 
-/** Matches breathing room under the site header (see sticky rail below). */
-const HEADER_GAP_REM = 4.25;
+/** Sticky offset: marketing / signed-in chrome height + device safe area (notch). */
+const STICKY_TOP_OFFSET = "calc(4.25rem + env(safe-area-inset-top, 0px))";
 
 /**
  * Vertical scroll distance mapped to full horizontal range — shorter than 1:1 px so the rail
@@ -135,7 +135,7 @@ export function FeaturedEventsHorizontalSection({ events }: { events: PublicEven
       <div className="space-y-6">
         <div className="border-b border-background pb-3 pt-2 md:pt-3">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted">
-            Scroll to explore · {events.length} shows
+            Scroll to explore · {events.length} events
           </p>
         </div>
         <div className="@container min-w-0 w-full">
@@ -150,7 +150,7 @@ export function FeaturedEventsHorizontalSection({ events }: { events: PublicEven
             ))}
           </div>
         </div>
-        <p className="text-center text-xs text-muted">Swipe sideways to browse featured shows.</p>
+        <p className="text-center text-xs text-muted">Swipe sideways to browse featured events.</p>
       </div>
     );
   }
@@ -166,18 +166,18 @@ export function FeaturedEventsHorizontalSection({ events }: { events: PublicEven
         className="relative -mx-[var(--axs-page-gutter)] w-[calc(100%+2*var(--axs-page-gutter))] max-w-[100vw] lg:mx-0 lg:w-full"
         style={{ height: sectionHeight }}
         role="region"
-        aria-label="Featured events — scroll the page to browse shows sideways"
+        aria-label="Featured events — scroll the page to browse the horizontal list"
       >
         <div
           ref={stickyShellRef}
-          className="sticky z-0 flex h-[calc(100svh-4.25rem)] max-h-[820px] min-h-0 flex-col px-[var(--axs-page-gutter)]"
-          style={{ top: `${HEADER_GAP_REM}rem` }}
+          className="sticky z-0 flex h-[calc(100svh-4.25rem-env(safe-area-inset-top,0px))] max-h-[820px] min-h-0 flex-col px-[var(--axs-page-gutter)]"
+          style={{ top: STICKY_TOP_OFFSET }}
         >
           {/* Tighter top so the sticky rail can use more space for bottom padding around the cards */}
           <div className="shrink-0 pt-2 md:pt-3">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-background pb-3">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted">
-                Scroll to explore · {events.length} shows
+                Scroll to explore · {events.length} events
               </p>
               <div className="flex items-center gap-2">
                 <button

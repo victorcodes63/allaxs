@@ -9,17 +9,8 @@ import { PublicEventCard } from "@/components/events/PublicEventCard";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { SwapCtaLink } from "@/components/ui/SwapCtaLink";
 import { shouldUnoptimizeEventImage } from "@/lib/utils/image";
-
-const US = (id: string) =>
-  `https://images.unsplash.com/${id}?ixlib=rb-4.0.3&auto=format&fit=crop&w=1400&q=82`;
-
-const IMG = {
-  buyerBand: "/images/hero-3.jpg",
-  organizerSide: US("photo-1634954238233-3d1445638a0e"),
-  quoteA: US("photo-1608500133806-676bd5e0153f"),
-  quoteB: US("photo-1544723795-3fb6469f5b39"),
-  quoteC: US("photo-1681284969711-ba6d84f3054c"),
-};
+import { marketingImages } from "@/lib/marketing-images";
+import { HomeParallaxBand } from "@/components/home/HomeParallaxBand";
 
 type QuickLink = { label: string; href: string };
 
@@ -28,11 +19,21 @@ const ease = [0.22, 1, 0.36, 1] as const;
 export function HomeQuickBrowseChips({
   quickFilterLinks,
   genreLinks,
+  eyebrow = "Browse faster",
+  sectionClassName,
+  variant = "default",
 }: {
   quickFilterLinks: QuickLink[];
   genreLinks: QuickLink[];
+  /** Section label above the chip rows (home default: “Browse faster”). */
+  eyebrow?: string;
+  /** Extra classes on the outer `<motion.section>` (e.g. `mb-0` when nested in a catalogue shell). */
+  sectionClassName?: string;
+  /** Softer chips for dark catalogue panels. */
+  variant?: "default" | "catalogue";
 }) {
   const reduce = useReducedMotion();
+  const catalogue = variant === "catalogue";
   const chipReveal = {
     hidden: reduce ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 },
     show: (i: number) => ({
@@ -42,9 +43,16 @@ export function HomeQuickBrowseChips({
     }),
   };
 
+  const whenChipClass = catalogue
+    ? "inline-flex rounded-full border border-white/[0.1] bg-white/[0.04] px-3.5 py-2 text-sm font-medium text-foreground/95 shadow-none transition-colors hover:border-primary/45 hover:bg-primary/[0.08]"
+    : "inline-flex rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-primary/35 hover:bg-primary/5";
+  const vibesChipClass = catalogue
+    ? "inline-flex rounded-full border border-white/[0.08] bg-white/[0.03] px-3.5 py-2 text-sm font-medium text-foreground/90 transition-colors hover:border-primary/40 hover:text-primary"
+    : "inline-flex rounded-full border border-border/80 bg-wash px-4 py-2 text-sm font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:text-primary";
+
   return (
     <motion.section
-      className="mb-10 md:mb-14"
+      className={["mb-10 md:mb-14", sectionClassName].filter(Boolean).join(" ")}
       initial="hidden"
       whileInView="show"
       viewport={{ once: true, margin: "-40px" }}
@@ -60,12 +68,17 @@ export function HomeQuickBrowseChips({
           hidden: { opacity: reduce ? 1 : 0, y: reduce ? 0 : 12 },
           show: { opacity: 1, y: 0, transition: { duration: 0.45, ease } },
         }}
-        className="text-xs font-semibold uppercase tracking-[0.22em] text-primary mb-4"
+        className={[
+          "mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-primary",
+          catalogue ? "mb-3" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
-        Browse faster
+        {eyebrow}
       </motion.p>
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <span className="text-sm text-muted w-full sm:w-auto shrink-0">When</span>
+      <div className={["flex flex-wrap items-center gap-2", catalogue ? "mb-5 gap-2" : "mb-6"].join(" ")}>
+        <span className="w-full shrink-0 text-sm text-muted sm:w-auto">When</span>
         {quickFilterLinks.map((item, i) => (
           <motion.div
             key={item.href}
@@ -75,17 +88,14 @@ export function HomeQuickBrowseChips({
             whileInView="show"
             viewport={{ once: true }}
           >
-            <Link
-              href={item.href}
-              className="inline-flex rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:border-primary/35 hover:bg-primary/5"
-            >
+            <Link href={item.href} className={whenChipClass}>
               {item.label}
             </Link>
           </motion.div>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted w-full sm:w-auto shrink-0">Vibes</span>
+        <span className="w-full shrink-0 text-sm text-muted sm:w-auto">Vibes</span>
         {genreLinks.map((item, i) => (
           <motion.div
             key={item.href}
@@ -95,10 +105,7 @@ export function HomeQuickBrowseChips({
             whileInView="show"
             viewport={{ once: true }}
           >
-            <Link
-              href={item.href}
-              className="inline-flex rounded-full border border-border/80 bg-wash px-4 py-2 text-sm font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:text-primary"
-            >
+            <Link href={item.href} className={vibesChipClass}>
               {item.label}
             </Link>
           </motion.div>
@@ -110,56 +117,96 @@ export function HomeQuickBrowseChips({
 
 export function HomeStartingSoonAndCity({
   startingSoonEvents,
+  stackAfterBrowse = false,
 }: {
   startingSoonEvents: PublicEvent[];
+  /** When true, sits under home “Browse faster” chips—lighter top padding, no layout gap if the calendar is empty. */
+  stackAfterBrowse?: boolean;
 }) {
   const reduce = useReducedMotion();
+  const sectionPad = stackAfterBrowse ? "pt-8 md:pt-10 pb-12 md:pb-16" : "py-12 md:py-16";
 
-  return (
-    <>
-      {startingSoonEvents.length > 0 ? (
-        <motion.section
-          className="mb-16 md:mb-24"
-          initial={reduce ? false : { opacity: 0, y: 32 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-50px" }}
-          transition={{ duration: 0.6, ease }}
-        >
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
-            <div className="max-w-2xl space-y-2">
+  if (startingSoonEvents.length === 0) {
+    return (
+      <motion.section
+        className={sectionPad}
+        initial={reduce ? false : { opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-50px" }}
+        transition={{ duration: 0.55, ease }}
+        aria-labelledby="home-calendar-fallback-heading"
+      >
+        <div className="axs-content-inner">
+          <div className="flex flex-col gap-6 rounded-[var(--radius-card)] border border-border/80 bg-surface/40 p-8 ring-1 ring-white/[0.04] md:flex-row md:items-center md:justify-between md:p-10">
+            <div className="max-w-xl space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Calendar</p>
-              <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-foreground">
-                Starting soon
+              <h2
+                id="home-calendar-fallback-heading"
+                className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-foreground"
+              >
+                Nothing in the next three weeks yet
               </h2>
-              <p className="text-muted text-base md:text-lg leading-relaxed">
-                Next three weeks—grab tickets before tiers move.
+              <p className="text-muted text-base leading-relaxed">
+                The full catalogue still updates daily—filter by date, format, or vibe and we will surface new drops
+                here when they land.
               </p>
             </div>
             <SwapCtaLink
               href="/events"
-              line1="Full catalogue"
-              line2="Open →"
+              line1="Browse all events"
+              line2="Open catalogue →"
               look="text"
-              className="text-foreground/75 hover:text-primary sm:pb-1"
+              className="text-foreground/80 hover:text-primary md:shrink-0"
             />
           </div>
-          <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-3 -mx-[var(--axs-page-gutter)] px-[var(--axs-page-gutter)] scrollbar-thin">
-            {startingSoonEvents.map((event, i) => (
-              <motion.div
-                key={event.id}
-                initial={reduce ? false : { opacity: 0, x: 28 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true, margin: "-20px" }}
-                transition={{ delay: reduce ? 0 : 0.06 * i, duration: 0.45, ease }}
-                className="snap-start shrink-0 w-[min(18rem,calc(100vw-3rem))] sm:w-72"
-              >
-                <PublicEventCard event={event} />
-              </motion.div>
-            ))}
+        </div>
+      </motion.section>
+    );
+  }
+
+  return (
+    <motion.section
+      className={sectionPad}
+      initial={reduce ? false : { opacity: 0, y: 32 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.6, ease }}
+    >
+      <div className="axs-content-inner mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div className="max-w-2xl space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Calendar</p>
+            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-foreground">
+              Starting soon
+            </h2>
+            <p className="text-muted text-base md:text-lg leading-relaxed">
+              Next three weeks—grab tickets before tiers move.
+            </p>
           </div>
-        </motion.section>
-      ) : null}
-    </>
+          <SwapCtaLink
+            href="/events"
+            line1="Full catalogue"
+            line2="Open →"
+            look="text"
+            className="text-foreground/75 hover:text-primary sm:pb-1"
+          />
+        </div>
+      </div>
+      <div className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-3 -mx-[var(--axs-page-gutter)] px-[var(--axs-page-gutter)] scrollbar-thin">
+        {startingSoonEvents.map((event, i) => (
+          <motion.div
+            key={event.id}
+            initial={reduce ? false : { opacity: 0, x: 28 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-20px" }}
+            transition={{ delay: reduce ? 0 : 0.06 * i, duration: 0.45, ease }}
+            className="snap-start shrink-0 w-[min(18rem,calc(100vw-3rem))] sm:w-72"
+          >
+            <PublicEventCard event={event} />
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
   );
 }
 
@@ -187,22 +234,22 @@ export function HomeQuotesAndBuyerSection() {
 
   const quotes = [
     {
-      text: "Checkout was calm—fees were obvious before I paid. The QR worked first try at the door, even on patchy venue Wi‑Fi.",
+      text: "Checkout was calm—fees were obvious before I paid. The QR worked first try at registration, even on patchy venue Wi‑Fi.",
       who: "Amara K.",
-      role: "Attendee · Nairobi",
-      img: IMG.quoteA,
+      role: "Delegate · Nairobi",
+      img: marketingImages.quoteA,
     },
     {
-      text: "We published tiers in an afternoon. Fans actually read the poster on the listing—same currency, same clarity.",
+      text: "We published tiers in an afternoon. Sponsors saw the same currency and copy we approved—no spreadsheet drift.",
       who: "Jordan M.",
-      role: "Organizer · Accra",
-      img: IMG.quoteB,
+      role: "Events lead · Accra",
+      img: marketingImages.quoteB,
     },
     {
-      text: "Tickets in my inbox and in my account meant I wasn’t hunting screenshots at the gate—huge when the line is moving fast.",
+      text: "Passes in my inbox and in my account meant I wasn’t hunting screenshots when the badge desk opened.",
       who: "Leah T.",
-      role: "Festival-goer · Lagos",
-      img: IMG.quoteC,
+      role: "Attendee · Lagos",
+      img: marketingImages.quoteC,
     },
   ];
 
@@ -226,148 +273,184 @@ export function HomeQuotesAndBuyerSection() {
   }, [reduce, n]);
 
   return (
-    <div className="space-y-16 md:space-y-24 mb-16 md:mb-24">
+    <div className="space-y-10 md:space-y-14">
       <motion.section
-        className="relative -mx-[var(--axs-page-gutter)] bg-white px-[var(--axs-page-gutter)] py-14 text-zinc-950 md:py-20"
+        className="relative -mx-[var(--axs-page-gutter)] overflow-hidden bg-background px-[var(--axs-page-gutter)] py-14 text-foreground md:py-20"
         initial={reduce ? false : { opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-50px" }}
         transition={{ duration: 0.65, ease }}
         aria-labelledby="home-testimonials-heading"
       >
-        <div className="mb-10 flex items-start gap-3 md:mb-14 md:gap-4">
-          <TestimonialsWaveIcon className="mt-0.5 shrink-0 text-zinc-900" />
-          <p
-            id="home-testimonials-heading"
-            className="max-w-lg text-sm leading-relaxed text-zinc-700 md:text-[15px]"
-          >
-            From Nairobi to Cape Town—real fans and organizers who want live culture to feel effortless.
-          </p>
-        </div>
+        <div className="axs-hero-brand-glow pointer-events-none absolute inset-0 opacity-[0.55]" aria-hidden />
+        <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/10 via-transparent to-transparent" aria-hidden />
 
-        <div className="mb-12 flex flex-col gap-10 md:mb-16 lg:flex-row lg:items-stretch lg:gap-12 xl:gap-16">
-          <div
-            className="flex flex-row gap-2 lg:flex-col lg:gap-2.5 lg:pt-1"
-            role="tablist"
-            aria-label="Choose testimonial"
-          >
-            {quotes.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                role="tab"
-                aria-selected={i === active}
-                aria-controls={`testimonial-panel-${i}`}
-                id={`testimonial-tab-${i}`}
-                onClick={() => setActive(i)}
-                className="flex items-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white"
-              >
-                <span
-                  className={[
-                    "block h-0.5 rounded-full transition-[width,background-color] duration-300",
-                    i === active ? "w-9 bg-primary md:w-10" : "w-4 bg-zinc-300 hover:bg-zinc-400",
-                  ].join(" ")}
-                  aria-hidden
-                />
-                <span className="sr-only">Testimonial {i + 1}</span>
-              </button>
-            ))}
+        <div className="relative z-10 axs-content-inner">
+          <div className="mb-10 flex items-start gap-3 md:mb-14 md:gap-4">
+            <TestimonialsWaveIcon className="mt-0.5 shrink-0 text-foreground/90" />
+            <p
+              id="home-testimonials-heading"
+              className="max-w-lg text-sm leading-relaxed text-muted md:text-[15px]"
+            >
+              From Nairobi to Cape Town—teams who want flagship forums to feel as polished as the keynote line-up.
+            </p>
           </div>
 
-          <div className="min-w-0 flex-1">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.blockquote
-                key={active}
-                id={`testimonial-panel-${active}`}
-                role="tabpanel"
-                aria-labelledby={`testimonial-tab-${active}`}
-                initial={reduce ? false : { opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={reduce ? undefined : { opacity: 0, y: -12 }}
-                transition={{ duration: reduce ? 0 : 0.28, ease }}
-                className="font-display text-center text-2xl font-medium leading-snug tracking-tight text-zinc-950 sm:text-3xl md:text-left md:text-[1.75rem] lg:text-4xl xl:text-[2.125rem] xl:leading-[1.2]"
-              >
-                &ldquo;{quotes[active].text}&rdquo;
-              </motion.blockquote>
-            </AnimatePresence>
-          </div>
-        </div>
+          <div className="mb-12 flex flex-col gap-10 md:mb-16 lg:flex-row lg:items-stretch lg:gap-12 xl:gap-16">
+            <div
+              className="flex flex-row gap-2 lg:flex-col lg:gap-2.5 lg:pt-1"
+              role="tablist"
+              aria-label="Choose testimonial"
+            >
+              {quotes.map((_, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === active}
+                  aria-controls={`testimonial-panel-${i}`}
+                  id={`testimonial-tab-${i}`}
+                  onClick={() => setActive(i)}
+                  className="flex items-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <span
+                    className={[
+                      "block h-0.5 rounded-full transition-[width,background-color] duration-300",
+                      i === active ? "w-9 bg-primary md:w-10" : "w-4 bg-white/25 hover:bg-white/40",
+                    ].join(" ")}
+                    aria-hidden
+                  />
+                  <span className="sr-only">Testimonial {i + 1}</span>
+                </button>
+              ))}
+            </div>
 
-        <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-wrap items-center gap-4 md:gap-5">
-            {quotes.map((q, i) => (
-              <button
-                key={q.who}
-                type="button"
-                onClick={() => setActive(i)}
-                className={[
-                  "relative size-12 shrink-0 overflow-hidden rounded-sm outline-none transition",
-                  "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-                  i === active
-                    ? "ring-2 ring-primary ring-offset-2 ring-offset-white"
-                    : "opacity-75 hover:opacity-100",
-                ].join(" ")}
-                aria-label={`Show quote from ${q.who}`}
-                aria-pressed={i === active}
-              >
-                <Image
-                  src={q.img}
-                  alt=""
-                  fill
-                  className={i === active ? "object-cover" : "object-cover grayscale"}
-                  sizes="48px"
-                  unoptimized={shouldUnoptimizeEventImage(q.img)}
-                />
-              </button>
-            ))}
-            <div className="min-h-12 border-l-2 border-primary pl-3 sm:ml-1" aria-live="polite">
-              <p className="font-display text-base font-semibold text-zinc-950">{quotes[active].who}</p>
-              <p className="text-sm text-zinc-600">{quotes[active].role}</p>
+            <div className="min-w-0 flex-1">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.blockquote
+                  key={active}
+                  id={`testimonial-panel-${active}`}
+                  role="tabpanel"
+                  aria-labelledby={`testimonial-tab-${active}`}
+                  initial={reduce ? false : { opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduce ? undefined : { opacity: 0, y: -12 }}
+                  transition={{ duration: reduce ? 0 : 0.28, ease }}
+                  className="font-display text-center text-2xl font-medium leading-snug tracking-tight text-foreground sm:text-3xl md:text-left md:text-[1.75rem] lg:text-4xl xl:text-[2.125rem] xl:leading-[1.2]"
+                >
+                  &ldquo;{quotes[active].text}&rdquo;
+                </motion.blockquote>
+              </AnimatePresence>
             </div>
           </div>
 
-          <div className="flex gap-2 sm:shrink-0">
-            <button
-              type="button"
-              onClick={() => go(-1)}
-              className="inline-flex size-11 items-center justify-center rounded-sm border border-zinc-300 bg-white text-zinc-900 transition hover:bg-zinc-50"
-              aria-label="Previous testimonial"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => go(1)}
-              className="inline-flex size-11 items-center justify-center rounded-sm border border-zinc-300 bg-white text-zinc-900 transition hover:bg-zinc-50"
-              aria-label="Next testimonial"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
+          <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-wrap items-center gap-4 md:gap-5">
+              {quotes.map((q, i) => (
+                <button
+                  key={q.who}
+                  type="button"
+                  onClick={() => setActive(i)}
+                  className={[
+                    "relative size-12 shrink-0 overflow-hidden rounded-sm outline-none transition",
+                    "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    i === active
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      : "opacity-75 hover:opacity-100",
+                  ].join(" ")}
+                  aria-label={`Show quote from ${q.who}`}
+                  aria-pressed={i === active}
+                >
+                  <Image
+                    src={q.img}
+                    alt=""
+                    fill
+                    className={i === active ? "object-cover" : "object-cover grayscale"}
+                    sizes="48px"
+                    unoptimized={shouldUnoptimizeEventImage(q.img)}
+                  />
+                </button>
+              ))}
+              <div className="min-h-12 border-l-2 border-primary pl-3 sm:ml-1" aria-live="polite">
+                <p className="font-display text-base font-semibold text-foreground">{quotes[active].who}</p>
+                <p className="text-sm text-muted">{quotes[active].role}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 sm:shrink-0">
+              <button
+                type="button"
+                onClick={() => go(-1)}
+                className="inline-flex size-11 items-center justify-center rounded-sm border border-white/20 bg-white/5 text-foreground transition hover:border-white/30 hover:bg-white/10"
+                aria-label="Previous testimonial"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => go(1)}
+                className="inline-flex size-11 items-center justify-center rounded-sm border border-white/20 bg-white/5 text-foreground transition hover:border-white/30 hover:bg-white/10"
+                aria-label="Next testimonial"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </motion.section>
 
+      <motion.div
+        className="py-14 md:py-20"
+        initial={reduce ? false : { opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.7 }}
+      >
+        <HomeParallaxBand
+          imageSrc="/images/hero_image.jpg"
+          alt="Speaker presenting in a bright conference room"
+          imageClassName="scale-105 sm:scale-100"
+        >
+          <motion.div
+            initial={reduce ? false : { opacity: 0, x: -32 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.7, ease }}
+            className="max-w-xl space-y-4"
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Event venues</p>
+            <p className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-foreground [text-shadow:0_2px_24px_rgba(255,255,255,0.85)]">
+              Listings and checkout that match the rigour of your keynote stage.
+            </p>
+            <p className="text-foreground/75 text-base md:text-lg leading-relaxed [text-shadow:0_1px_16px_rgba(255,255,255,0.75)]">
+              Built for multi-day summits: clear agendas, transparent fees, and passes delegates can open even when
+              the venue Wi‑Fi is under load.
+            </p>
+          </motion.div>
+        </HomeParallaxBand>
+      </motion.div>
+
       <motion.section
-        className="relative overflow-hidden rounded-[var(--radius-panel)] min-h-[320px]"
+        className="relative min-h-[320px] overflow-hidden rounded-[var(--radius-panel)] ring-1 ring-white/[0.05]"
         initial={reduce ? false : { opacity: 0, scale: 0.99 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true, amount: 0.2 }}
         transition={{ duration: 0.7, ease }}
       >
         <Image
-          src={IMG.buyerBand}
-          alt="Live event atmosphere"
+          src={marketingImages.buyerBand}
+          alt="Team collaborating in a bright professional workspace"
           fill
           className="object-cover"
           sizes="100vw"
-          unoptimized={shouldUnoptimizeEventImage(IMG.buyerBand)}
+          unoptimized={shouldUnoptimizeEventImage(marketingImages.buyerBand)}
         />
         <div className="absolute inset-0 bg-linear-to-r from-foreground/88 via-foreground/72 to-foreground/45" />
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 p-10 md:p-14 text-background">
+        <div className="relative z-10 axs-content-inner flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 p-10 md:p-14 text-background">
           <div className="max-w-xl space-y-4">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-background/90">Buyer protection</p>
             <h3 className="font-display text-2xl md:text-3xl font-semibold leading-tight">Policies you can point to—before and after purchase</h3>
@@ -431,14 +514,14 @@ export function HomeOrganizerChecklistNewsletter() {
   return (
     <div
       id="sell"
-      className="relative -mx-[var(--axs-page-gutter)] mb-8 px-[var(--axs-page-gutter)] md:mb-12"
+      className="relative -mx-[var(--axs-page-gutter)] px-[var(--axs-page-gutter)] pb-10 pt-14 md:pb-14 md:pt-20"
     >
       <motion.section
         initial={reduce ? false : { opacity: 0, y: 32 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-40px" }}
         transition={{ duration: 0.65, ease }}
-        className="border-t border-border/70 pt-12 md:pt-16 grid lg:grid-cols-2 gap-10 lg:gap-14 items-center"
+        className="axs-content-inner grid items-center gap-10 lg:grid-cols-2 lg:gap-14"
       >
         <div className="space-y-6 order-2 lg:order-1">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">For organizers</p>
@@ -467,18 +550,26 @@ export function HomeOrganizerChecklistNewsletter() {
               </motion.li>
             ))}
           </ol>
-          <div className="flex flex-col sm:flex-row sm:items-center flex-wrap gap-3 pt-2">
+          <div className="flex flex-col flex-wrap gap-3 pt-2 sm:flex-row sm:items-stretch">
             <ArrowCtaLink
               href="/register"
               variant="primary"
-              className="justify-center !border-transparent !bg-primary-dark !shadow-[0_4px_16px_-6px_rgba(192,41,66,0.38)] hover:!bg-primary-dark/92 hover:!shadow-[0_6px_20px_-6px_rgba(192,41,66,0.35)]"
+              className="justify-center !border-transparent !bg-primary-dark !text-white shadow-[0_4px_16px_-6px_rgba(192,41,66,0.38)] hover:!bg-primary-dark/90 hover:!shadow-[0_6px_20px_-6px_rgba(192,41,66,0.35)] sm:min-w-0 sm:flex-1"
             >
               Create organizer account
             </ArrowCtaLink>
-            <ArrowCtaLink href="/organizers" variant="outline" className="justify-center border-border bg-white">
+            <ArrowCtaLink
+              href="/organizers"
+              variant="outline"
+              className="justify-center !border-white/35 !bg-white/[0.1] !text-white shadow-none hover:!border-primary/55 hover:!bg-primary/20 hover:!text-white sm:min-w-0 sm:flex-1"
+            >
               Full organizer guide
             </ArrowCtaLink>
-            <ArrowCtaLink href="/events" variant="outline" className="justify-center">
+            <ArrowCtaLink
+              href="/events"
+              variant="outline"
+              className="justify-center !border-white/35 !bg-transparent !text-white shadow-none hover:!border-white/55 hover:!bg-white/[0.08] sm:min-w-0 sm:flex-1"
+            >
               See a sample listing
             </ArrowCtaLink>
           </div>
@@ -491,12 +582,12 @@ export function HomeOrganizerChecklistNewsletter() {
           className="relative order-1 lg:order-2 aspect-[4/3] overflow-hidden rounded-2xl"
         >
           <Image
-            src={IMG.organizerSide}
-            alt="Crowd gathered outside a Lagos venue"
+            src={marketingImages.organizerSide}
+            alt="Bright open-plan office with workstations and natural light"
             fill
             className="object-cover"
             sizes="(max-width: 1024px) 100vw, 50vw"
-            unoptimized={shouldUnoptimizeEventImage(IMG.organizerSide)}
+            unoptimized={shouldUnoptimizeEventImage(marketingImages.organizerSide)}
           />
         </motion.div>
       </motion.section>

@@ -10,6 +10,7 @@ import {
   type ResetPasswordInput,
 } from "@/lib/validation/auth";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
@@ -74,7 +75,7 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
+      <AuthPageShell>
         <AuthCard
           title="Password Reset Successful"
           subtitle="Your password has been reset successfully"
@@ -94,12 +95,12 @@ function ResetPasswordForm() {
             </Link>
           </div>
         </AuthCard>
-      </div>
+      </AuthPageShell>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
+    <AuthPageShell>
       <AuthCard
         title="Reset Password"
         subtitle="Enter your new password"
@@ -145,19 +146,19 @@ function ResetPasswordForm() {
           </Link>
         </div>
       </AuthCard>
-    </div>
+    </AuthPageShell>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-black/60">Loading...</p>
-        </div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <AuthPageShell>
+          <p className="text-lg text-muted">Loading…</p>
+        </AuthPageShell>
+      }
+    >
       <ResetPasswordForm />
     </Suspense>
   );

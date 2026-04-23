@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Textarea } from "@/components/ui/Textarea";
 import axios from "axios";
+import { getEventBannerUrl, shouldUnoptimizeEventImage } from "@/lib/utils/image";
 
 interface Organizer {
   id: string;
@@ -148,19 +149,6 @@ export function ReviewPanel({
     });
   };
 
-  const getBannerUrl = (url: string | null | undefined): string | null => {
-    if (!url) return null;
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      return url;
-    }
-    if (typeof window !== "undefined") {
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      return `${apiUrl}${url.startsWith("/") ? url : `/${url}`}`;
-    }
-    return url;
-  };
-
   const getTypeLabel = (type: string) => {
     return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
   };
@@ -230,15 +218,14 @@ export function ReviewPanel({
               </label>
               <div className="relative w-full h-48 rounded-lg border border-black/10 overflow-hidden">
                 <Image
-                  src={getBannerUrl(event.bannerUrl) || ""}
+                  src={getEventBannerUrl(event.bannerUrl)}
                   alt={`${event.title} banner`}
                   fill
                   className="object-cover"
                   sizes="100vw"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = "none";
-                  }}
+                  unoptimized={shouldUnoptimizeEventImage(
+                    getEventBannerUrl(event.bannerUrl),
+                  )}
                 />
               </div>
             </div>

@@ -32,7 +32,7 @@ export default function AdminLayout({
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-center space-y-2">
-          <p className="text-lg text-black/60">Checking access…</p>
+          <p className="text-lg text-muted">Checking access…</p>
         </div>
       </div>
     );
@@ -47,7 +47,7 @@ export default function AdminLayout({
           <p className="text-lg text-primary">
             You do not have permission to access this page
           </p>
-          <p className="text-sm text-black/60">
+          <p className="text-sm text-muted">
             Admin access is required
           </p>
         </div>

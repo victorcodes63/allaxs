@@ -28,13 +28,16 @@ function getTypeLabel(type: string): string {
 export function PublicEventCard({
   event,
   variant = "default",
+  className,
 }: {
   event: PublicEvent;
-  /** Compact: short banner rail. featuredRail: poster-like + details for home featured scroller. */
-  variant?: "default" | "compact" | "featuredRail";
+  /** Compact: short banner rail. featuredRail: poster-like + details for home featured scroller. listRow: horizontal row (poster left). */
+  variant?: "default" | "compact" | "featuredRail" | "listRow";
+  className?: string;
 }) {
   const compact = variant === "compact";
   const featuredRail = variant === "featuredRail";
+  const listRow = variant === "listRow";
   const bannerUrl = getEventBannerUrl(event.bannerUrl);
   const placeholderUrl = generatePlaceholderImage(event.title);
   const minPrice =
@@ -46,15 +49,79 @@ export function PublicEventCard({
       ? event.ticketTypes[0].currency
       : "KES";
 
+  if (listRow) {
+    return (
+      <Link
+        href={`/e/${event.slug}`}
+        className={[
+          "group flex flex-row gap-4 overflow-hidden rounded-[var(--radius-card)] bg-surface/55 p-3.5 text-left ring-1 ring-white/[0.06] transition-[box-shadow,transform,background-color] duration-300 hover:bg-surface/70 hover:shadow-md active:scale-[0.995] sm:gap-5 sm:p-4",
+          className,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-label={`View event: ${event.title}`}
+      >
+        <div className="relative h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-lg bg-foreground/5 sm:h-28 sm:w-28">
+          {event.bannerUrl ? (
+            <Image
+              src={bannerUrl}
+              alt=""
+              fill
+              className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+              sizes="112px"
+              unoptimized={shouldUnoptimizeEventImage(bannerUrl)}
+            />
+          ) : (
+            <Image
+              src={placeholderUrl}
+              alt=""
+              fill
+              className="object-cover object-top"
+              sizes="112px"
+              loading="lazy"
+              unoptimized={shouldUnoptimizeEventImage(placeholderUrl)}
+            />
+          )}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="font-display line-clamp-2 text-[15px] font-semibold leading-snug text-foreground transition-colors group-hover:text-primary sm:text-base">
+              {event.title}
+            </h2>
+            <span className="shrink-0 rounded-md bg-background/80 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-muted ring-1 ring-white/10">
+              {getTypeLabel(event.type)}
+            </span>
+          </div>
+          <p className="text-xs text-muted">{event.organizer.orgName}</p>
+          <p className="text-xs text-muted">{formatDate(event.startAt)}</p>
+          {(event.venue || event.city) && (
+            <p className="line-clamp-1 text-xs text-foreground/80">
+              {[event.venue, event.city].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          <div className="mt-1 flex items-center justify-between gap-2 pt-2">
+            <span className="text-[10px] text-muted">All AXS</span>
+            {minPrice !== null && (
+              <span className="text-sm font-semibold text-primary">
+                From {minPrice / 100} {currency}
+              </span>
+            )}
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
   return (
     <Link
       href={`/e/${event.slug}`}
       className={[
-        "group flex flex-col bg-surface rounded-[var(--radius-card)] border border-border overflow-hidden hover:border-primary/25 transition-all duration-300",
+        "group flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-border/80 bg-surface/55 ring-1 ring-white/[0.06] transition-all duration-300 hover:border-primary/25",
         featuredRail
-          ? "shadow-sm border-border/80 hover:shadow-md hover:border-primary/20"
+          ? "shadow-sm hover:shadow-md hover:border-primary/20"
           : "shadow-sm hover:shadow-lg",
         compact || featuredRail ? "h-full" : "",
+        className,
       ]
         .filter(Boolean)
         .join(" ")}

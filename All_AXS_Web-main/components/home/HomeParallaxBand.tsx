@@ -17,6 +17,7 @@ export function HomeParallaxBand({
   className = "",
   imageClassName = "",
   focal = "left",
+  overlayTone = "default",
 }: {
   imageSrc: string;
   alt: string;
@@ -25,6 +26,8 @@ export function HomeParallaxBand({
   imageClassName?: string;
   /** Scrim gradient favors this side for text contrast. */
   focal?: "left" | "right";
+  /** `dark` adds a black wash so bright photography reads like a moody hero. */
+  overlayTone?: "default" | "dark";
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const reduce = useReducedMotion();
@@ -55,17 +58,33 @@ export function HomeParallaxBand({
             priority={false}
           />
         </motion.div>
-        <div
-          className={
-            focal === "right"
-              ? "absolute inset-0 bg-linear-to-l from-background/92 via-background/55 to-transparent sm:via-background/40"
-              : "absolute inset-0 bg-linear-to-r from-background/92 via-background/55 to-transparent sm:via-background/40"
-          }
-          aria-hidden
-        />
+        {overlayTone === "dark" ? (
+          <>
+            <div className="absolute inset-0 bg-black/55" aria-hidden />
+            <div
+              className={
+                focal === "right"
+                  ? "absolute inset-0 bg-linear-to-l from-black/80 via-black/45 to-black/15 sm:via-black/35"
+                  : "absolute inset-0 bg-linear-to-r from-black/80 via-black/45 to-black/15 sm:via-black/35"
+              }
+              aria-hidden
+            />
+          </>
+        ) : (
+          <div
+            className={
+              focal === "right"
+                ? "absolute inset-0 bg-linear-to-l from-background/92 via-background/55 to-transparent sm:via-background/40"
+                : "absolute inset-0 bg-linear-to-r from-background/92 via-background/55 to-transparent sm:via-background/40"
+            }
+            aria-hidden
+          />
+        )}
         {children ? (
           <div className="relative z-10 flex h-full min-h-[inherit] items-center">
-            <div className="axs-page-shell w-full py-12 md:py-16">{children}</div>
+            <div className="axs-page-shell w-full py-12 md:py-16">
+              <div className="axs-content-inner">{children}</div>
+            </div>
           </div>
         ) : null}
       </div>

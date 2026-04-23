@@ -9,6 +9,7 @@ import {
   type ForgotPasswordInput,
 } from "@/lib/validation/auth";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
@@ -46,7 +47,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
+    <AuthPageShell>
       <AuthCard
         title="Forgot Password"
         subtitle="Enter your email to receive a password reset link"
@@ -94,6 +95,6 @@ export default function ForgotPasswordPage() {
           </div>
         )}
       </AuthCard>
-    </div>
+    </AuthPageShell>
   );
 }

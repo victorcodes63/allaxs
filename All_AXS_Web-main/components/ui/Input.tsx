@@ -1,4 +1,5 @@
 import { InputHTMLAttributes, forwardRef } from "react";
+import { nativeDarkControlClass } from "@/components/ui/nativeDarkField";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -14,7 +15,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block font-medium mb-1 text-sm text-black"
+            className="mb-1 block text-sm font-medium text-foreground"
           >
             {label}
           </label>
@@ -24,9 +25,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           aria-invalid={error ? "true" : "false"}
           aria-describedby={error ? `${inputId}-error` : undefined}
-          className={`w-full border ${
-            error ? "border-primary" : "border-black/20"
-          } rounded-lg px-4 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors ${className}`}
+          className={`${nativeDarkControlClass(!!error)} ${className}`}
           {...props}
         />
         {error && (

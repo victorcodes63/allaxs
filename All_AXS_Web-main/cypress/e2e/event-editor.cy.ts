@@ -1,13 +1,14 @@
 describe("Event Editor", () => {
   beforeEach(() => {
     // Mock authenticated user
-    cy.intercept("GET", "/api/auth/me", {
+    cy.intercept("GET", "**/api/auth/me", {
       statusCode: 200,
       body: {
         user: {
           id: "organizer-user-id",
           email: "organizer@example.com",
           name: "Organizer User",
+          roles: ["ORGANIZER"],
         },
       },
     }).as("getMe");
@@ -30,17 +31,17 @@ describe("Event Editor", () => {
       ticketTypes: [],
     };
 
-    cy.intercept("GET", "/api/events/event-id-123", {
+    cy.intercept("GET", "**/api/events/event-id-123", {
       statusCode: 200,
       body: mockEvent,
     }).as("getEvent");
 
-    cy.intercept("PATCH", "/api/events/event-id-123", {
+    cy.intercept("PATCH", "**/api/events/event-id-123", {
       statusCode: 200,
       body: { ...mockEvent, title: "Updated Event" },
     }).as("updateEvent");
 
-    cy.intercept("POST", "/api/events/event-id-123/submit", {
+    cy.intercept("POST", "**/api/events/event-id-123/submit", {
       statusCode: 200,
       body: { ...mockEvent, status: "PENDING_REVIEW" },
     }).as("submitEvent");
@@ -50,7 +51,7 @@ describe("Event Editor", () => {
     cy.visit("/organizer/events/event-id-123/edit");
     cy.wait("@getEvent");
 
-    cy.contains("Edit Event").should("be.visible");
+    cy.contains("Editing").should("be.visible");
     cy.contains("Test Event").should("be.visible");
 
     // Check tabs are present
@@ -108,13 +109,13 @@ describe("Event Editor", () => {
     cy.wait("@submitEvent");
 
     // After submit, status should change and button should disappear
-    cy.contains("PENDING_REVIEW").should("be.visible");
+    cy.contains(/pending review/i).should("be.visible");
     cy.contains("button", "Submit for Review").should("not.exist");
   });
 
   it("should disable editing when event is not in editable status", () => {
     // Mock published event
-    cy.intercept("GET", "/api/events/event-id-123", {
+    cy.intercept("GET", "**/api/events/event-id-123", {
       statusCode: 200,
       body: {
         id: "event-id-123",
@@ -144,9 +145,9 @@ describe("Event Editor", () => {
     cy.contains("button", "Media").click();
 
     // Should show upload area
-    cy.contains("Event Banner").should("be.visible");
-    cy.contains("No banner uploaded").should("be.visible");
-    cy.contains("button", "Upload Banner").should("be.visible");
+    cy.contains("Poster / banner").should("be.visible");
+    cy.contains("No poster yet").should("be.visible");
+    cy.contains("button", "Upload poster").should("be.visible");
   });
 
   it("should display Ticket Tiers tab", () => {
@@ -162,7 +163,7 @@ describe("Event Editor", () => {
   });
 
   it("should handle 404 error gracefully", () => {
-    cy.intercept("GET", "/api/events/non-existent-id", {
+    cy.intercept("GET", "**/api/events/non-existent-id", {
       statusCode: 404,
       body: { message: "Event not found" },
     }).as("getNonExistentEvent");
@@ -171,11 +172,11 @@ describe("Event Editor", () => {
     cy.wait("@getNonExistentEvent");
 
     cy.contains("Event not found").should("be.visible");
-    cy.contains("Back to Events").should("be.visible");
+    cy.contains("Back to events").should("be.visible");
   });
 
   it("should handle 403 error gracefully", () => {
-    cy.intercept("GET", "/api/events/event-id-123", {
+    cy.intercept("GET", "**/api/events/event-id-123", {
       statusCode: 403,
       body: { message: "You do not have permission to access this event" },
     }).as("getEventForbidden");
@@ -190,13 +191,14 @@ describe("Event Editor", () => {
 describe("Events List and Creation", () => {
   beforeEach(() => {
     // Mock authenticated user
-    cy.intercept("GET", "/api/auth/me", {
+    cy.intercept("GET", "**/api/auth/me", {
       statusCode: 200,
       body: {
         user: {
           id: "organizer-user-id",
           email: "organizer@example.com",
           name: "Organizer User",
+          roles: ["ORGANIZER"],
         },
       },
     }).as("getMe");
@@ -228,7 +230,7 @@ describe("Events List and Creation", () => {
       },
     ];
 
-    cy.intercept("GET", "/api/events", {
+    cy.intercept("GET", /\/api\/events$/, {
       statusCode: 200,
       body: mockEvents,
     }).as("getEvents");
@@ -244,7 +246,7 @@ describe("Events List and Creation", () => {
       type: "IN_PERSON",
     };
 
-    cy.intercept("POST", "/api/events", {
+    cy.intercept("POST", "**/api/events", {
       statusCode: 201,
       body: newEvent,
     }).as("createEvent");
@@ -254,8 +256,8 @@ describe("Events List and Creation", () => {
     cy.visit("/organizer/events");
     cy.wait("@getEvents");
 
-    cy.contains("My Events").should("be.visible");
-    cy.contains("Create Event").should("be.visible");
+    cy.get("h1").should("contain.text", "Events");
+    cy.contains("button", "Create event").should("be.visible");
     cy.contains("Event 1").should("be.visible");
     cy.contains("Event 2").should("be.visible");
   });
@@ -279,9 +281,9 @@ describe("Events List and Creation", () => {
     cy.visit("/organizer/events");
     cy.wait("@getEvents");
 
-    cy.contains("Create Event").click();
+    cy.contains("button", "Create event").click();
     cy.url().should("include", "/organizer/events/new");
-    cy.contains("Create Event").should("be.visible");
+    cy.get("h1").should("contain.text", "Create event");
   });
 
   it("should create event and redirect to editor", () => {
@@ -294,7 +296,7 @@ describe("Events List and Creation", () => {
     cy.get('input[name="startsAt"]').type("2025-12-20T10:00");
     cy.get('input[name="endsAt"]').type("2025-12-20T18:00");
 
-    // Submit
+    // Submit (form primary label uses title case on the new-event page)
     cy.contains("button", "Create Event").click();
     cy.wait("@createEvent");
 
@@ -303,21 +305,34 @@ describe("Events List and Creation", () => {
   });
 
   it("should navigate to editor from list", () => {
+    cy.intercept("GET", /\/api\/events\/event-1$/, {
+      statusCode: 200,
+      body: {
+        id: "event-1",
+        title: "Event 1",
+        type: "IN_PERSON",
+        venue: "Venue 1",
+        startAt: "2025-12-01T10:00:00Z",
+        endAt: "2025-12-01T18:00:00Z",
+        description: "",
+        status: "DRAFT",
+        slug: "event-1",
+        bannerUrl: null,
+        ticketTypes: [],
+      },
+    }).as("getEventOne");
+
     cy.visit("/organizer/events");
     cy.wait("@getEvents");
 
-    // Click Edit on first event
-    cy.contains("Event 1")
-      .closest("div")
-      .within(() => {
-        cy.contains("button", "Edit").click();
-      });
+    cy.get('a[href="/organizer/events/event-1/edit"]').click();
+    cy.wait("@getEventOne");
 
     cy.url().should("include", "/organizer/events/event-1/edit");
   });
 
   it("should show empty state when no events", () => {
-    cy.intercept("GET", "/api/events", {
+    cy.intercept("GET", /\/api\/events$/, {
       statusCode: 200,
       body: [],
     }).as("getEmptyEvents");
@@ -327,6 +342,32 @@ describe("Events List and Creation", () => {
 
     cy.contains("No events yet").should("be.visible");
     cy.contains("Create Your First Event").should("be.visible");
+  });
+
+  it("should accept paginated / wrapped organizer list payloads", () => {
+    cy.intercept("GET", /\/api\/events$/, {
+      statusCode: 200,
+      body: {
+        events: [
+          {
+            id: "event-wrapped-1",
+            title: "Wrapped Shape Event",
+            status: "DRAFT",
+            startAt: "2025-12-01T10:00:00Z",
+            endAt: "2025-12-01T18:00:00Z",
+            venue: "Venue",
+            slug: "wrapped",
+            type: "IN_PERSON",
+          },
+        ],
+        total: 1,
+      },
+    }).as("getEventsWrapped");
+
+    cy.visit("/organizer/events");
+    cy.wait("@getEventsWrapped");
+
+    cy.contains("Wrapped Shape Event").should("be.visible");
   });
 });
 

@@ -3,11 +3,21 @@
  * Event art uses posters from `/public/posters` with titles aligned to each campaign.
  *
  * Enable with NEXT_PUBLIC_USE_DEMO_EVENTS=true
+ *
+ * Catalogue mirror: keep aligned with All_AXS_Backend-main `scripts/demo-catalogue-seed-data.ts`.
+ *
+ * Organizer fields mirror the API `npm run seed:demo` demo organizer
+ * (`demo-organizer@allaxs.demo` + `organizer_profiles`) so switching
+ * `NEXT_PUBLIC_USE_DEMO_EVENTS=false` against a seeded API shows the same
+ * catalogue story. IDs here are fixture-only until the API returns real UUIDs.
  */
 
 import type { PublicEvent } from "@/lib/types/public-event";
 
-const ORG = { id: "demo-org-allaxs", orgName: "All AXS (demo)" };
+const DEMO_ORGANIZER = {
+  id: "demo-organizer-seed-profile",
+  orgName: "Demo Organizer",
+} as const;
 
 const demo = (
   e: Omit<PublicEvent, "createdAt" | "updatedAt"> & {
@@ -44,13 +54,13 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-04-24T15:00:00.000Z",
     endAt: "2026-04-24T16:30:00.000Z",
     bannerUrl: POSTER.blueprint,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-01a",
         name: "General",
         description: "Live access + replay 7 days",
-        priceCents: 0,
+        priceCents: 24900,
         currency: "KES",
         quantityTotal: 500,
         quantitySold: 0,
@@ -73,12 +83,12 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-05-02T12:00:00.000Z",
     endAt: "2026-05-02T13:15:00.000Z",
     bannerUrl: POSTER.currency,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-02a",
         name: "RSVP",
-        priceCents: 0,
+        priceCents: 14900,
         currency: "KES",
         quantityTotal: 800,
         quantitySold: 12,
@@ -101,7 +111,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-05-16T14:00:00.000Z",
     endAt: "2026-05-16T15:30:00.000Z",
     bannerUrl: POSTER.giveToGain,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-03a",
@@ -129,7 +139,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-06-07T08:00:00.000Z",
     endAt: "2026-06-07T11:00:00.000Z",
     bannerUrl: POSTER.womenAi,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-04a",
@@ -168,7 +178,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-06-20T07:30:00.000Z",
     endAt: "2026-06-20T12:00:00.000Z",
     bannerUrl: POSTER.visioning,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-05a",
@@ -196,12 +206,12 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-07-05T13:00:00.000Z",
     endAt: "2026-07-05T15:00:00.000Z",
     bannerUrl: POSTER.wealth,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-06a",
         name: "Participant",
-        priceCents: 0,
+        priceCents: 44900,
         currency: "KES",
         quantityTotal: 900,
         quantitySold: 0,
@@ -222,7 +232,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-07-18T09:00:00.000Z",
     endAt: "2026-07-18T12:30:00.000Z",
     bannerUrl: POSTER.blueprint,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-07a",
@@ -257,7 +267,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-08-09T16:00:00.000Z",
     endAt: "2026-08-09T17:45:00.000Z",
     bannerUrl: POSTER.currency,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-08a",
@@ -283,7 +293,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-08-29T06:00:00.000Z",
     endAt: "2026-08-30T16:00:00.000Z",
     bannerUrl: POSTER.visioning,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-09a",
@@ -320,7 +330,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
     startAt: "2026-09-19T05:30:00.000Z",
     endAt: "2026-09-19T14:00:00.000Z",
     bannerUrl: POSTER.giveToGain,
-    organizer: ORG,
+    organizer: DEMO_ORGANIZER,
     ticketTypes: [
       {
         id: "demo-tt-10a",

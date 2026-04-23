@@ -7,15 +7,28 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
 import { AuthCard } from "@/components/auth/AuthCard";
+import { AuthPageShell } from "@/components/auth/AuthPageShell";
+import { AuthIntentHint } from "@/components/auth/AuthIntentHint";
+import { AuthSessionEntryGate } from "@/components/auth/AuthSessionEntryGate";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
+import {
+  buildAuthQuery,
+  fetchPostAuthSnapshot,
+  parseIntent,
+  resolvePostAuthRedirect,
+} from "@/lib/auth/post-auth-redirect";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const registerHref = `/register${buildAuthQuery({
+    next: searchParams.get("next"),
+    intent: parseIntent(searchParams.get("intent")),
+  })}`;
 
   const {
     register,
@@ -34,9 +47,14 @@ function LoginForm() {
       const response = await axios.post("/api/auth/login", data);
       
       if (response.status === 200) {
-        // Redirect to dashboard or the next parameter
-        const next = searchParams.get("next") || "/dashboard";
-        router.push(next);
+        const snapshot = await fetchPostAuthSnapshot();
+        const path = resolvePostAuthRedirect({
+          nextParam: searchParams.get("next"),
+          intent: parseIntent(searchParams.get("intent")),
+          roles: snapshot.roles,
+          hasOrganizerProfile: snapshot.hasOrganizerProfile,
+        });
+        router.push(path);
       }
     } catch (err) {
       const message =
@@ -48,11 +66,12 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
+    <AuthPageShell>
       <AuthCard
         title="Sign In"
         subtitle="Enter your credentials to access your account"
       >
+        <AuthIntentHint searchParams={searchParams} basePath="/login" />
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {error && (
             <div className="bg-primary/10 border border-primary/30 text-primary rounded-lg p-3 text-sm">
@@ -90,28 +109,33 @@ function LoginForm() {
           >
             Forgot password?
           </Link>
-          <p className="text-sm text-black/60">
+          <p className="text-sm text-muted">
             Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
+            <Link href={registerHref} className="text-primary hover:underline">
               Sign up
             </Link>
           </p>
         </div>
       </AuthCard>
-    </div>
+    </AuthPageShell>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-black/60">Loading...</p>
-        </div>
-      </div>
-    }>
-      <LoginForm />
+    <Suspense
+      fallback={
+        <AuthPageShell>
+          <p className="text-lg text-muted">Loading…</p>
+        </AuthPageShell>
+      }
+    >
+      <AuthSessionEntryGate
+        title="Sign In"
+        subtitle="Enter your credentials to access your account"
+      >
+        <LoginForm />
+      </AuthSessionEntryGate>
     </Suspense>
   );
 }

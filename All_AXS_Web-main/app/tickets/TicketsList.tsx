@@ -2,27 +2,81 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { loadAllTickets } from "@/lib/checkout-storage";
+import { loadAllTickets, type StoredTicket } from "@/lib/checkout-storage";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
+import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
+import { mergeTicketsById, normalizeApiTicketsPayload } from "@/lib/tickets-api";
 
 export function TicketsList() {
   const [mounted, setMounted] = useState(false);
+  const [apiTickets, setApiTickets] = useState<StoredTicket[] | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     const t = window.setTimeout(() => setMounted(true), 0);
     return () => window.clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    if (!mounted || !isApiCheckoutEnabled()) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/tickets/me", { credentials: "same-origin" });
+        if (!res.ok) {
+          if (cancelled) return;
+          if (res.status === 401) {
+            setApiError("Sign in to load tickets linked to your account.");
+          } else {
+            setApiError("Could not load tickets from the server.");
+          }
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setApiTickets(normalizeApiTicketsPayload(data));
+      } catch {
+        if (!cancelled) setApiError("Could not load tickets.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted]);
+
   if (!mounted) {
     return <p className="text-muted py-12 text-center">Loading tickets…</p>;
   }
 
-  const tickets = loadAllTickets();
+  const sessionTickets = loadAllTickets();
+  const tickets: StoredTicket[] = !isApiCheckoutEnabled()
+    ? sessionTickets
+    : apiError
+      ? sessionTickets
+      : mergeTicketsById(apiTickets ?? [], sessionTickets);
+
+  const awaitingServerList =
+    isApiCheckoutEnabled() && apiTickets === null && !apiError && tickets.length === 0;
+
+  if (awaitingServerList) {
+    return <p className="text-muted py-12 text-center">Loading tickets…</p>;
+  }
+
+  if (apiError && tickets.length === 0) {
+    return (
+      <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-16 text-center space-y-4 max-w-lg mx-auto">
+        <p className="text-lg text-muted">{apiError}</p>
+        <ArrowCtaLink href="/login" variant="primary">
+          Sign in
+        </ArrowCtaLink>
+      </div>
+    );
+  }
 
   if (tickets.length === 0) {
     return (
       <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-16 text-center space-y-4 max-w-lg mx-auto">
-        <p className="text-lg text-muted">No tickets yet—your QR passes will land here after purchase.</p>
+        <p className="text-lg text-muted">No tickets yet—complete checkout on a published event.</p>
         <ArrowCtaLink href="/events" variant="primary">
           Find an event
         </ArrowCtaLink>
@@ -30,9 +84,22 @@ export function TicketsList() {
     );
   }
 
+  const sessionFallbackBanner =
+    isApiCheckoutEnabled() && apiError && tickets.length > 0 ? (
+      <div className="rounded-[var(--radius-panel)] border border-border bg-primary/5 px-5 py-4 text-sm text-muted max-w-2xl">
+        <p className="font-medium text-foreground">Account passes unavailable</p>
+        <p className="mt-1 leading-relaxed">{apiError}</p>
+        <p className="mt-2 leading-relaxed">
+          You still have demo passes stored in this browser—open each card below for a scannable QR code.
+        </p>
+      </div>
+    ) : null;
+
   return (
-    <ul className="grid gap-4 sm:grid-cols-2">
-      {tickets.map((t) => (
+    <div className="space-y-6">
+      {sessionFallbackBanner}
+      <ul className="grid gap-4 sm:grid-cols-2">
+      {tickets.map((t: StoredTicket) => (
         <li key={t.id}>
           <Link
             href={`/tickets/${t.id}`}
@@ -47,6 +114,7 @@ export function TicketsList() {
           </Link>
         </li>
       ))}
-    </ul>
+      </ul>
+    </div>
   );
 }

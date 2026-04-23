@@ -21,7 +21,7 @@ export function Tabs({ tabs, defaultTab }: TabsProps) {
   return (
     <div className="w-full">
       {/* Tab Navigation */}
-      <div className="border-b border-black/10 mb-6">
+      <div className="mb-6 border-b border-border">
         <nav className="flex gap-4" role="tablist" aria-label="Event editor tabs">
           {tabs.map((tab) => (
             <button
@@ -46,10 +46,10 @@ export function Tabs({ tabs, defaultTab }: TabsProps) {
                   e.preventDefault();
                 }
               }}
-              className={`px-4 py-2 font-medium text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+              className={`px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 activeTab === tab.id
-                  ? "text-primary border-b-2 border-primary"
-                  : "text-black/60 hover:text-black"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-muted hover:text-foreground"
               }`}
             >
               {tab.label}

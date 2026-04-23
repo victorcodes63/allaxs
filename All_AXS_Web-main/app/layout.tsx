@@ -1,7 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Figtree } from "next/font/google";
-import { SiteHeader } from "@/components/layout/SiteHeader";
-import { SiteFooter } from "@/components/layout/SiteFooter";
+import { AppChrome } from "@/components/layout/AppChrome";
 import "./globals.css";
 
 /** Site-wide: Figtree (300–700), same weight range as before. */
@@ -17,21 +16,23 @@ export const metadata: Metadata = {
     "Discover live experiences and get tickets in seconds—built for fans and organizers across Africa.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={figtree.variable}>
+    <html lang="en" className={`${figtree.variable} axs-marketing-dark`}>
       <body
-        className={`font-sans antialiased bg-background text-foreground min-h-screen flex flex-col`}
+        className={`font-sans antialiased min-h-dvh flex flex-col bg-background text-foreground`}
       >
-        <SiteHeader />
-
-        <main className="flex-1 axs-page-shell py-8 md:py-10">{children}</main>
-
-        <SiteFooter />
+        <AppChrome>{children}</AppChrome>
       </body>
     </html>
   );

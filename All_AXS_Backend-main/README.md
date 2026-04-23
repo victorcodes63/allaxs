@@ -71,6 +71,7 @@ Server will be running at `http://localhost:8080`
 | **[POSTMAN_TESTING_GUIDE.md](POSTMAN_TESTING_GUIDE.md)** | API testing with Postman |
 | **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** | Database migration guide |
 | **[CI_SETUP.md](CI_SETUP.md)** | GitHub Actions CI/CD |
+| **[docs/DEMO_ROLES_AND_CHECKOUT.md](docs/DEMO_ROLES_AND_CHECKOUT.md)** | Demo roles, seed users, API checkout, QR signing |
 
 ---
 

@@ -15,27 +15,69 @@ function decodeJWT(token: string): { exp?: number } | null {
   }
 }
 
-export function middleware(request: NextRequest) {
+function accessTokenNeedsRotation(accessToken: string | undefined): boolean {
+  if (!accessToken) return true;
+  const decoded = decodeJWT(accessToken);
+  if (!decoded?.exp) return false;
+  const now = Math.floor(Date.now() / 1000);
+  return decoded.exp < now;
+}
+
+function forwardSetCookies(from: Response, to: NextResponse) {
+  const headersWithGetSetCookie = from.headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+  if (typeof headersWithGetSetCookie.getSetCookie === "function") {
+    for (const cookie of headersWithGetSetCookie.getSetCookie()) {
+      to.headers.append("Set-Cookie", cookie);
+    }
+    return;
+  }
+  const joined = from.headers.get("set-cookie");
+  if (joined) {
+    to.headers.append("Set-Cookie", joined);
+  }
+}
+
+/**
+ * When the access JWT is missing or past `exp`, renew it using the httpOnly refresh cookie
+ * so users stay signed in until they hit logout (refresh cookie lifetime).
+ */
+async function tryRefreshAndContinue(request: NextRequest): Promise<NextResponse | null> {
+  const refreshToken = request.cookies.get("refreshToken")?.value;
+  if (!refreshToken) return null;
+
+  const refreshUrl = new URL("/api/auth/refresh", request.url);
+  let refreshRes: Response;
+  try {
+    refreshRes = await fetch(refreshUrl, {
+      method: "POST",
+      headers: {
+        Cookie: request.headers.get("cookie") ?? "",
+      },
+    });
+  } catch {
+    return null;
+  }
+
+  if (!refreshRes.ok) return null;
+
+  const res = NextResponse.next();
+  forwardSetCookies(refreshRes, res);
+  return res;
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const accessToken = request.cookies.get("accessToken")?.value;
 
-  // Check if token exists
-  if (!accessToken) {
+  if (accessTokenNeedsRotation(accessToken)) {
+    const renewed = await tryRefreshAndContinue(request);
+    if (renewed) return renewed;
+
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
-  }
-
-  // Optionally check if token is expired
-  const decoded = decodeJWT(accessToken);
-  if (decoded?.exp) {
-    const now = Math.floor(Date.now() / 1000);
-    if (decoded.exp < now) {
-      // Token expired, redirect to login
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
   }
 
   return NextResponse.next();
@@ -47,9 +89,6 @@ export const config = {
     "/organizer/:path*",
     "/admin/:path*",
     "/account/:path*",
-    /* Checkout requires an account so the demo matches signup → pay → ticket */
-    "/events/:eventId/checkout",
-    /* /tickets stays public so session-stored passes work after checkout */
+    /* Checkout is public: buyers choose sign-in / new account or guest delivery; /tickets stays public for session passes. */
   ],
 };
-
