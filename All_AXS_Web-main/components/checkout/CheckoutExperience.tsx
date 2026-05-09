@@ -10,13 +10,11 @@ import { getEventBannerUrl, generatePlaceholderImage } from "@/lib/utils/image";
 import {
   clearCheckoutDraft,
   loadCheckoutDraft,
-  mergeTicketsFromApi,
   saveCheckoutDraft,
   saveOrderForSession,
   saveOrderSnapshot,
   type CheckoutLineItem,
   type StoredOrder,
-  type StoredTicket,
 } from "@/lib/checkout-storage";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
 import { ArrowButton } from "@/components/ui/ArrowCta";
@@ -238,7 +236,7 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
     setSubmitting(true);
     try {
       if (isApiCheckoutEnabled() && signedIn) {
-        const res = await fetch("/api/checkout/demo", {
+        const res = await fetch("/api/checkout/paystack/init", {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -255,30 +253,9 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
         });
         const data = (await res.json().catch(() => ({}))) as {
           message?: string | string[];
-          order?: {
-            id: string;
-            eventId: string;
-            totalCents: number;
-            currency: string;
-            eventTitle: string;
-            eventSlug: string;
-            buyerName: string;
-            buyerEmail: string;
-            lineItems: {
-              ticketTypeId: string;
-              name: string;
-              quantity: number;
-              unitPriceCents: number;
-              currency: string;
-            }[];
-          };
-          tickets?: {
-            id: string;
-            ticketTypeId: string;
-            tierName: string;
-            qrNonce: string;
-            qrSignature: string;
-          }[];
+          orderId?: string;
+          reference?: string;
+          authorizationUrl?: string;
         };
         if (!res.ok) {
           const msg = Array.isArray(data.message)
@@ -287,50 +264,30 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
           setError(msg);
           return;
         }
-        const order = data.order;
-        const tickets = data.tickets;
-        if (!order?.id || !tickets?.length) {
-          setError("Unexpected response from checkout.");
+        if (!data.authorizationUrl) {
+          setError("Could not start Paystack checkout.");
           return;
         }
-        const createdAt = new Date().toISOString();
-        const orderSnap: StoredOrder = {
-          orderId: order.id,
-          createdAt,
-          eventId: order.eventId,
-          eventSlug: order.eventSlug,
-          eventTitle: order.eventTitle,
-          buyerName: order.buyerName,
-          buyerEmail: order.buyerEmail,
-          buyerPhone: phone.trim() || undefined,
-          lineItems: order.lineItems.map((li) => ({
-            ticketTypeId: li.ticketTypeId,
-            name: li.name,
-            quantity: li.quantity,
-            unitPriceCents: li.unitPriceCents,
-            currency: li.currency,
-          })),
-          totalCents: order.totalCents,
-          currency: order.currency,
-          guestCheckout: false,
-          ticketDelivery: "account",
-        };
-        saveOrderForSession(orderSnap);
-        const mapped: StoredTicket[] = tickets.map((t) => ({
-          id: t.id,
-          orderId: order.id,
-          eventSlug: order.eventSlug,
-          eventTitle: order.eventTitle,
-          tierName: t.tierName,
-          attendeeEmail: order.buyerEmail,
-          issuedAt: createdAt,
-          currency: order.currency,
-          qrNonce: t.qrNonce,
-          qrSignature: t.qrSignature,
-        }));
-        mergeTicketsFromApi(mapped);
-        clearCheckoutDraft();
-        router.push(`/orders/${order.id}/confirmation`);
+        if (typeof window !== "undefined") {
+          const pending: StoredOrder = {
+            orderId: data.orderId || "",
+            createdAt: new Date().toISOString(),
+            eventId: event.id,
+            eventSlug: event.slug,
+            eventTitle: event.title,
+            buyerName: name.trim(),
+            buyerEmail: email.trim(),
+            buyerPhone: phone.trim() || undefined,
+            lineItems,
+            totalCents: subtotal,
+            currency,
+            guestCheckout: false,
+            ticketDelivery: "account",
+          };
+          saveOrderForSession(pending);
+          clearCheckoutDraft();
+          window.location.href = data.authorizationUrl;
+        }
         return;
       }
 
@@ -433,7 +390,7 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
             <>
               Demo checkout: no card or wallet is charged. Choose how you want to receive passes—signed-in
               buyers can use <strong>My tickets</strong>; guests get email / WhatsApp details in production
-              and instant QR on this device in the demo.
+              and instant QR on this device in fallback mode.
             </>
           ) : (
             <>
@@ -447,7 +404,7 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
               ) : (
                 <>
                   Choose <strong>account checkout</strong> (sign in or register) to save passes to My tickets,
-                  or <strong>guest checkout</strong> to continue with email and optional WhatsApp—demo issues
+                  or <strong>guest checkout</strong> to continue with email and optional WhatsApp—fallback mode issues
                   QR passes on this device right away.
                 </>
               )}
@@ -656,7 +613,7 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
                     <>
                       {isApiCheckoutEnabled() && (
                         <p className="text-xs text-muted leading-relaxed">
-                          Server-backed checkout is available to signed-in buyers only. As a guest, this demo still
+                          Server-backed checkout is available to signed-in buyers only. As a guest, fallback mode still
                           creates your QR passes in this browser right away.
                         </p>
                       )}
@@ -693,9 +650,11 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
               >
                 {submitting
                   ? "Processing…"
-                  : subtotal === 0
-                    ? "Complete demo — free pass"
-                    : `Complete demo payment — ${subtotal / 100} ${currency}`}
+                  : isApiCheckoutEnabled() && signedIn
+                    ? `Proceed to Paystack — ${subtotal / 100} ${currency}`
+                    : subtotal === 0
+                      ? "Complete checkout — free pass"
+                      : `Complete checkout — ${subtotal / 100} ${currency}`}
               </ArrowButton>
               {(signedIn || guestMode === true) && (
                 <p className="text-xs text-muted max-w-md">

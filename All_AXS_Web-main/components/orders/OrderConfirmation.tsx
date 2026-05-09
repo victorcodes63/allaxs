@@ -74,6 +74,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         const data = (await res.json()) as {
           order: {
             id: string;
+            status: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED" | "DRAFT";
             eventId: string;
             totalCents: number;
             currency: string;
@@ -194,7 +195,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         </h1>
         <p className="text-muted leading-relaxed">
           Order <span className="font-mono text-foreground text-sm">{order.orderId.slice(0, 8)}…</span>{" "}
-          is confirmed (demo—no real card / Paystack charge).
+          {apiCheckout ? "has been confirmed." : "is confirmed (demo—no real card / Paystack charge)."}
           {guest ? (
             <>
               {" "}
@@ -228,11 +229,11 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
           ) : apiCheckout ? (
             <>
               {" "}
-              Your order is stored in the database—open{" "}
+              Your payment has been verified and tickets were issued. Open{" "}
               <Link href="/tickets" className="text-primary font-semibold hover:underline">
                 My tickets
               </Link>{" "}
-              for QR codes.
+              for QR codes, or request a resend below.
             </>
           ) : (
             <>
@@ -357,6 +358,20 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
       </div>
 
       <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center">
+        {apiCheckout ? (
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch(`/api/checkout/orders/${order.orderId}/resend-tickets`, {
+                method: "POST",
+                credentials: "same-origin",
+              });
+            }}
+            className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/45"
+          >
+            Resend ticket email
+          </button>
+        ) : null}
         {passes[0] ? (
           <ArrowCtaLink href={`/tickets/${passes[0].id}`} variant="primary" className="justify-center">
             Open first QR pass
