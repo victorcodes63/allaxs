@@ -14,6 +14,16 @@ export const metadata: Metadata = {
   title: "All AXS | Events & ticketing",
   description:
     "Discover live experiences and get tickets in seconds—built for fans and organizers across Africa.",
+  manifest: "/favicons/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicons/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicons/favicon.png", type: "image/png" },
+    ],
+    apple: [{ url: "/favicons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/favicons/favicon-32x32.png"],
+  },
 };
 
 export const viewport: Viewport = {
