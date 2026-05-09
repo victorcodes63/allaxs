@@ -115,6 +115,28 @@ function LoginForm() {
               Sign up
             </Link>
           </p>
+          <details className="pt-2 text-xs">
+            <summary className="mx-auto inline-flex cursor-pointer list-none items-center gap-1.5 rounded-full border border-border/50 px-2.5 py-1 text-muted hover:border-border">
+              <span
+                aria-hidden
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] font-semibold leading-none"
+              >
+                i
+              </span>
+              <span>Demo credentials</span>
+            </summary>
+            <div className="mx-auto mt-2 max-w-xs rounded-lg border border-border/50 bg-background/40 p-3 text-left text-muted">
+              <p>
+                Organizer: <span className="font-mono text-foreground">demo-organizer@allaxs.demo</span>
+              </p>
+              <p>
+                Attendee: <span className="font-mono text-foreground">demo-attendee@allaxs.demo</span>
+              </p>
+              <p>
+                Password: <span className="font-mono text-foreground">DemoFlow123!</span>
+              </p>
+            </div>
+          </details>
         </div>
       </AuthCard>
     </AuthPageShell>
