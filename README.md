@@ -27,6 +27,14 @@ BACKEND_PUSH_FORCE=1 ./scripts/push-backend-to-github.sh
 
 Override defaults if needed: `BACKEND_REMOTE`, `BACKEND_URL`.
 
+**Optional — run automatically on `git push`:** when commits you are pushing touch `All_AXS_Backend-main/`, the pre-push hook mirrors that subtree to the backend repo (same as the script above). Enable once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Pushes to the `backend` remote are skipped by the hook (stdin is drained first so nested `git push backend` from the subtree script never hangs).
+
 ## Local development
 
 - **Web:** `cd All_AXS_Web-main && npm install && npm run dev`
