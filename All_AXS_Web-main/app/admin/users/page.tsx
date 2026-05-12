@@ -17,6 +17,7 @@ import {
   type UserActionKind,
   type UserActionTarget,
 } from "@/components/admin/UserActionConfirmDialog";
+import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
 
 type UserStatus = "ACTIVE" | "SUSPENDED";
 
@@ -36,9 +37,6 @@ interface AdminUsersResponse {
   limit: number;
   offset: number;
 }
-
-const PAGE_PADDING =
-  "mx-auto w-full max-w-[min(100%,1400px)] px-4 sm:px-6 lg:px-8";
 
 const ROLE_FILTERS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "all", label: "All roles" },
@@ -194,21 +192,21 @@ function AdminUsersPageContent() {
   };
 
   return (
-    <main className={`${PAGE_PADDING} space-y-6 py-6 md:py-8`}>
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+    <main className={`${ADMIN_PAGE_SHELL} space-y-6 sm:space-y-8`}>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+        <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">
             Admin
           </p>
-          <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="mt-1.5 font-display text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
             Users
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
             Manage roles and account status for everyone on the platform. All
             changes are recorded in the admin audit trail.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted sm:shrink-0">
           <span className="rounded-full border border-border/70 bg-surface/80 px-3 py-1">
             {total} total
           </span>
@@ -281,7 +279,7 @@ function AdminUsersPageContent() {
       </div>
 
       {error ? (
-        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3.5 text-sm leading-relaxed text-red-100 sm:p-4">
           {error}
         </div>
       ) : null}
@@ -445,7 +443,7 @@ function AdminUserCard({
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="min-w-0 truncate font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+          <h3 className="line-clamp-2 min-w-0 font-display text-base font-semibold leading-snug tracking-tight text-foreground sm:line-clamp-1 sm:truncate sm:text-lg">
             {display}
           </h3>
           <span
@@ -551,7 +549,9 @@ export default function AdminUsersPage() {
   return (
     <Suspense
       fallback={
-        <main className={`${PAGE_PADDING} py-10`}>
+        <main
+          className={`${ADMIN_PAGE_SHELL} flex min-h-[min(40vh,20rem)] flex-col justify-center py-12 sm:py-16`}
+        >
           <p className="text-sm text-muted">Loading users…</p>
         </main>
       }

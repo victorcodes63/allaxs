@@ -10,6 +10,7 @@ import {
   getEventBannerUrl,
   shouldUnoptimizeEventImage,
 } from "@/lib/utils/image";
+import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
 
 type EventStatusKey = (typeof EventStatus)[keyof typeof EventStatus];
 
@@ -44,9 +45,6 @@ const STATUS_FILTERS: ReadonlyArray<{ value: string; label: string }> = [
   { value: EventStatus.REJECTED, label: "Rejected" },
   { value: EventStatus.ARCHIVED, label: "Archived" },
 ];
-
-const PAGE_PADDING =
-  "mx-auto w-full max-w-[min(100%,1400px)] px-4 sm:px-6 lg:px-8";
 
 function statusChipClass(status: string): string {
   switch (status) {
@@ -165,22 +163,22 @@ function AdminEventsPageContent() {
   }, [events]);
 
   return (
-    <main className={`${PAGE_PADDING} space-y-6 py-6 md:py-8`}>
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+    <main className={`${ADMIN_PAGE_SHELL} space-y-6 sm:space-y-8`}>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+        <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">
             Admin
           </p>
-          <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="mt-1.5 font-display text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
             All events
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
             Every event on the platform across organisers and statuses. Use
             this view for research; jump into the moderation queue to action
             pending submissions.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted sm:shrink-0">
           <span className="rounded-full border border-border/70 bg-surface/80 px-3 py-1">
             {counts.total} total
           </span>
@@ -305,7 +303,7 @@ function AdminEventCard({ event }: { event: AdminEventRow }) {
             alt=""
             fill
             className="object-cover"
-            sizes="160px"
+            sizes="(max-width: 639px) 92vw, 160px"
             unoptimized={shouldUnoptimizeEventImage(bannerSrc)}
           />
         ) : (
@@ -316,7 +314,7 @@ function AdminEventCard({ event }: { event: AdminEventRow }) {
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="min-w-0 truncate font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+          <h3 className="line-clamp-2 min-w-0 font-display text-base font-semibold leading-snug tracking-tight text-foreground sm:line-clamp-1 sm:truncate sm:text-lg">
             {event.title}
           </h3>
           <span
@@ -388,7 +386,9 @@ export default function AdminEventsPage() {
   return (
     <Suspense
       fallback={
-        <main className={`${PAGE_PADDING} py-10`}>
+        <main
+          className={`${ADMIN_PAGE_SHELL} flex min-h-[min(40vh,20rem)] flex-col justify-center py-12 sm:py-16`}
+        >
           <p className="text-sm text-muted">Loading events…</p>
         </main>
       }

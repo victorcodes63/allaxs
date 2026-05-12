@@ -88,9 +88,14 @@ export function EventReviewActions({
 
   return (
     <>
-      <div className={className ?? "flex flex-wrap items-center gap-2"}>
+      <div
+        className={
+          className ??
+          "grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-2"
+        }
+      >
         {error ? (
-          <div className="w-full rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+          <div className="col-span-2 w-full rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
             {error}
           </div>
         ) : null}
@@ -99,7 +104,7 @@ export function EventReviewActions({
           variant="secondary"
           onClick={() => setRejectDialogOpen(true)}
           disabled={isApproving || isRejecting}
-          className="w-auto border-red-400/30 bg-red-500/10 text-red-100 hover:border-red-400/50 hover:bg-red-500/20 hover:text-white"
+          className="w-full border-red-400/30 bg-red-500/10 text-red-100 hover:border-red-400/50 hover:bg-red-500/20 hover:text-white sm:w-auto"
         >
           Reject
         </Button>
@@ -108,7 +113,7 @@ export function EventReviewActions({
           variant="primary"
           onClick={() => setApproveDialogOpen(true)}
           disabled={isApproving || isRejecting}
-          className="w-auto"
+          className="w-full sm:w-auto"
         >
           {isApproving ? "Approving…" : "Approve"}
         </Button>

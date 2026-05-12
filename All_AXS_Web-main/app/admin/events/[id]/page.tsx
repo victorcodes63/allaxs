@@ -12,6 +12,7 @@ import {
   getEventBannerUrl,
   shouldUnoptimizeEventImage,
 } from "@/lib/utils/image";
+import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
 
 interface AdminTicketType {
   id: string;
@@ -79,9 +80,6 @@ interface AuditEntry {
   metadata?: Record<string, unknown> | null;
   admin: { id: string; email: string; name?: string | null } | null;
 }
-
-const PAGE_PADDING =
-  "mx-auto w-full max-w-[min(100%,1400px)] px-4 sm:px-6 lg:px-8";
 
 function statusChipClass(status: string): string {
   switch (status) {
@@ -181,7 +179,7 @@ function DetailItem({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[var(--radius-panel)] border border-border/70 bg-surface/70 p-4">
+    <div className="rounded-[var(--radius-panel)] border border-border/70 bg-surface/70 p-3.5 sm:p-4">
       <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
         {label}
       </dt>
@@ -214,13 +212,13 @@ function KpiTile({
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
         {label}
       </p>
-      <p className="mt-2 font-display text-2xl font-semibold tabular-nums text-foreground">
+      <p className="mt-1.5 font-display text-xl font-semibold tabular-nums text-foreground sm:mt-2 sm:text-2xl">
         {value}
       </p>
       {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
     </>
   );
-  const baseClass = `rounded-[var(--radius-panel)] border ${toneClass} p-4`;
+  const baseClass = `rounded-[var(--radius-panel)] border ${toneClass} p-3.5 sm:p-4`;
   if (href) {
     return (
       <Link
@@ -391,7 +389,9 @@ export default function AdminEventInspectPage() {
 
   if (loading) {
     return (
-      <main className={`${PAGE_PADDING} py-10`}>
+      <main
+        className={`${ADMIN_PAGE_SHELL} flex min-h-[min(40vh,20rem)] flex-col justify-center py-12 sm:py-16`}
+      >
         <p className="text-sm text-muted">Loading event…</p>
       </main>
     );
@@ -399,14 +399,14 @@ export default function AdminEventInspectPage() {
 
   if (error || !event) {
     return (
-      <main className={`${PAGE_PADDING} space-y-4 py-10`}>
+      <main className={`${ADMIN_PAGE_SHELL} space-y-4`}>
         <Link
           href="/admin/events"
           className="text-sm text-muted hover:text-foreground"
         >
           ← Back to all events
         </Link>
-        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
+        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3.5 text-sm leading-relaxed text-red-100 sm:p-4">
           {error || "Event not found."}
         </div>
       </main>
@@ -427,8 +427,8 @@ export default function AdminEventInspectPage() {
   const refundedCents = orders?.refunded.grossCents ?? 0;
 
   return (
-    <main className={`${PAGE_PADDING} space-y-6 py-6 md:py-8`}>
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <main className={`${ADMIN_PAGE_SHELL} space-y-6 sm:space-y-8`}>
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
         <div className="min-w-0">
           <Link
             href="/admin/events"
@@ -437,7 +437,7 @@ export default function AdminEventInspectPage() {
             ← Back to all events
           </Link>
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <h1 className="min-w-0 font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="min-w-0 font-display text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
               {event.title}
             </h1>
             <span
@@ -456,7 +456,7 @@ export default function AdminEventInspectPage() {
             does not depend on the moderation queue filter.
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
+        <div className="flex w-full shrink-0 flex-col items-stretch gap-2 sm:w-auto lg:items-end">
           {isPending ? (
             <EventReviewActions
               event={event}
@@ -468,8 +468,9 @@ export default function AdminEventInspectPage() {
               href={`/events/${event.slug}`}
               target="_blank"
               rel="noopener"
+              className="w-full sm:w-auto"
             >
-              <Button type="button" variant="secondary" className="w-auto">
+              <Button type="button" variant="secondary" className="w-full sm:w-auto">
                 View live
               </Button>
             </Link>
@@ -478,8 +479,8 @@ export default function AdminEventInspectPage() {
             Edit-as-admin route is intentionally always available (any status,
             any organiser). Audit-logged via ADMIN_UPDATE_EVENT.
           */}
-          <Link href={`/admin/events/${event.id}/edit` as const}>
-            <Button type="button" variant="secondary" className="w-auto">
+          <Link href={`/admin/events/${event.id}/edit` as const} className="w-full sm:w-auto">
+            <Button type="button" variant="secondary" className="w-full sm:w-auto">
               Edit as admin
             </Button>
           </Link>
@@ -488,7 +489,7 @@ export default function AdminEventInspectPage() {
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(20rem,0.7fr)]">
         <div className="space-y-6">
-          <div className="relative h-72 overflow-hidden rounded-[var(--radius-panel)] border border-border bg-wash md:h-96">
+          <div className="relative h-52 overflow-hidden rounded-[var(--radius-panel)] border border-border bg-wash sm:h-64 md:h-96">
             {bannerSrc ? (
               <Image
                 src={bannerSrc}
@@ -505,8 +506,8 @@ export default function AdminEventInspectPage() {
             )}
           </div>
 
-          <div className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-5">
-            <h2 className="font-display text-lg font-semibold text-foreground">
+          <div className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 sm:p-5">
+            <h2 className="font-display text-base font-semibold text-foreground sm:text-lg">
               Description
             </h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
@@ -543,12 +544,12 @@ export default function AdminEventInspectPage() {
         </aside>
       </section>
 
-      <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-5">
-        <div className="flex items-end justify-between gap-2">
-          <h2 className="font-display text-lg font-semibold text-foreground">
+      <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 sm:p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+          <h2 className="font-display text-base font-semibold text-foreground sm:text-lg">
             Ticket tiers
           </h2>
-          <p className="text-xs text-muted">
+          <p className="text-xs text-muted sm:text-right">
             {tiers.length} configured · sold figures from latest sync
           </p>
         </div>
@@ -565,17 +566,17 @@ export default function AdminEventInspectPage() {
         )}
       </section>
 
-      <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-5">
-        <div className="flex items-end justify-between gap-2">
-          <div>
-            <h2 className="font-display text-lg font-semibold text-foreground">
+      <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 sm:p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <h2 className="font-display text-base font-semibold text-foreground sm:text-lg">
               Revenue summary
             </h2>
-            <p className="mt-0.5 text-xs text-muted">
+            <p className="mt-1 text-xs leading-relaxed text-muted sm:mt-0.5">
               Tiles link through to the filtered orders view.
             </p>
           </div>
-          <p className="text-xs text-muted">
+          <p className="shrink-0 text-xs text-muted sm:text-right">
             Currency: <span className="text-foreground/85">{currency}</span>
           </p>
         </div>
@@ -617,12 +618,12 @@ export default function AdminEventInspectPage() {
         </div>
       </section>
 
-      <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-5">
-        <div className="flex items-end justify-between gap-2">
-          <h2 className="font-display text-lg font-semibold text-foreground">
+      <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 sm:p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+          <h2 className="font-display text-base font-semibold text-foreground sm:text-lg">
             Moderation history
           </h2>
-          <p className="text-xs text-muted">
+          <p className="text-xs text-muted sm:text-right">
             {audit.length} {audit.length === 1 ? "entry" : "entries"}
           </p>
         </div>

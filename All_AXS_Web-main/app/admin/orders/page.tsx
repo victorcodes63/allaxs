@@ -16,6 +16,7 @@ import {
   type BulkRefundResult,
 } from "@/components/admin/BulkRefundDialog";
 import { useSelection } from "@/lib/hooks/use-selection";
+import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
 
 type OrderStatusKey =
   | "DRAFT"
@@ -51,9 +52,6 @@ interface AdminOrdersResponse {
   limit: number;
   offset: number;
 }
-
-const PAGE_PADDING =
-  "mx-auto w-full max-w-[min(100%,1400px)] px-4 sm:px-6 lg:px-8";
 
 const STATUS_FILTERS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "all", label: "All" },
@@ -313,21 +311,21 @@ function AdminOrdersPageContent() {
   };
 
   return (
-    <main className={`${PAGE_PADDING} space-y-6 py-6 md:py-8`}>
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+    <main className={`${ADMIN_PAGE_SHELL} space-y-6 sm:space-y-8`}>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-6">
+        <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">
             Admin
           </p>
-          <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="mt-1.5 font-display text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
             Orders
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
             Every order on the platform across events, organisers, and statuses.
             Issue refunds with full audit trail.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted sm:shrink-0">
           <span className="rounded-full border border-border/70 bg-surface/80 px-3 py-1">
             {total} total
           </span>
@@ -412,7 +410,7 @@ function AdminOrdersPageContent() {
             })}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+        <div className="grid grid-cols-1 gap-3 sm:max-w-md sm:grid-cols-2">
           <div>
             <label
               htmlFor="admin-orders-from"
@@ -448,7 +446,7 @@ function AdminOrdersPageContent() {
 
       {actionMessage ? (
         <div
-          className="rounded-[var(--radius-panel)] border border-sky-400/30 bg-sky-500/10 p-3 text-sm text-sky-100"
+          className="rounded-[var(--radius-panel)] border border-sky-400/30 bg-sky-500/10 p-3.5 text-sm leading-relaxed text-sky-100 sm:p-4"
           role="status"
         >
           {actionMessage}
@@ -456,7 +454,7 @@ function AdminOrdersPageContent() {
       ) : null}
 
       {error ? (
-        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
+        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3.5 text-sm leading-relaxed text-red-100 sm:p-4">
           {error}
         </div>
       ) : null}
@@ -762,7 +760,9 @@ export default function AdminOrdersPage() {
   return (
     <Suspense
       fallback={
-        <main className={`${PAGE_PADDING} py-10`}>
+        <main
+          className={`${ADMIN_PAGE_SHELL} flex min-h-[min(40vh,20rem)] flex-col justify-center py-12 sm:py-16`}
+        >
           <p className="text-sm text-muted">Loading orders…</p>
         </main>
       }

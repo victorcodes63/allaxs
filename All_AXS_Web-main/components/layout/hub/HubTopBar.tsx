@@ -338,7 +338,7 @@ export function HubTopBar({
 
   return (
     <header className="sticky top-0 z-30 shrink-0 border-b border-border/70 bg-background/75 pt-[env(safe-area-inset-top,0px)] shadow-[0_1px_0_rgba(255,255,255,0.05),0_8px_32px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-      <div className={innerClassName}>
+      <div className={`${innerClassName} relative`}>
         <button
           type="button"
           className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-button)] border border-border/90 bg-surface/80 text-foreground shadow-[var(--btn-shadow-outline)] transition-[border-color,box-shadow,background-color] hover:border-primary/35 hover:bg-wash lg:hidden"
@@ -408,7 +408,7 @@ export function HubTopBar({
           </Link>
         ) : null}
 
-        <div className="relative shrink-0" ref={notificationsRef}>
+        <div className="shrink-0">
           <button
             ref={notificationsButtonRef}
             type="button"
@@ -433,11 +433,13 @@ export function HubTopBar({
               </span>
             ) : null}
           </button>
+        </div>
 
-          {notificationsOpen ? (
+        {notificationsOpen ? (
             <div
+              ref={notificationsRef}
               role="menu"
-              className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-[var(--radius-panel)] border border-border/90 bg-surface shadow-[0_16px_48px_-12px_rgba(0,0,0,0.55)]"
+              className="absolute inset-x-0 top-[calc(100%+0.5rem)] z-50 overflow-hidden rounded-[var(--radius-panel)] border border-border/90 bg-surface shadow-[0_16px_48px_-12px_rgba(0,0,0,0.55)]"
             >
               <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
@@ -551,7 +553,6 @@ export function HubTopBar({
               )}
             </div>
           ) : null}
-        </div>
 
         <div className="hidden h-8 w-px shrink-0 bg-border/70 sm:block" aria-hidden />
 

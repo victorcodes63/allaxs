@@ -18,6 +18,7 @@ import {
   type UserActionKind,
   type UserActionTarget,
 } from "@/components/admin/UserActionConfirmDialog";
+import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
 
 type UserStatus = "ACTIVE" | "SUSPENDED";
 
@@ -96,9 +97,6 @@ interface AuditEntry {
   metadata?: Record<string, unknown> | null;
   admin: { id: string; email: string; name?: string | null } | null;
 }
-
-const PAGE_PADDING =
-  "mx-auto w-full max-w-[min(100%,1400px)] px-4 sm:px-6 lg:px-8";
 
 function roleChipClass(role: AdminRole): string {
   switch (role) {
@@ -256,7 +254,9 @@ function AdminUserDetailPageContent() {
 
   if (loading) {
     return (
-      <main className={`${PAGE_PADDING} py-10`}>
+      <main
+        className={`${ADMIN_PAGE_SHELL} flex min-h-[min(40vh,20rem)] flex-col justify-center py-12 sm:py-16`}
+      >
         <p className="text-sm text-muted">Loading user…</p>
       </main>
     );
@@ -264,7 +264,7 @@ function AdminUserDetailPageContent() {
 
   if (error || !detail) {
     return (
-      <main className={`${PAGE_PADDING} space-y-4 py-10`}>
+      <main className={`${ADMIN_PAGE_SHELL} space-y-4`}>
         <button
           type="button"
           onClick={() => router.back()}
@@ -272,7 +272,7 @@ function AdminUserDetailPageContent() {
         >
           ← Back
         </button>
-        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
+        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3.5 text-sm leading-relaxed text-red-100 sm:p-4">
           {error ?? "User not found."}
         </div>
       </main>
@@ -287,7 +287,7 @@ function AdminUserDetailPageContent() {
   const hostedTotal = countFromRecord(hostedEvents.byStatus);
 
   return (
-    <main className={`${PAGE_PADDING} space-y-6 py-6 md:py-8`}>
+    <main className={`${ADMIN_PAGE_SHELL} space-y-6 sm:space-y-8`}>
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href="/admin/users"
@@ -299,15 +299,15 @@ function AdminUserDetailPageContent() {
         <span className="text-xs text-muted">User detail</span>
       </div>
 
-      <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-5">
+      <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 sm:p-5">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 gap-4">
+          <div className="flex min-w-0 gap-3 sm:gap-4">
             <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border/80 bg-wash text-lg font-semibold uppercase text-foreground/85">
               {userInitials({ name: user.name ?? undefined, email: user.email })}
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="min-w-0 truncate font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                <h1 className="line-clamp-2 min-w-0 font-display text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground sm:line-clamp-1 sm:truncate sm:text-3xl">
                   {display}
                 </h1>
                 <span
@@ -347,7 +347,7 @@ function AdminUserDetailPageContent() {
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end sm:gap-1.5">
             <button
               type="button"
               onClick={() =>
@@ -422,7 +422,7 @@ function AdminUserDetailPageContent() {
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Hosted events" value={String(hostedTotal)} />
         <StatCard label="Orders placed" value={String(orders.total)} />
         <StatCard
@@ -556,11 +556,11 @@ function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-[var(--radius-panel)] border border-border bg-surface/80 p-4">
+    <div className="rounded-[var(--radius-panel)] border border-border bg-surface/80 p-3.5 sm:p-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
         {label}
       </p>
-      <p className="mt-2 font-display text-2xl font-semibold tracking-tight text-foreground">
+      <p className="mt-1.5 break-words font-display text-xl font-semibold tracking-tight text-foreground sm:mt-2 sm:text-2xl">
         {value}
       </p>
       {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
@@ -578,16 +578,16 @@ function PanelHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex items-end justify-between gap-3">
-      <div>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+      <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">
           {eyebrow}
         </p>
-        <h2 className="mt-1 font-display text-xl font-semibold tracking-tight text-foreground">
+        <h2 className="mt-1 font-display text-lg font-semibold tracking-tight text-foreground sm:text-xl">
           {title}
         </h2>
       </div>
-      {action}
+      {action ? <div className="shrink-0 sm:self-end">{action}</div> : null}
     </div>
   );
 }
@@ -629,7 +629,7 @@ function OrganizerProfileCard({
   }
 
   return (
-    <div className="rounded-[var(--radius-panel)] border border-border bg-surface/80 p-4">
+    <div className="rounded-[var(--radius-panel)] border border-border bg-surface/80 p-3.5 sm:p-4">
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-display text-lg font-semibold text-foreground">
           {profile.orgName}
@@ -837,7 +837,9 @@ export default function AdminUserDetailPage() {
   return (
     <Suspense
       fallback={
-        <main className={`${PAGE_PADDING} py-10`}>
+        <main
+          className={`${ADMIN_PAGE_SHELL} flex min-h-[min(40vh,20rem)] flex-col justify-center py-12 sm:py-16`}
+        >
           <p className="text-sm text-muted">Loading user…</p>
         </main>
       }

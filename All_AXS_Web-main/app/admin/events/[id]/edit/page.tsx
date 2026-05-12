@@ -34,6 +34,7 @@ import { EventDetailsTab } from "@/components/organizer/event-editor/EventDetail
 import { EventMediaTab } from "@/components/organizer/event-editor/EventMediaTab";
 import { EventTicketTiersTab } from "@/components/organizer/event-editor/EventTicketTiersTab";
 import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab";
+import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
 
 interface TicketType {
   id: string;
@@ -174,7 +175,7 @@ export default function AdminEventEditorPage() {
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-[min(100%,1400px)] space-y-4 px-4 py-10 sm:px-6 lg:px-8">
+      <div className={`${ADMIN_PAGE_SHELL} space-y-4`}>
         <p className="text-sm text-muted">Loading event…</p>
       </div>
     );
@@ -182,14 +183,14 @@ export default function AdminEventEditorPage() {
 
   if (error || !event) {
     return (
-      <div className="mx-auto w-full max-w-[min(100%,1400px)] space-y-4 px-4 py-10 sm:px-6 lg:px-8">
+      <div className={`${ADMIN_PAGE_SHELL} space-y-4`}>
         <Link
           href="/admin/events"
           className="text-sm text-muted hover:text-foreground"
         >
           ← Back to all events
         </Link>
-        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
+        <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3.5 text-sm leading-relaxed text-red-100 sm:p-4">
           {error || "Event not found."}
         </div>
       </div>
@@ -244,8 +245,8 @@ export default function AdminEventEditorPage() {
     "Unknown organiser";
 
   return (
-    <div className="mx-auto w-full max-w-[min(100%,1400px)] space-y-6 px-4 py-6 sm:px-6 md:py-8 lg:px-8">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className={`${ADMIN_PAGE_SHELL} space-y-6 sm:space-y-8`}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <Link
             href={`/admin/events/${event.id}`}
@@ -266,13 +267,13 @@ export default function AdminEventEditorPage() {
             against your admin user. Organiser:{" "}
             <span className="text-foreground/85">{organizerLabel}</span>
           </p>
-          <p className="mt-3 text-lg font-semibold text-foreground">
+          <p className="mt-3 text-base font-semibold leading-snug text-foreground sm:text-lg">
             {event.title}
           </p>
         </div>
         <Link
           href={`/admin/events/${event.id}`}
-          className="shrink-0 text-sm font-medium text-primary hover:underline"
+          className="shrink-0 text-sm font-medium text-primary hover:underline sm:pt-1 sm:text-right"
         >
           View inspect page →
         </Link>
