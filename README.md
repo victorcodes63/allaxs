@@ -1,12 +1,31 @@
 # All AXS
 
-Monorepo layout:
+This clone keeps **web**, **API**, and **infra** folders side by side. On GitHub they are separate repositories: the Next app and this umbrella repo are typically [`victorcodes63/allaxs`](https://github.com/victorcodes63/allaxs); the Nest API lives in [`victorcodes63/All_AXS_Backend-main`](https://github.com/victorcodes63/All_AXS_Backend-main).
 
 | Directory | Description |
 |-----------|-------------|
 | `All_AXS_Web-main` | Next.js frontend ([docs/VERCEL.md](All_AXS_Web-main/docs/VERCEL.md)) |
 | `All_AXS_Backend-main` | NestJS API ([docs/VERCEL.md](All_AXS_Backend-main/docs/VERCEL.md), [docs/NEON.md](All_AXS_Backend-main/docs/NEON.md)) |
 | `All_AXS_Infra-main` | Terraform / infrastructure |
+
+## Push API changes to the backend repository
+
+After you commit backend work under `All_AXS_Backend-main/` in **this** repo, sync it to the standalone backend remote:
+
+```bash
+cd "/Users/victorchumo/Desktop/Raven Tech Group/AllAXS"
+./scripts/push-backend-to-github.sh
+```
+
+The script adds a `backend` remote if needed and uses `git subtree split` to push `All_AXS_Backend-main/` to `main` on [`All_AXS_Backend-main`](https://github.com/victorcodes63/All_AXS_Backend-main).
+
+If the first push is rejected (unrelated histories), run once:
+
+```bash
+BACKEND_PUSH_FORCE=1 ./scripts/push-backend-to-github.sh
+```
+
+Override defaults if needed: `BACKEND_REMOTE`, `BACKEND_URL`.
 
 ## Local development
 
