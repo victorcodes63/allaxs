@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getServerApiBaseUrl } from "@/lib/server/api-url";
+import { nestRouteMissing } from "@/lib/server/nest-route-missing";
 
 async function getAccessToken() {
   const cookieStore = await cookies();
@@ -31,6 +32,9 @@ export async function POST() {
       : { message: "Unexpected response format" };
 
     if (!response.ok) {
+      if (nestRouteMissing(response.status, data, "/notifications/me/read-all")) {
+        return NextResponse.json({ updated: 0 });
+      }
       return NextResponse.json(
         {
           message:

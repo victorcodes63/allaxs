@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getServerApiBaseUrl } from "@/lib/server/api-url";
+import { buildAdminOverviewFallback } from "@/lib/server/admin-overview-fallback";
+import { nestRouteMissing } from "@/lib/server/nest-route-missing";
 
 async function getAccessToken() {
   const cookieStore = await cookies();
@@ -43,6 +45,26 @@ export async function GET() {
     }
 
     if (!response.ok) {
+      if (nestRouteMissing(response.status, data, "/admin/overview") && accessToken) {
+        try {
+          const synthesized = await buildAdminOverviewFallback(
+            API_URL,
+            accessToken,
+          );
+          return NextResponse.json(synthesized);
+        } catch (fallbackErr) {
+          console.error("Admin overview fallback failed:", fallbackErr);
+          return NextResponse.json(
+            {
+              message:
+                (fallbackErr as Error).message ||
+                "Admin overview fallback failed",
+            },
+            { status: 502 },
+          );
+        }
+      }
+
       return NextResponse.json(data, { status: response.status });
     }
 

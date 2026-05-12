@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerApiBaseUrl } from "@/lib/server/api-url";
+import { nestRouteMissing } from "@/lib/server/nest-route-missing";
 
 async function getAccessToken() {
   const cookieStore = await cookies();
@@ -15,9 +16,11 @@ export async function GET(request: NextRequest) {
     }
 
     const API_URL = getServerApiBaseUrl();
-    const limit = request.nextUrl.searchParams.get("limit") ?? "8";
-    const offset = request.nextUrl.searchParams.get("offset") ?? "0";
-    const endpoint = `${API_URL}/notifications/me?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`;
+    const limitRaw = request.nextUrl.searchParams.get("limit") ?? "8";
+    const offsetRaw = request.nextUrl.searchParams.get("offset") ?? "0";
+    const limit = Math.max(1, Math.min(Number.parseInt(limitRaw, 10) || 8, 25));
+    const offset = Math.max(0, Number.parseInt(offsetRaw, 10) || 0);
+    const endpoint = `${API_URL}/notifications/me?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`;
 
     const response = await fetch(endpoint, {
       method: "GET",
@@ -33,6 +36,15 @@ export async function GET(request: NextRequest) {
       : { message: "Unexpected response format" };
 
     if (!response.ok) {
+      if (nestRouteMissing(response.status, data, "/notifications/me")) {
+        return NextResponse.json({
+          notifications: [],
+          unreadCount: 0,
+          total: 0,
+          limit,
+          offset,
+        });
+      }
       return NextResponse.json(
         {
           message:
