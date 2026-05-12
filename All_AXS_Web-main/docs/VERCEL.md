@@ -2,14 +2,14 @@
 
 Use a **dedicated Vercel project** for this Next.js app. The Nest API lives in a **separate** GitHub repository and should be its **own** Vercel project:
 
-**Backend:** [github.com/victorcodes63/All_AXS_Backend-main](https://github.com/victorcodes63/All_AXS_Backend-main) — see that repo’s `docs/VERCEL.md` for API env vars, `api/index.ts`, and production checks.
+**Backend:** [github.com/victorcodes63/All_AXS_Backend-main](https://github.com/victorcodes63/All_AXS_Backend-main) — see that repo’s `docs/VERCEL.md` for API env vars, `api/[[...segments]].ts`, and production checks.
 
 ## Repositories (not a monorepo)
 
 | Piece | GitHub | Vercel |
 | ----- | ------ | ------ |
 | **Web** (this app) | The repo you imported for `allaxs` (e.g. `victorcodes63/allaxs`) | One project — **Root Directory** = the folder that contains this app’s `package.json` and `app/` (often `.` at the repo root). |
-| **API** | [victorcodes63/All_AXS_Backend-main](https://github.com/victorcodes63/All_AXS_Backend-main) | A **second** project — root should be the **backend** repo root (where `nest-cli.json`, `package.json`, and `api/index.ts` live). |
+| **API** | [victorcodes63/All_AXS_Backend-main](https://github.com/victorcodes63/All_AXS_Backend-main) | A **second** project — root should be the **backend** repo root (where `nest-cli.json`, `package.json`, and `api/[[...segments]].ts` live). |
 
 Point `API_URL` and `NEXT_PUBLIC_API_BASE_URL` at the **production URL** of the API project (e.g. `https://all-axs-backend-main.vercel.app`), not a team preview URL that requires SSO unless you intend that.
 

@@ -91,4 +91,4 @@ Push to **`main`** on this repository (or run **Redeploy** in the Vercel dashboa
 
 ### Vercel entrypoint
 
-Production on Vercel uses **`api/index.ts`** at the **repository root** (next to `package.json`). It bootstraps `AppModule` from `src/`. The Vercel project’s **Root Directory** should be **`.`** (the backend repo root), not a parent folder or an old copy of the codebase.
+Production on Vercel uses **`api/[[...segments]].ts`** plus **`vercel.json` `rewrites`**: every path (e.g. `/auth/login`) is routed into the serverless function under `/api/...`, then the `/api` prefix is stripped so Nest routes match. The Vercel project’s **Root Directory** should be **`.`** (the backend repo root).

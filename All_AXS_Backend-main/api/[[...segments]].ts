@@ -36,7 +36,6 @@ async function createHandler() {
     }),
   );
 
-  // Serverless functions should initialize the app, not listen on a port.
   await app.init();
 
   if (process.env.NODE_ENV !== 'test') {
@@ -54,13 +53,22 @@ async function createHandler() {
   }
 
   const expressApp = app.getHttpAdapter().getInstance();
-  return (req: VercelRequest, res: VercelResponse) => expressApp(req, res);
+
+  return (req: VercelRequest, res: VercelResponse) => {
+    const rawUrl = req.url ?? '/';
+    // Vercel mounts this file under /api/... ; Nest routes have no /api prefix.
+    const url =
+      rawUrl === '/api' || rawUrl.startsWith('/api/')
+        ? rawUrl.replace(/^\/api/, '') || '/'
+        : rawUrl;
+    (req as { url?: string }).url = url;
+    return expressApp(req as any, res as any);
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!cachedHandler) {
     cachedHandler = await createHandler();
   }
-
   return cachedHandler(req, res);
 }
