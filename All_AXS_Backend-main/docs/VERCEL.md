@@ -25,6 +25,7 @@ We standardize on **Neon** for now: follow **[NEON.md](./NEON.md)** (you create 
 Run migrations against that database **once** from your machine (or a CI job), with the same `DATABASE_URL`:
 
 ```bash
+git clone https://github.com/victorcodes63/All_AXS_Backend-main.git
 cd All_AXS_Backend-main
 export DATABASE_URL="postgres://..."
 export NODE_ENV=production
@@ -86,8 +87,8 @@ Use `vercel dev` from this repo (Vercel CLI ≥ 48.4) to approximate production 
 
 ## 9. Redeploy after API changes
 
-If the Vercel project’s root directory is this API package, push any commit that touches files under `All_AXS_Backend-main/` (or run **Redeploy** in the Vercel dashboard) so new routes such as `GET /admin/overview` are included in the serverless bundle.
+Push to **`main`** on this repository (or run **Redeploy** in the Vercel dashboard) so new routes such as `GET /admin/overview` ship in the serverless bundle.
 
 ### Vercel entrypoint
 
-Production on Vercel uses **`api/index.ts`** at the **root of this package** (same directory as `package.json`). It bootstraps `AppModule` from `src/`. Ensure the Vercel project **Root Directory** is set to **`All_AXS_Backend-main`** (not a stale copy) so this file and `src/` stay in sync with Git.
+Production on Vercel uses **`api/index.ts`** at the **repository root** (next to `package.json`). It bootstraps `AppModule` from `src/`. The Vercel project’s **Root Directory** should be **`.`** (the backend repo root), not a parent folder or an old copy of the codebase.

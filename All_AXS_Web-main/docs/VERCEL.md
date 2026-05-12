@@ -1,22 +1,22 @@
 # Deploy the web app on Vercel
 
-Use a **dedicated Vercel project** for this Next.js app. The Nest API should be a **second** Vercel project (see `All_AXS_Backend-main/docs/VERCEL.md`).
+Use a **dedicated Vercel project** for this Next.js app. The Nest API lives in a **separate** GitHub repository and should be its **own** Vercel project:
 
-## Monorepo layout (this Git repository)
+**Backend:** [github.com/victorcodes63/All_AXS_Backend-main](https://github.com/victorcodes63/All_AXS_Backend-main) — see that repo’s `docs/VERCEL.md` for API env vars, `api/index.ts`, and production checks.
 
-The All AXS repo contains **two deployable roots**:
+## Repositories (not a monorepo)
 
-| Directory | Vercel project | Framework | Notes |
-| --------- | -------------- | --------- | ----- |
-| `All_AXS_Web-main` | e.g. `allaxs` | Next.js | Set **Root Directory** to `All_AXS_Web-main` (not repo `.`). |
-| `All_AXS_Backend-main` | e.g. `all-axs-backend-main` | NestJS | Set **Root Directory** to `All_AXS_Backend-main`. Must include `api/index.ts` + `src/` from the same commit (see backend `docs/VERCEL.md`). |
+| Piece | GitHub | Vercel |
+| ----- | ------ | ------ |
+| **Web** (this app) | The repo you imported for `allaxs` (e.g. `victorcodes63/allaxs`) | One project — **Root Directory** = the folder that contains this app’s `package.json` and `app/` (often `.` at the repo root). |
+| **API** | [victorcodes63/All_AXS_Backend-main](https://github.com/victorcodes63/All_AXS_Backend-main) | A **second** project — root should be the **backend** repo root (where `nest-cli.json`, `package.json`, and `api/index.ts` live). |
 
-If the API project’s root is the **repository root** (`./`) while the code lives under `All_AXS_Backend-main/`, Vercel will build the wrong tree and you will get **partial** APIs (e.g. `GET /admin/events` works but `GET /admin/overview`, `/admin/orders`, or `/notifications/me` return 404).
+Point `API_URL` and `NEXT_PUBLIC_API_BASE_URL` at the **production URL** of the API project (e.g. `https://all-axs-backend-main.vercel.app`), not a team preview URL that requires SSO unless you intend that.
 
-## One-time setup
+## One-time setup (web)
 
-1. Vercel → **Add New** → **Project** → import this repo.
-2. Set **Root Directory** to **`All_AXS_Web-main`**.
+1. Vercel → **Add New** → **Project** → import **this** web repository.
+2. **Root Directory:** leave as `.` if the Next app is at the repo root; otherwise select the subdirectory that contains `package.json` and `app/`.
 3. Framework: **Next.js** (auto-detected). Build: `npm run build`, output default.
 4. Add environment variables (Production and Preview as needed):
 
