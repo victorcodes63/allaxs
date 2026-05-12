@@ -6,7 +6,7 @@ The All AXS API is a NestJS app. Vercel runs it as a single serverless function 
 
 1. Vercel → **Add New** → **Project** → import the **backend** Git repository.
 2. Framework preset should detect **NestJS** (zero config). Root directory: repository root (where `nest-cli.json` lives).
-3. **Build Command:** `npm run build` (already set in `vercel.json`). **`outputDirectory`** is set to **`dist`** (where `nest build` writes). If the Vercel dashboard still has **Output Directory** = `public`, clear it or leave it blank so `vercel.json` wins — otherwise the build can fail with “No Output Directory named public”.
+3. **Build Command:** `npm run build` (already set in `vercel.json`). **`outputDirectory`** is set to **`dist`** (where `nest build` writes). The **`api/`** Vercel entry files are **excluded** from `nest build` via `tsconfig.build.json` so they are **not** copied into `dist/api/` — otherwise Vercel would treat them as static files and shadow the real serverless routes (symptom: `POST /auth/login` returns platform `NOT_FOUND`). If the Vercel dashboard still has **Output Directory** = `public`, clear it or leave it blank so `vercel.json` wins — otherwise the build can fail with “No Output Directory named public”.
 4. Deploy once; it will fail until environment variables are set — that is expected.
 
 ## 2. Postgres (required)
