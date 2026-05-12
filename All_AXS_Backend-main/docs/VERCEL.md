@@ -83,3 +83,7 @@ Then set `NEXT_PUBLIC_USE_DEMO_EVENTS=false` if you want listings to come from t
 ## Local parity
 
 Use `vercel dev` from this repo (Vercel CLI ≥ 48.4) to approximate production locally.
+
+## 9. Redeploy after API changes
+
+If the Vercel project’s root directory is this API package, push any commit that touches files under `All_AXS_Backend-main/` (or run **Redeploy** in the Vercel dashboard) so new routes such as `GET /admin/overview` are included in the serverless bundle.
