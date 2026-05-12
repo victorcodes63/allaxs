@@ -195,7 +195,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         </h1>
         <p className="text-muted leading-relaxed">
           Order <span className="font-mono text-foreground text-sm">{order.orderId.slice(0, 8)}…</span>{" "}
-          {apiCheckout ? "has been confirmed." : "is confirmed (demo—no real card / Paystack charge)."}
+          {apiCheckout ? "has been confirmed." : "is confirmed (demo—no real card / payment charge)."}
           {guest ? (
             <>
               {" "}

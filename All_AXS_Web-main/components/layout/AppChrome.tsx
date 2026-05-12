@@ -15,27 +15,32 @@ function isHubPath(
   const p = pathname && pathname.length > 0 ? pathname : null;
 
   if (p) {
-    if (
-      p === "/organizer/onboarding" ||
-      p.startsWith("/organizer/onboarding/")
-    ) {
-      return false;
-    }
     /** `/organizers` (marketing) must not match `/organizer` (dashboard hub). */
     if (p === "/organizer" || p.startsWith("/organizer/")) return true;
     if (p === "/dashboard" || p.startsWith("/dashboard/")) return true;
+    /**
+     * `/admin/*` is admin-only by definition — the admin layout itself
+     * gates access and redirects guests to /login. Do NOT also gate on
+     * `signedIn` here: `useAuth` is component-local state, so this
+     * `AppChrome` instance can disagree with the admin layout's
+     * instance during fetch races, which leaks the marketing
+     * `SiteHeader` (with Sign in / Sign up) on top of the admin shell.
+     */
+    if (p === "/admin" || p.startsWith("/admin/")) return true;
     /** Wallet uses the same fan hub chrome when signed in; guests keep marketing chrome + session passes. */
     if (signedIn && (p === "/tickets" || p.startsWith("/tickets/"))) return true;
+    if (signedIn && (p === "/notifications" || p.startsWith("/notifications/"))) return true;
     return false;
   }
 
   /** Pathname can be empty briefly during navigation; avoid wrapping hub pages in browse chrome (breaks `HubAppShell` height). */
   if (!layoutSegments.length) return false;
   const seg = new Set(layoutSegments);
-  if (seg.has("organizer") && seg.has("onboarding")) return false;
   if (seg.has("organizer")) return true;
   if (seg.has("dashboard")) return true;
+  if (seg.has("admin")) return true;
   if (signedIn && seg.has("tickets")) return true;
+  if (signedIn && seg.has("notifications")) return true;
   return false;
 }
 

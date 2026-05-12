@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { OrganizerShell } from "@/components/organizer/OrganizerShell";
+import { AttendeeHubShell } from "@/components/layout/hub/AttendeeHubShell";
 
 export default function OrganizerLayout({
   children,
@@ -51,7 +52,7 @@ export default function OrganizerLayout({
   }
 
   if (onOnboarding) {
-    return <>{children}</>;
+    return <AttendeeHubShell user={user}>{children}</AttendeeHubShell>;
   }
 
   return <OrganizerShell user={user}>{children}</OrganizerShell>;

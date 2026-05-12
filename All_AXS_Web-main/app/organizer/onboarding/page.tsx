@@ -9,7 +9,6 @@ import {
   organizerOnboardingSchema,
   type OrganizerOnboardingInput,
 } from "@/lib/validation/organizer";
-import { AuthCard } from "@/components/auth/AuthCard";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
@@ -38,15 +37,23 @@ export default function OnboardingPage() {
 
   // Check if profile already exists on mount
   useEffect(() => {
+    let cancelled = false;
     const checkProfile = async () => {
       try {
-        const response = await axios.get("/api/organizer/profile");
+        const response = await axios.get("/api/organizer/profile", { timeout: 8000 });
+        if (cancelled) return;
         if (response.status === 200 && response.data) {
           setHasProfile(true);
+          try {
+            await axios.post("/api/auth/promote-organizer");
+          } catch {
+            /* best-effort role sync + legacy dual-role repair */
+          }
           // Redirect to dashboard if profile exists
           router.replace("/organizer/dashboard");
         }
       } catch (err) {
+        if (cancelled) return;
         if ((err as { response?: { status?: number } }).response?.status === 404) {
           // No profile exists, continue with onboarding
           setHasProfile(false);
@@ -54,11 +61,14 @@ export default function OnboardingPage() {
           console.error("Error checking profile:", err);
         }
       } finally {
-        setIsChecking(false);
+        if (!cancelled) setIsChecking(false);
       }
     };
 
     checkProfile();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   const validateStep = async (step: Step): Promise<boolean> => {
@@ -108,10 +118,11 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
 
     try {
+      await axios.post("/api/auth/promote-organizer");
       const response = await axios.post("/api/organizer/profile", data);
       if (response.status === 200 || response.status === 201) {
-        // Redirect to organizer dashboard
-        router.push("/organizer/dashboard");
+        // Redirect to organizer dashboard with welcome banner trigger
+        router.push("/organizer/dashboard?hostWelcome=1");
       }
     } catch (err) {
       const message =
@@ -125,9 +136,9 @@ export default function OnboardingPage() {
 
   if (isChecking) {
     return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
+      <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
-          <p className="text-lg text-black/60">Loading...</p>
+          <p className="text-sm text-muted">Loading...</p>
         </div>
       </div>
     );
@@ -138,43 +149,54 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4">
-      <div className="w-full max-w-2xl">
-        <AuthCard
-          title="Set up your organizer profile"
-          subtitle="Tell us about your organization and how you want to get paid."
-        >
+    <div className="space-y-6 pb-8">
+      <header className="max-w-3xl space-y-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
+          Hosting
+        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          Set up your organizer profile
+        </h1>
+        <p className="text-sm leading-relaxed text-muted sm:text-base">
+          Tell us about your organization and how you want to get paid.
+        </p>
+      </header>
+
+      <section className="w-full max-w-3xl space-y-5">
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-2 mb-6">
             <div
               className={`flex items-center justify-center w-8 h-8 rounded-full ${
                 currentStep >= 1
                   ? "bg-primary text-white"
-                  : "bg-black/10 text-black/40"
+                  : "border border-border bg-background text-muted"
               }`}
             >
               1
             </div>
             <div
               className={`h-1 w-16 ${
-                currentStep >= 2 ? "bg-primary" : "bg-black/10"
+                currentStep >= 2 ? "bg-primary" : "bg-border"
               }`}
             />
             <div
               className={`flex items-center justify-center w-8 h-8 rounded-full ${
                 currentStep >= 2
                   ? "bg-primary text-white"
-                  : "bg-black/10 text-black/40"
+                  : "border border-border bg-background text-muted"
               }`}
             >
               2
             </div>
           </div>
-          <p className="text-center text-sm text-black/60 mb-6">
+          <p className="text-center text-sm text-muted mb-6">
             Step {currentStep} of 2
           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-6 rounded-[var(--radius-panel)] border border-border/70 bg-background/35 p-4 shadow-[0_20px_60px_-44px_rgba(0,0,0,0.9)] sm:p-5"
+          >
             {error && (
               <div className="bg-primary/10 border border-primary/30 text-primary rounded-lg p-3 text-sm">
                 {error}
@@ -183,7 +205,7 @@ export default function OnboardingPage() {
 
             {currentStep === 1 && (
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-black mb-4">
+                <h2 className="text-xl font-semibold text-foreground mb-4">
                   Organization Details
                 </h2>
 
@@ -242,17 +264,17 @@ export default function OnboardingPage() {
 
             {currentStep === 2 && (
               <div className="space-y-4">
-                <h2 className="text-xl font-semibold text-black mb-4">
+                <h2 className="text-xl font-semibold text-foreground mb-4">
                   Payout Details
                 </h2>
-                <p className="text-sm text-black/60 mb-4">
+                <p className="text-sm text-muted mb-4">
                   This is a placeholder for payout information. Your payout
                   details will be finalized when we integrate with payment
                   service providers.
                 </p>
 
                 <div>
-                  <label className="block font-medium mb-2 text-sm text-black">
+                  <label className="block font-medium mb-2 text-sm text-foreground">
                     Payout Method *
                   </label>
                   <div className="space-y-2">
@@ -337,7 +359,7 @@ export default function OnboardingPage() {
                       error={errors.mpesaTillNumber?.message}
                     />
 
-                    <p className="text-xs text-black/60">
+                    <p className="text-xs text-muted">
                       At least one of Paybill or Till Number is required
                     </p>
                   </div>
@@ -346,13 +368,13 @@ export default function OnboardingPage() {
                 {payoutMethod === "OTHER" && (
                   <div className="space-y-4 pl-6 border-l-2 border-primary/20">
                     <div>
-                      <label className="block font-medium mb-1 text-sm text-black">
+                      <label className="block font-medium mb-1 text-sm text-foreground">
                         Payout Instructions
                       </label>
                       <textarea
                         {...register("payoutInstructions")}
                         rows={3}
-                        className="w-full border border-black/20 rounded-lg px-4 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                        className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder="Describe your preferred payout method..."
                       />
                     </div>
@@ -387,8 +409,7 @@ export default function OnboardingPage() {
               </div>
             )}
           </form>
-        </AuthCard>
-      </div>
+      </section>
     </div>
   );
 }

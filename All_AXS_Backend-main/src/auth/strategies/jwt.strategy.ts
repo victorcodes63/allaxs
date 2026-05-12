@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../auth.service';
-import { Role } from '../../domain/enums';
+import { Role, UserStatus } from '../../domain/enums';
 
 export interface JwtPayload {
   sub: string;
@@ -30,17 +30,33 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
+  /**
+   * Re-fetch the user on every request so role/status changes take effect
+   * within the access-token lifetime. A SUSPENDED account is rejected here
+   * with a 401 carrying a `accountSuspended` code so the frontend can show
+   * a friendlier "contact support" message instead of the generic
+   * invalid-token copy.
+   */
   async validate(payload: JwtPayload) {
+    let user;
     try {
-      const user = await this.authService.validateUser(payload.sub);
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        roles: user.roles,
-      };
+      user = await this.authService.validateUser(payload.sub);
     } catch {
       throw new UnauthorizedException('Invalid token');
     }
+
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException({
+        message: 'Account suspended',
+        code: 'accountSuspended',
+      });
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      roles: user.roles,
+    };
   }
 }

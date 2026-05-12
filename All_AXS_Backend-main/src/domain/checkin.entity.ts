@@ -6,7 +6,7 @@ import { User } from 'src/users/entities/user.entity';
 @Entity('checkins')
 export class CheckIn extends BaseEntity {
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'ticket_id' })
   ticketId!: string;
 
   @ManyToOne(() => Ticket, { onDelete: 'CASCADE' })
@@ -14,7 +14,7 @@ export class CheckIn extends BaseEntity {
   ticket!: Ticket;
 
   @Index()
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'uuid', nullable: true, name: 'operator_id' })
   operatorId?: string | null;
 
   @ManyToOne(() => User, (u) => u.checkIns, { onDelete: 'SET NULL' })

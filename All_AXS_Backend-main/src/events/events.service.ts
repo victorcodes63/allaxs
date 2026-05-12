@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
@@ -11,15 +12,56 @@ import { EventStatus, EventType, Role } from 'src/domain/enums';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { OrganizerProfile } from 'src/users/entities/organizer-profile.entity';
+import { User } from 'src/users/entities/user.entity';
+import { NotificationsService } from 'src/notifications/notifications.service';
+import { AdminAuditLog } from 'src/admin/entities/admin-audit-log.entity';
 
 @Injectable()
 export class EventsService {
+  private readonly logger = new Logger(EventsService.name);
+
   constructor(
     @InjectRepository(Event)
     private readonly eventRepository: Repository<Event>,
     @InjectRepository(OrganizerProfile)
     private readonly organizerProfileRepository: Repository<OrganizerProfile>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly notificationsService: NotificationsService,
+    @InjectRepository(AdminAuditLog)
+    private readonly adminAuditLogRepository: Repository<AdminAuditLog>,
   ) {}
+
+  /**
+   * Record an admin mutation against an event. Best-effort: failures are
+   * logged but never propagate, so audit hiccups can't block legitimate
+   * admin edits. Mirrors the shape used by AdminController via
+   * `AdminAuditService` so all admin actions land in the same table.
+   */
+  private async recordAdminAction(
+    actorId: string,
+    action: string,
+    eventId: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.adminAuditLogRepository.save(
+        this.adminAuditLogRepository.create({
+          adminUserId: actorId,
+          action,
+          resourceType: 'event',
+          resourceId: eventId,
+          metadata,
+          status: 'SUCCESS',
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to record admin audit entry for ${action} on event ${eventId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
 
   /**
    * Generate a URL-safe slug from a title
@@ -92,7 +134,21 @@ export class EventsService {
   /**
    * Check if user owns the event
    */
-  async ensureOwnership(eventId: string, userId: string): Promise<Event> {
+  /**
+   * Loads the event and asserts the user has permission to mutate it.
+   *
+   * Admins are exempt from the ownership check: pass the JWT's roles in via
+   * `userRoles` to enable the bypass. This is how the admin event editor
+   * (/admin/events/[id]/edit) reuses the same controllers as organisers.
+   * If `userRoles` is omitted we keep the historic strict-ownership
+   * behaviour, so any legacy callers that don't yet thread roles through
+   * still get the safer default.
+   */
+  async ensureOwnership(
+    eventId: string,
+    userId: string,
+    userRoles?: Role[],
+  ): Promise<Event> {
     const event = await this.eventRepository
       .createQueryBuilder('event')
       .innerJoinAndSelect('event.organizer', 'organizer')
@@ -103,7 +159,8 @@ export class EventsService {
       throw new NotFoundException('Event not found');
     }
 
-    if (event.organizer.userId !== userId) {
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
+    if (!isAdmin && event.organizer.userId !== userId) {
       throw new ForbiddenException('You do not own this event');
     }
 
@@ -115,8 +172,71 @@ export class EventsService {
    */
   private canEdit(status: EventStatus): boolean {
     return (
-      status === EventStatus.DRAFT || status === EventStatus.PENDING_REVIEW
+      status === EventStatus.DRAFT ||
+      status === EventStatus.PENDING_REVIEW ||
+      status === EventStatus.REJECTED
     );
+  }
+
+  private async notifyAdminsEventSubmitted(event: Event): Promise<void> {
+    const admins = await this.userRepository
+      .createQueryBuilder('user')
+      .where(':role = ANY(user.roles)', { role: Role.ADMIN })
+      .getMany();
+
+    await Promise.allSettled(
+      admins.map((admin) =>
+        this.notificationsService.createInAppNotification({
+          to: admin.email,
+          title: 'Event submitted for review',
+          body: `${event.title} is waiting in the moderation queue.`,
+          link: '/admin/moderation',
+          category: 'hosting',
+          template: 'event_submitted_for_review',
+          payload: {
+            eventId: event.id,
+            eventTitle: event.title,
+            eventStatus: EventStatus.PENDING_REVIEW,
+          },
+        }),
+      ),
+    );
+  }
+
+  private async notifyOrganizerReviewDecision(
+    eventId: string,
+    decision: 'approved' | 'rejected',
+    reason?: string,
+  ): Promise<void> {
+    const event = await this.eventRepository.findOne({
+      where: { id: eventId },
+      relations: ['organizer', 'organizer.user'],
+    });
+
+    const organizerEmail = event?.organizer?.user?.email;
+    if (!event || !organizerEmail) return;
+
+    const approved = decision === 'approved';
+    await this.notificationsService.createInAppNotification({
+      to: organizerEmail,
+      title: approved ? 'Event approved' : 'Event needs changes',
+      body: approved
+        ? `${event.title} is now live on All AXS.`
+        : reason
+          ? `${event.title} was rejected: ${reason}`
+          : `${event.title} was rejected. Open the editor to update and resubmit.`,
+      link: approved
+        ? `/events/${event.slug}`
+        : `/organizer/events/${event.id}/edit`,
+      category: 'hosting',
+      template: approved ? 'event_review_approved' : 'event_review_rejected',
+      payload: {
+        eventId: event.id,
+        eventTitle: event.title,
+        eventStatus: event.status,
+        rejectionReason: reason,
+      },
+    });
   }
 
   /**
@@ -243,10 +363,15 @@ export class EventsService {
     eventId: string,
     userId: string,
     dto: UpdateEventDto,
+    userRoles?: Role[],
   ): Promise<Event> {
-    const event = await this.ensureOwnership(eventId, userId);
+    const event = await this.ensureOwnership(eventId, userId, userRoles);
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
 
-    if (!this.canEdit(event.status)) {
+    // Admins can edit events in any status (including PUBLISHED) so they can
+    // correct typos, change venues last-minute, etc. Organisers remain
+    // limited to the draft/pending/rejected window.
+    if (!isAdmin && !this.canEdit(event.status)) {
       throw new BadRequestException(
         'Event can only be edited when status is draft or pending',
       );
@@ -298,6 +423,18 @@ export class EventsService {
 
     const savedEvent = await this.eventRepository.save(event);
 
+    if (isAdmin && event.organizer.userId !== userId) {
+      // Only log when an admin is mutating someone else's event; we don't
+      // want to spam the audit log if an admin who happens to also be the
+      // organiser is editing their own event through the normal flow.
+      await this.recordAdminAction(userId, 'ADMIN_UPDATE_EVENT', eventId, {
+        organizerUserId: event.organizer.userId,
+        // Persist the requested changes (not the merged entity) so a
+        // reviewer can quickly see what the admin actually touched.
+        changes: dto,
+      });
+    }
+
     // Reload with organizer relation to ensure it's available for serialization
     return this.eventRepository.findOne({
       where: { id: savedEvent.id },
@@ -308,12 +445,20 @@ export class EventsService {
   /**
    * Submit event for review (draft -> pending)
    */
-  async submitForReview(eventId: string, userId: string): Promise<Event> {
-    const event = await this.ensureOwnership(eventId, userId);
+  async submitForReview(
+    eventId: string,
+    userId: string,
+    userRoles?: Role[],
+  ): Promise<Event> {
+    const event = await this.ensureOwnership(eventId, userId, userRoles);
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
 
-    if (event.status !== EventStatus.DRAFT) {
+    if (
+      event.status !== EventStatus.DRAFT &&
+      event.status !== EventStatus.REJECTED
+    ) {
       throw new BadRequestException(
-        'Event can only be submitted from draft status',
+        'Event can only be submitted from draft or rejected status',
       );
     }
 
@@ -332,7 +477,20 @@ export class EventsService {
     }
 
     event.status = EventStatus.PENDING_REVIEW;
+    // Stamp the first-submission time so the admin overview chart and
+    // moderation queue can sort by "submitted" rather than "draft created"
+    // (which was a misleading proxy). Re-submissions after a rejection
+    // overwrite this on purpose — it's "most recent submission" not
+    // "first ever".
+    event.submittedAt = new Date();
     const savedEvent = await this.eventRepository.save(event);
+    await this.notifyAdminsEventSubmitted(savedEvent);
+
+    if (isAdmin && event.organizer.userId !== userId) {
+      await this.recordAdminAction(userId, 'ADMIN_SUBMIT_EVENT', eventId, {
+        organizerUserId: event.organizer.userId,
+      });
+    }
 
     // Reload with organizer relation to ensure it's available for serialization
     return this.eventRepository.findOne({
@@ -361,6 +519,7 @@ export class EventsService {
 
     event.status = EventStatus.PUBLISHED;
     const savedEvent = await this.eventRepository.save(event);
+    await this.notifyOrganizerReviewDecision(savedEvent.id, 'approved');
 
     // Reload with organizer relation to ensure it's available for serialization
     return this.eventRepository.findOne({
@@ -394,6 +553,7 @@ export class EventsService {
     };
 
     const savedEvent = await this.eventRepository.save(event);
+    await this.notifyOrganizerReviewDecision(savedEvent.id, 'rejected', reason);
 
     // Reload with organizer relation to ensure it's available for serialization
     return this.eventRepository.findOne({
@@ -410,19 +570,37 @@ export class EventsService {
     eventId: string,
     userId: string,
     url: string,
+    userRoles?: Role[],
   ): Promise<Event> {
-    const event = await this.ensureOwnership(eventId, userId);
+    const event = await this.ensureOwnership(eventId, userId, userRoles);
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
 
-    if (!this.canEdit(event.status)) {
+    // Admins can swap banners on any event (e.g. to remove inappropriate
+    // imagery that slipped past moderation).
+    if (!isAdmin && !this.canEdit(event.status)) {
       throw new BadRequestException(
-        'Banner can only be committed for events in DRAFT or PENDING_REVIEW status',
+        'Banner can only be committed for events in DRAFT, PENDING_REVIEW, or REJECTED status',
       );
     }
 
     // URL validation is done in the controller
     // Here we just update the banner URL
+    const previousBannerUrl = event.bannerUrl;
     event.bannerUrl = url;
     const savedEvent = await this.eventRepository.save(event);
+
+    if (isAdmin && event.organizer.userId !== userId) {
+      await this.recordAdminAction(
+        userId,
+        'ADMIN_UPDATE_EVENT_BANNER',
+        eventId,
+        {
+          organizerUserId: event.organizer.userId,
+          previousBannerUrl,
+          newBannerUrl: url,
+        },
+      );
+    }
 
     // Reload with organizer relation to ensure it's available for serialization
     return this.eventRepository.findOne({

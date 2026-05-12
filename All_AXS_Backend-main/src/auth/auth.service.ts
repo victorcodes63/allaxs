@@ -13,7 +13,7 @@ import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { User } from '../users/entities/user.entity';
-import { Role } from '../domain/enums';
+import { Role, UserStatus } from '../domain/enums';
 import { RefreshToken } from './entities/refresh-token.entity';
 import {
   RefreshTokenService,
@@ -138,6 +138,17 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Block suspended accounts at the credential gate so we never mint
+    // tokens for them in the first place. The error carries a stable
+    // `accountSuspended` code that the frontend uses to render a
+    // dedicated "contact support" message.
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException({
+        message: 'Account suspended. Please contact support.',
+        code: 'accountSuspended',
+      });
+    }
+
     // Issue tokens with device fingerprint
     const tokens = await this.issueTokensForUser(user, metadata);
 
@@ -184,6 +195,21 @@ export class AuthService {
 
     // Step 5: Get user
     const user = await this.usersService.findByIdOrFail(userId);
+
+    // Step 5b: Refuse to mint new tokens for suspended accounts and
+    // revoke every refresh chain they still hold. Without this a
+    // suspended user could ride a previously-issued refresh token to a
+    // brand new access token after the admin action.
+    if (user.status !== UserStatus.ACTIVE) {
+      await this.refreshTokenService.revokeAllUserTokens(
+        user.id,
+        'Account suspended',
+      );
+      throw new UnauthorizedException({
+        message: 'Account suspended',
+        code: 'accountSuspended',
+      });
+    }
 
     // Step 6: Issue new tokens (creates new session)
     const tokens = await this.issueTokensForUser(user, metadata);
@@ -242,6 +268,20 @@ export class AuthService {
       userId,
       'User logout from all devices',
     );
+  }
+
+  /**
+   * Admin-driven sign-out: revoke every active refresh-token session for
+   * a user and return how many sessions were terminated so we can show
+   * it in the audit log and on the admin UI. Used by suspend and the
+   * standalone force-logout admin action.
+   */
+  async forceSignOutUser(userId: string, reason: string): Promise<number> {
+    const activeSessions =
+      await this.refreshTokenService.getUserActiveTokens(userId);
+    if (activeSessions.length === 0) return 0;
+    await this.refreshTokenService.revokeAllUserTokens(userId, reason);
+    return activeSessions.length;
   }
 
   /**

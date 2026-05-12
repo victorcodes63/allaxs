@@ -87,6 +87,16 @@ export class Event extends BaseEntity {
   @Column({ type: 'enum', enum: EventStatus, default: EventStatus.DRAFT })
   status!: EventStatus;
 
+  @ApiPropertyOptional({
+    description:
+      'Timestamp of the first DRAFT/REJECTED -> PENDING_REVIEW transition. ' +
+      'NULL while the event is still in DRAFT.',
+    nullable: true,
+  })
+  @Index()
+  @Column({ type: 'timestamptz', nullable: true, name: 'submitted_at' })
+  submittedAt?: Date | null;
+
   @ApiPropertyOptional({ description: 'Event category' })
   @Column({ type: 'varchar', length: 120, nullable: true })
   category?: string;

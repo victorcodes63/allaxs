@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree } from "next/font/google";
 import { AppChrome } from "@/components/layout/AppChrome";
+import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
 /** Site-wide: Figtree (300–700), same weight range as before. */
@@ -42,7 +43,9 @@ export default function RootLayout({
       <body
         className={`font-sans antialiased min-h-dvh flex flex-col bg-background text-foreground`}
       >
-        <AppChrome>{children}</AppChrome>
+        <AuthProvider>
+          <AppChrome>{children}</AppChrome>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -67,6 +67,7 @@ export function resolvePostAuthRedirect(options: {
 
   const { intent, roles, hasOrganizerProfile } = options;
   const isOrganizer = roles.includes("ORGANIZER");
+  const isAdmin = roles.includes("ADMIN");
 
   if (intent === "attend") {
     return "/events";
@@ -76,6 +77,13 @@ export function resolvePostAuthRedirect(options: {
     if (!isOrganizer) return "/dashboard";
     if (!hasOrganizerProfile) return "/organizer/onboarding";
     return "/organizer/dashboard";
+  }
+
+  if (isAdmin && !isOrganizer) {
+    // Pure admin accounts (e.g. the seeded `demo-admin@allaxs.demo`) have no
+    // attendee or organiser hub of their own — land them on the moderation
+    // overview which is the primary admin workspace.
+    return "/admin";
   }
 
   if (isOrganizer) {

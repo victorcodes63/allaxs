@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@vercel/blob": "^2.3.3",
     "axios": "^1.13.2",
     "framer-motion": "^12.38.0",
     "next": "^16.2.4",

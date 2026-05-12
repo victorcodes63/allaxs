@@ -46,6 +46,6 @@ import { EmailService } from './services/email.service';
     JwtAuthGuard,
     RolesGuard,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, EmailService],
 })
 export class AuthModule {}

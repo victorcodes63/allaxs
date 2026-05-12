@@ -57,13 +57,28 @@ export class UsersService {
     await this.userRepository.update({ id: userId }, { passwordHash });
   }
 
-  /** Adds ORGANIZER to the user's role array (idempotent). */
+  /**
+   * Ensures host upgrades are additive:
+   * - keep ATTENDEE access (wallet, purchases)
+   * - add ORGANIZER access (host tools)
+   * Also repairs legacy organizer-only role arrays.
+   */
   async addOrganizerRole(userId: string): Promise<User> {
     const user = await this.findByIdOrFail(userId);
-    if (!user.roles.includes(Role.ORGANIZER)) {
-      user.roles = [...user.roles, Role.ORGANIZER];
-      return this.userRepository.save(user);
+    const currentRoles = Array.isArray(user.roles) ? user.roles : [];
+    const roleSet = new Set<Role>(currentRoles);
+    roleSet.add(Role.ATTENDEE);
+    roleSet.add(Role.ORGANIZER);
+    const nextRoles = [...roleSet];
+
+    const unchanged =
+      currentRoles.length === nextRoles.length &&
+      currentRoles.every((role) => roleSet.has(role));
+    if (unchanged) {
+      return user;
     }
-    return user;
+
+    user.roles = nextRoles;
+    return this.userRepository.save(user);
   }
 }

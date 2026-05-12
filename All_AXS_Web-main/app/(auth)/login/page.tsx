@@ -19,10 +19,12 @@ import {
   parseIntent,
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
+import { useAuth } from "@/lib/auth";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refresh: refreshAuth } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const registerHref = `/register${buildAuthQuery({
@@ -48,6 +50,12 @@ function LoginForm() {
       
       if (response.status === 200) {
         const snapshot = await fetchPostAuthSnapshot();
+        // Propagate the freshly-signed-in user into the shared
+        // <AuthProvider> so the chrome (sidebar, top bar, role guards)
+        // updates before we navigate. Without this the provider would
+        // still hold its initial null state until something else
+        // triggered a refresh.
+        await refreshAuth();
         const path = resolvePostAuthRedirect({
           nextParam: searchParams.get("next"),
           intent: parseIntent(searchParams.get("intent")),
@@ -133,7 +141,18 @@ function LoginForm() {
                 Attendee: <span className="font-mono text-foreground">demo-attendee@allaxs.demo</span>
               </p>
               <p>
+                Admin: <span className="font-mono text-foreground">demo-admin@allaxs.demo</span>
+              </p>
+              <p>
                 Password: <span className="font-mono text-foreground">DemoFlow123!</span>
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed">
+                Admins land on{" "}
+                <span className="font-mono text-foreground">/admin</span> — a
+                dashboard with the review queue, sales totals, and recent
+                moderation actions. Open{" "}
+                <span className="font-mono text-foreground">/admin/moderation</span>{" "}
+                to action submissions.
               </p>
             </div>
           </details>

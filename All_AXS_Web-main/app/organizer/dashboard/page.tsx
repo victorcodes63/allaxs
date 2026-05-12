@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import axios, { isAxiosError } from "axios";
@@ -139,6 +139,7 @@ function CompactEventRow({
 
 export default function OrganizerDashboardPage(): React.ReactElement {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<OrganizerProfileDisplay | null>(null);
@@ -304,6 +305,13 @@ export default function OrganizerDashboardPage(): React.ReactElement {
       .slice(0, 4);
   }, [events]);
 
+  const showHostWelcome = searchParams.get("hostWelcome") === "1";
+
+  useEffect(() => {
+    if (!showHostWelcome) return;
+    router.replace("/organizer/dashboard", { scroll: false });
+  }, [router, showHostWelcome]);
+
   if (loading) {
     return (
       <div className="flex min-h-[30vh] flex-col items-center justify-center gap-2">
@@ -328,6 +336,15 @@ export default function OrganizerDashboardPage(): React.ReactElement {
 
   return (
     <div className="space-y-8 sm:space-y-10">
+      {showHostWelcome ? (
+        <section
+          className="rounded-[var(--radius-panel)] border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100"
+          role="status"
+          aria-live="polite"
+        >
+          Host access is now enabled. Your organizer workspace is ready.
+        </section>
+      ) : null}
       <header className="space-y-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
           Organiser home
@@ -596,10 +613,10 @@ export default function OrganizerDashboardPage(): React.ReactElement {
             </h3>
             {attentionEvents.length > 0 ? (
               <Link
-                href="/organizer/events"
+                href="/organizer/events?status=attention"
                 className="text-xs font-semibold uppercase tracking-wide text-primary hover:underline"
               >
-                Events list
+                Review items
               </Link>
             ) : null}
           </div>

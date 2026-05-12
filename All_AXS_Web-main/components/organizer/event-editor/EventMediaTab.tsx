@@ -5,6 +5,7 @@ import Image from "next/image";
 import axios from "axios";
 import { Button } from "@/components/ui/Button";
 import { EventStatus } from "@/lib/validation/event";
+import { getEventBannerUrl, shouldUnoptimizeEventImage } from "@/lib/utils/image";
 
 interface TicketType {
   id: string;
@@ -39,9 +40,20 @@ interface Event {
 interface EventMediaTabProps {
   event: Event;
   onEventUpdate: (event: Event) => void;
+  /**
+   * Set by the admin editor to allow banner replacement on PUBLISHED /
+   * APPROVED events (e.g. to take down inappropriate imagery flagged
+   * post-launch). Backend audit-logs the upload as
+   * `ADMIN_UPDATE_EVENT_BANNER`.
+   */
+  canEditOverride?: boolean;
 }
 
-export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
+export function EventMediaTab({
+  event,
+  onEventUpdate,
+  canEditOverride = false,
+}: EventMediaTabProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -50,35 +62,17 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Helper to get the full banner URL for display
-  // Backend serves static files from /static/... paths when using local storage
-  // For production with CDN, URLs will be absolute
-  const getBannerUrl = (url: string | null | undefined): string | null => {
-    if (!url) return null;
-    // If it's already an absolute URL (CDN/production), return as is
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      return url;
-    }
-    // If it's a relative path (local storage), construct full URL
-    // Backend serves static files, so we need the backend API URL
-    if (typeof window !== "undefined") {
-      // In browser, use NEXT_PUBLIC_API_URL if set, otherwise infer from current location
-      // For local dev, backend typically runs on port 8080
-      const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-      return `${apiUrl}${url.startsWith("/") ? url : `/${url}`}`;
-    }
-    return url;
-  };
-
   // Update preview URL when event banner changes
   useEffect(() => {
     setPreviewUrl(event.bannerUrl || null);
   }, [event.bannerUrl]);
 
   const isEditable =
+    canEditOverride ||
     event.status === EventStatus.DRAFT ||
-    event.status === EventStatus.PENDING_REVIEW;
+    event.status === EventStatus.PENDING_REVIEW ||
+    event.status === EventStatus.REJECTED;
+  const resolvedPreviewUrl = previewUrl ? getEventBannerUrl(previewUrl) : null;
 
   // MIME types and file size limits should match backend configuration
   // Backend uses UPLOAD_ALLOWED_MIME and UPLOAD_MAX_MB env vars (default: 10MB)
@@ -143,7 +137,6 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
         }
       );
 
-      // If direct upload is supported, use it
       if (initResponse.data.directUpload) {
         const formData = new FormData();
         formData.append("file", file);
@@ -163,31 +156,63 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
         setPreviewUrl(uploadResponse.data.finalUrl);
         setSuccess("Poster uploaded successfully");
         setTimeout(() => setSuccess(null), 3000);
+      } else if (initResponse.data.mode === "presigned") {
+        const uploadUrl = initResponse.data.uploadUrl as string | undefined;
+        const finalUrl = initResponse.data.finalUrl as string | undefined;
+
+        if (!uploadUrl || !finalUrl) {
+          setError("Upload could not be initialized. Please try again.");
+          return;
+        }
+
+        const uploadHeaders = {
+          ...(initResponse.data.headers ?? {}),
+          "Content-Type": file.type,
+        } as Record<string, string>;
+        delete uploadHeaders["Content-Length"];
+        delete uploadHeaders["content-length"];
+
+        await axios.put(uploadUrl, file, {
+          headers: uploadHeaders,
+        });
+
+        const commitResponse = await axios.post(
+          `/api/events/${event.id}/banner/commit`,
+          { url: finalUrl },
+        );
+
+        onEventUpdate(commitResponse.data);
+        setPreviewUrl(finalUrl);
+        setSuccess("Poster uploaded successfully");
+        setTimeout(() => setSuccess(null), 3000);
       } else {
-        // For presigned URLs (e.g., Spaces), we would need to implement the upload flow
-        // For now, show an error
-        setError("Direct upload not available. Please use a different storage driver.");
+        setError("Upload mode is not supported by this storage driver.");
       }
     } catch (err) {
       const axiosError = err as {
         response?: { status?: number; data?: { message?: string } };
       };
-      
-      if (axiosError.response?.status === 403) {
-        setError("You do not have permission to upload a banner for this event");
-      } else if (axiosError.response?.status === 404) {
-        setError("Event not found");
-      } else if (axiosError.response?.status === 400) {
-        const message =
-          axiosError.response.data?.message || "Invalid file. Please check file type and size.";
-        setError(message);
+      const status = axiosError.response?.status;
+      const rawMessage = axiosError.response?.data?.message;
+      const isStorageDisabled =
+        status === 501 ||
+        (typeof rawMessage === "string" &&
+          /file uploads are disabled|storage_driver/i.test(rawMessage));
+
+      if (isStorageDisabled) {
+        setError(
+          "Poster uploads are not configured on this server yet. Ask an admin to enable storage (e.g. STORAGE_DRIVER=local in dev, or DigitalOcean Spaces in production).",
+        );
+      } else if (status === 403) {
+        setError("You do not have permission to upload a poster for this event.");
+      } else if (status === 404) {
+        setError("Event not found.");
+      } else if (status === 400) {
+        setError(rawMessage || "Invalid file. Check the file type and size and try again.");
       } else {
-        const message =
-          axiosError.response?.data?.message || "Failed to upload banner";
-        setError(message);
+        setError(rawMessage || "Failed to upload poster. Please try again.");
       }
-      
-      // Reset preview on error
+
       setPreviewUrl(event.bannerUrl || null);
     } finally {
       setUploading(false);
@@ -253,15 +278,16 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
           Use a wide image (about 2:1) or a tall poster — it will be cropped to fit.
         </p>
 
-        {previewUrl ? (
+        {resolvedPreviewUrl ? (
           <div className="space-y-4">
             <div className="relative h-64 w-full overflow-hidden rounded-lg bg-wash">
               <Image
-                src={getBannerUrl(previewUrl) || ""}
+                src={resolvedPreviewUrl}
                 alt="Event banner preview"
                 fill
                 className="object-cover"
                 sizes="100vw"
+                unoptimized={shouldUnoptimizeEventImage(resolvedPreviewUrl)}
                 onError={() => {
                   setError("Failed to load banner image");
                 }}
@@ -327,7 +353,7 @@ export function EventMediaTab({ event, onEventUpdate }: EventMediaTabProps) {
       {!isEditable && (
         <p className="text-sm text-muted">
           Posters cannot be edited in the current event status. Only events in
-          DRAFT or PENDING_REVIEW can be updated.
+          DRAFT, PENDING_REVIEW, or REJECTED can be updated.
         </p>
       )}
 

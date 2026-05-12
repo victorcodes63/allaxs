@@ -21,6 +21,10 @@ export function getEventBannerUrl(bannerUrl: string | null | undefined): string 
     return "/images/event-placeholder.jpg";
   }
 
+  if (bannerUrl.startsWith("data:") || bannerUrl.startsWith("blob:")) {
+    return bannerUrl;
+  }
+
   if (bannerUrl.startsWith("http://") || bannerUrl.startsWith("https://")) {
     return bannerUrl;
   }
@@ -50,7 +54,16 @@ export function getEventBannerAbsoluteUrl(bannerUrl: string | null | undefined):
  * Use with next/image `unoptimized` for sources that break Vercel/Next’s default optimizer.
  */
 export function shouldUnoptimizeEventImage(url: string): boolean {
-  return url.startsWith("data:") || /^https?:\/\/images\.unsplash\.com\//.test(url);
+  return (
+    url.startsWith("data:") ||
+    url.startsWith("blob:") ||
+    /^https?:\/\/images\.unsplash\.com\//.test(url) ||
+    // Local Nest API (dev). next/image's remotePatterns + helmet's CORP are
+    // both fragile here; skipping the optimiser lets the browser load the
+    // poster directly from /static once the backend opts the route into
+    // cross-origin embedding.
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(url)
+  );
 }
 
 /**

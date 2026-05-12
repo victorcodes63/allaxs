@@ -1,7 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import * as QRCode from 'qrcode';
 import { User } from '../../users/entities/user.entity';
+
+type ResendSendResult = {
+  data?: { id?: string } | null;
+  error?: { message?: string; statusCode?: number; name?: string };
+};
 
 @Injectable()
 export class EmailService {
@@ -54,6 +60,23 @@ export class EmailService {
         'FRONTEND_URL is not configured. Email links may be incorrect.',
       );
     }
+  }
+
+  /** Resend's Node SDK returns `{ error }` instead of throwing for many API failures. */
+  private assertResendSendOk(result: unknown, context: string): string {
+    if (!result || typeof result !== 'object') {
+      throw new Error(`${context}: unexpected Resend response`);
+    }
+    const r = result as ResendSendResult;
+    if (r.error) {
+      const detail = r.error.message ?? JSON.stringify(r.error);
+      throw new Error(`${context}: ${detail}`);
+    }
+    const id = r.data?.id;
+    if (!id) {
+      throw new Error(`${context}: Resend returned no message id`);
+    }
+    return id;
   }
 
   async sendVerificationEmail(user: User, token: string): Promise<void> {
@@ -149,19 +172,12 @@ export class EmailService {
         html,
       });
 
-      const resendId =
-        result && typeof result === 'object' && 'id' in result
-          ? String((result as { id: unknown }).id)
-          : 'N/A';
-      const serializedResponse = (() => {
-        try {
-          return JSON.stringify(result);
-        } catch {
-          return '[unserializable response]';
-        }
-      })();
+      const resendId = this.assertResendSendOk(
+        result,
+        'sendVerificationEmail',
+      );
       this.logger.log(
-        `[sendVerificationEmail] Verification email sent successfully to: ${user.email}. Resend ID: ${resendId}. Response: ${serializedResponse}`,
+        `[sendVerificationEmail] Verification email sent successfully to: ${user.email}. Resend ID: ${resendId}`,
       );
     } catch (error) {
       const err = error as Error;
@@ -279,19 +295,12 @@ export class EmailService {
         html,
       });
 
-      const resendId =
-        result && typeof result === 'object' && 'id' in result
-          ? String((result as { id: unknown }).id)
-          : 'N/A';
-      const serializedResponse = (() => {
-        try {
-          return JSON.stringify(result);
-        } catch {
-          return '[unserializable response]';
-        }
-      })();
+      const resendId = this.assertResendSendOk(
+        result,
+        'sendPasswordResetEmail',
+      );
       this.logger.log(
-        `[sendPasswordResetEmail] Password reset email sent successfully to: ${user.email}. Resend ID: ${resendId}. Response: ${serializedResponse}`,
+        `[sendPasswordResetEmail] Password reset email sent successfully to: ${user.email}. Resend ID: ${resendId}`,
       );
     } catch (error) {
       const err = error as Error;
@@ -342,13 +351,14 @@ export class EmailService {
     `;
 
     try {
-      await this.resend.emails.send({
+      const result = await this.resend.emails.send({
         from: fromEmail,
         to: user.email,
         subject: `Welcome to ${appName}!`,
         html,
       });
-      this.logger.log(`Welcome email sent to ${user.email}`);
+      const id = this.assertResendSendOk(result, 'sendWelcomeEmail');
+      this.logger.log(`Welcome email sent to ${user.email} (Resend ID: ${id})`);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.error(
@@ -357,5 +367,68 @@ export class EmailService {
       );
       // Don't throw - welcome email is not critical
     }
+  }
+
+  async sendTicketEmail(input: {
+    buyerName: string;
+    buyerEmail: string;
+    eventTitle: string;
+    eventSlug: string;
+    tickets: { id: string; tierName: string; qrPayload: string }[];
+  }): Promise<void> {
+    if (!input.tickets.length) return;
+    if (!this.resend || !this.resendFrom) {
+      this.logger.warn(
+        `[sendTicketEmail] Email provider unavailable, skipping ticket email for ${input.buyerEmail}`,
+      );
+      return;
+    }
+
+    const frontendUrl = this.frontendUrl || 'http://localhost:3000';
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+
+    const ticketRows = await Promise.all(
+      input.tickets.map(async (ticket) => {
+        const qrImage = await QRCode.toDataURL(ticket.qrPayload, {
+          errorCorrectionLevel: 'M',
+          margin: 1,
+          width: 220,
+        });
+        const ticketUrl = `${frontendUrl}/tickets/${ticket.id}`;
+        return `
+          <div style="border:1px solid #eee;border-radius:12px;padding:16px;margin-bottom:16px;">
+            <p style="margin:0 0 8px 0;font-size:14px;color:#555;">${ticket.tierName}</p>
+            <img src="${qrImage}" alt="Ticket QR code" width="220" height="220" style="display:block;margin:8px 0;" />
+            <p style="margin:8px 0 0 0;">
+              <a href="${ticketUrl}" style="color:#0b5fff;text-decoration:none;">Open ticket</a>
+            </p>
+          </div>
+        `;
+      }),
+    );
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
+        <h2>Your tickets for ${input.eventTitle}</h2>
+        <p>Hello ${input.buyerName || 'there'}, your payment was successful. Your tickets are ready.</p>
+        ${ticketRows.join('')}
+        <p style="margin-top:24px;">
+          View all tickets: <a href="${frontendUrl}/tickets">${frontendUrl}/tickets</a>
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+        <p style="font-size:12px;color:#888;">Sent by ${appName}</p>
+      </div>
+    `;
+
+    const ticketSendResult = await this.resend.emails.send({
+      from: this.resendFrom,
+      to: input.buyerEmail,
+      subject: `Your tickets for ${input.eventTitle}`,
+      html,
+    });
+    const ticketId = this.assertResendSendOk(ticketSendResult, 'sendTicketEmail');
+    this.logger.log(
+      `[sendTicketEmail] Sent to ${input.buyerEmail} (Resend ID: ${ticketId})`,
+    );
   }
 }

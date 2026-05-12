@@ -36,7 +36,6 @@ import {
   validateMimeType,
 } from '../storage/utils/storage.utils';
 import { ConfigService } from '@nestjs/config';
-import { LocalStorage } from '../storage/drivers/local-storage.driver';
 
 @ApiTags('uploads')
 @Controller('uploads/events')
@@ -97,10 +96,11 @@ export class UploadsController {
 
     if (
       event.status !== EventStatus.DRAFT &&
-      event.status !== EventStatus.PENDING_REVIEW
+      event.status !== EventStatus.PENDING_REVIEW &&
+      event.status !== EventStatus.REJECTED
     ) {
       throw new ForbiddenException(
-        'Banner can only be uploaded for events in DRAFT or PENDING_REVIEW status',
+        'Banner can only be uploaded for events in DRAFT, PENDING_REVIEW, or REJECTED status',
       );
     }
 
@@ -190,11 +190,10 @@ export class UploadsController {
     @GetUser() user: CurrentUser,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // Check if local storage is enabled
     const storage = this.storageService.getDriver();
-    if (!(storage instanceof LocalStorage) || !storage.saveDirect) {
+    if (!storage.saveDirect) {
       throw new BadRequestException(
-        'Direct upload is only available with local storage driver',
+        'Direct upload is not available with the configured storage driver',
       );
     }
 
@@ -207,10 +206,11 @@ export class UploadsController {
 
     if (
       event.status !== EventStatus.DRAFT &&
-      event.status !== EventStatus.PENDING_REVIEW
+      event.status !== EventStatus.PENDING_REVIEW &&
+      event.status !== EventStatus.REJECTED
     ) {
       throw new ForbiddenException(
-        'Banner can only be uploaded for events in DRAFT or PENDING_REVIEW status',
+        'Banner can only be uploaded for events in DRAFT, PENDING_REVIEW, or REJECTED status',
       );
     }
 

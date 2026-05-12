@@ -28,7 +28,7 @@ You can hold **both** roles on one user (`ATTENDEE` + `ORGANIZER`) after promoti
 
 1. **Register** at `/register`, then browse **`/events`** (or open an event from the home page).
 2. Choose **Continue to checkout** — you must be **signed in**; checkout pre-fills name and email from your session.
-3. Select tickets and **Complete demo payment** (no card or Paystack call; totals are for display only).
+3. Select tickets and **Complete demo payment** (no card or live payment processor call; totals are for display only).
 4. On the confirmation screen, open **My tickets**, then a pass to view a **real QR code** (JSON payload for scanners in demo mode).
 
 **Storage:** With `NEXT_PUBLIC_USE_API_CHECKOUT=true` (and the API running with demo checkout enabled), orders and tickets are persisted in the database; the app still mirrors a snapshot in **sessionStorage** for the confirmation UI. Without that flag, passes live only in **sessionStorage** until you clear site data.

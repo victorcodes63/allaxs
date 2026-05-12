@@ -156,7 +156,9 @@ export class EventsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ORGANIZER)
+  // Admins can edit any event (audit-logged in `EventsService.update`);
+  // organisers retain their existing ownership-scoped edit path.
+  @Roles(Role.ORGANIZER, Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update event' })
   @ApiParam({ name: 'id', description: 'Event ID' })
@@ -169,12 +171,12 @@ export class EventsController {
     @GetUser() user: CurrentUser,
     @Body() dto: UpdateEventDto,
   ) {
-    return this.eventsService.update(id, user.id, dto);
+    return this.eventsService.update(id, user.id, dto, user.roles);
   }
 
   @Post(':id/submit')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ORGANIZER)
+  @Roles(Role.ORGANIZER, Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Submit event for review' })
@@ -184,7 +186,7 @@ export class EventsController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   @ApiResponse({ status: 404, description: 'Event not found' })
   async submitForReview(@Param('id') id: string, @GetUser() user: CurrentUser) {
-    return this.eventsService.submitForReview(id, user.id);
+    return this.eventsService.submitForReview(id, user.id, user.roles);
   }
 
   /**
@@ -193,7 +195,7 @@ export class EventsController {
    */
   @Post(':id/banner/commit')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ORGANIZER)
+  @Roles(Role.ORGANIZER, Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Commit banner URL to event' })
@@ -212,8 +214,8 @@ export class EventsController {
     @GetUser() user: CurrentUser,
     @Body() dto: CommitBannerDto,
   ) {
-    // Get the event to validate ownership and status
-    await this.eventsService.ensureOwnership(id, user.id);
+    // Validate ownership / admin override + load the event for status checks.
+    await this.eventsService.ensureOwnership(id, user.id, user.roles);
 
     // Validate URL matches expected pattern for this event
     // The URL should match: events/{eventId}/banner.{ext}
@@ -285,6 +287,6 @@ export class EventsController {
       }
     }
 
-    return this.eventsService.commitBanner(id, user.id, dto.url);
+    return this.eventsService.commitBanner(id, user.id, dto.url, user.roles);
   }
 }

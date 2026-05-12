@@ -39,6 +39,17 @@ function forwardSetCookies(from: Response, to: NextResponse) {
   }
 }
 
+function isAuthEntryPath(pathname: string): boolean {
+  const authPaths = [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+    "/verify-email",
+  ] as const;
+  return authPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 /**
  * When the access JWT is missing or past `exp`, renew it using the httpOnly refresh cookie
  * so users stay signed in until they hit logout (refresh cookie lifetime).
@@ -71,6 +82,21 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const accessToken = request.cookies.get("accessToken")?.value;
 
+  if (isAuthEntryPath(pathname)) {
+    if (!accessTokenNeedsRotation(accessToken)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    const renewed = await tryRefreshAndContinue(request);
+    if (renewed) {
+      const redirect = NextResponse.redirect(new URL("/dashboard", request.url));
+      forwardSetCookies(renewed, redirect);
+      return redirect;
+    }
+
+    return NextResponse.next();
+  }
+
   if (accessTokenNeedsRotation(accessToken)) {
     const renewed = await tryRefreshAndContinue(request);
     if (renewed) return renewed;
@@ -85,6 +111,11 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/reset-password",
+    "/verify-email",
     "/dashboard/:path*",
     "/organizer/:path*",
     "/admin/:path*",

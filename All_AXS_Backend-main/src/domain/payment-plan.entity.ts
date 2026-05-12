@@ -21,7 +21,7 @@ export enum PaymentPlanStatus {
 @Entity('payment_plans')
 export class PaymentPlan extends BaseEntity {
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'order_id' })
   orderId!: string;
 
   @ManyToOne(() => Order, (o) => o.paymentPlans, { onDelete: 'CASCADE' })
@@ -29,7 +29,7 @@ export class PaymentPlan extends BaseEntity {
   order!: Order;
 
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'ticket_type_id' })
   ticketTypeId!: string;
 
   @ManyToOne(() => TicketType, { onDelete: 'RESTRICT' })

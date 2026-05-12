@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { CheckoutController } from './checkout.controller';
+import { PaystackWebhookController } from './paystack-webhook.controller';
 import { CheckoutService } from './checkout.service';
 import { TicketsController } from './tickets.controller';
 import { TicketsService } from './tickets.service';
@@ -24,7 +25,7 @@ import { TicketType } from '../events/entities/ticket-type.entity';
     ]),
     AuthModule,
   ],
-  controllers: [CheckoutController, TicketsController],
+  controllers: [CheckoutController, PaystackWebhookController, TicketsController],
   providers: [CheckoutService, TicketsService],
 })
 export class CheckoutModule {}

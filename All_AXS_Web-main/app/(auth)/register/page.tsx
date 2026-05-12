@@ -19,10 +19,12 @@ import {
   parseIntent,
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
+import { useAuth } from "@/lib/auth";
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refresh: refreshAuth } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const loginHref = `/login${buildAuthQuery({
@@ -48,6 +50,9 @@ function RegisterForm() {
 
       if (response.status === 200 || response.status === 201) {
         const snapshot = await fetchPostAuthSnapshot();
+        // Push the new user into the shared <AuthProvider> so the
+        // chrome and role-aware redirects react immediately.
+        await refreshAuth();
         const path = resolvePostAuthRedirect({
           nextParam: searchParams.get("next"),
           intent: parseIntent(searchParams.get("intent")),

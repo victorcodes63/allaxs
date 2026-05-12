@@ -12,7 +12,7 @@ export enum PaymentInstallmentStatus {
 @Entity('payment_installments')
 export class PaymentInstallment extends BaseEntity {
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'plan_id' })
   planId!: string;
 
   @ManyToOne(() => PaymentPlan, (p) => p.installments, { onDelete: 'CASCADE' })

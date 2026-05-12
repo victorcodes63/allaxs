@@ -214,9 +214,10 @@ export default function TicketDetailPage() {
 
   const organizerName = eventDetails?.organizer?.orgName;
   const formatChip = eventDetails?.type ? eventTypeLabel(eventDetails.type) : null;
+  const hasEventMeta = Boolean(whenLine || venueLine || organizerName);
 
   return (
-    <div className="axs-content-inner max-w-lg mx-auto pb-20 pt-2 md:pt-4 space-y-8">
+    <div className="axs-content-inner mx-auto max-w-2xl space-y-5 pb-16 pt-2 sm:space-y-6 sm:pb-20 md:pt-4">
       <Link
         href="/tickets"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted hover:text-primary transition-colors"
@@ -227,110 +228,108 @@ export default function TicketDetailPage() {
         My tickets
       </Link>
 
-      <article className="overflow-hidden rounded-[var(--radius-panel)] border border-border bg-surface shadow-[0_12px_40px_-18px_rgba(0,0,0,0.12),0_4px_14px_-6px_rgba(0,0,0,0.06)]">
-        <header className="relative bg-foreground px-6 pb-10 pt-9 text-center text-background md:px-10">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.14]"
-            style={{
-              background:
-                "radial-gradient(120% 80% at 50% -20%, rgba(240,114,65,0.55), transparent 55%), radial-gradient(80% 60% at 100% 100%, rgba(96,24,72,0.35), transparent 50%)",
-            }}
-            aria-hidden
-          />
-          <div className="relative space-y-3">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/65">All AXS</p>
-              {formatChip ? (
-                <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/85">
-                  {formatChip}
-                </span>
-              ) : null}
-            </div>
-            <h1 className="font-display text-[1.65rem] font-semibold leading-[1.15] tracking-tight text-white sm:text-3xl">
-              {headline}
-            </h1>
-            <p>
-              <span className="inline-flex items-center rounded-full bg-white/12 px-3 py-1 text-xs font-semibold text-white/90 ring-1 ring-white/15">
-                {ticket.tierName}
-              </span>
-            </p>
-            {eventLoading && eventSlugForLink ? (
-              <p className="text-xs text-white/55">Syncing event details…</p>
-            ) : null}
-          </div>
-        </header>
-
-        {(whenLine || venueLine || organizerName) && (
-          <div className="border-b border-border bg-gradient-to-b from-wash to-background px-6 py-5 md:px-8">
-            <ul className="space-y-4 text-sm">
-              {whenLine ? (
-                <li className="flex gap-3">
-                  <span className="shrink-0 w-16 pt-0.5 text-xs font-semibold uppercase tracking-wider text-muted">
-                    When
-                  </span>
-                  <span className="min-w-0 font-medium leading-snug text-foreground">{whenLine}</span>
-                </li>
-              ) : null}
-              {venueLine ? (
-                <li className="flex gap-3">
-                  <span className="shrink-0 w-16 pt-0.5 text-xs font-semibold uppercase tracking-wider text-muted">
-                    Where
-                  </span>
-                  <span className="min-w-0 leading-snug text-foreground">{venueLine}</span>
-                </li>
-              ) : null}
-              {organizerName ? (
-                <li className="flex gap-3">
-                  <span className="shrink-0 w-16 pt-0.5 text-xs font-semibold uppercase tracking-wider text-muted">
-                    Host
-                  </span>
-                  <span className="min-w-0 font-medium leading-snug text-foreground">{organizerName}</span>
-                </li>
-              ) : null}
-            </ul>
-          </div>
-        )}
-
-        <div className="px-6 pb-9 pt-8 md:px-10">
-          <div className="mx-auto max-w-[280px] text-center">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted">Entry code</p>
+      <article className="overflow-hidden rounded-[var(--radius-panel)] border border-border bg-surface shadow-[0_16px_46px_-22px_rgba(0,0,0,0.25),0_6px_20px_-10px_rgba(0,0,0,0.2)]">
+        <div className="lg:grid lg:grid-cols-[1.08fr_0.92fr]">
+          <section className="relative overflow-hidden border-b border-border/80 bg-[#080a14] px-5 py-7 text-white sm:px-7 sm:py-8 md:px-10 lg:border-b-0 lg:border-r lg:border-border/70 lg:py-10">
             <div
-              className="mt-3 rounded-[var(--radius-card)] bg-gradient-to-b from-white to-neutral-50 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_1px_rgba(0,0,0,0.06),0_8px_28px_-12px_rgba(0,0,0,0.15)] ring-1 ring-black/[0.06]"
-              aria-label="Ticket QR code"
-            >
-              <QRCode value={qrValue} size={216} level="M" />
-            </div>
-            <p className="mt-4 text-xs leading-relaxed text-muted">
-              {isApiCheckoutEnabled()
-                ? "This QR includes a server-issued nonce and signature for demo check-in."
-                : "Demo mode: payload is JSON your scanners can read for testing."}
-            </p>
-          </div>
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(120% 70% at 42% -5%, rgba(240,114,65,0.44), transparent 56%), radial-gradient(75% 55% at 100% 95%, rgba(96,24,72,0.24), transparent 58%), linear-gradient(180deg, rgba(7,11,28,0.95), rgba(6,9,20,0.98))",
+              }}
+              aria-hidden
+            />
+            <div className="relative space-y-6">
+              <div className="space-y-2.5 text-center lg:text-left">
+                <div className="flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/65">All AXS</p>
+                  {formatChip ? (
+                    <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/85">
+                      {formatChip}
+                    </span>
+                  ) : null}
+                </div>
+                <h1 className="font-display text-[1.45rem] font-semibold leading-[1.15] tracking-tight text-white sm:text-[1.8rem] md:text-[2rem]">
+                  {headline}
+                </h1>
+                <p>
+                  <span className="inline-flex items-center rounded-full bg-white/12 px-3 py-1 text-xs font-semibold text-white/90 ring-1 ring-white/15">
+                    {ticket.tierName}
+                  </span>
+                </p>
+                {eventLoading && eventSlugForLink ? (
+                  <p className="text-xs text-white/55">Syncing event details…</p>
+                ) : null}
+              </div>
 
-          <div className="mt-10 overflow-hidden rounded-[var(--radius-card)] border border-border divide-y divide-border bg-background/50">
-            <div className="flex flex-col gap-0.5 px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <dt className="text-xs font-semibold uppercase tracking-wider text-muted">Attendee email</dt>
-              <dd className="text-sm font-medium text-foreground text-right break-all sm:max-w-[60%]">
-                {ticket.attendeeEmail}
-              </dd>
+              {hasEventMeta ? (
+                <ul className="space-y-4 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+                  {whenLine ? (
+                    <li className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-white/55">When</p>
+                      <p className="text-sm font-medium leading-snug text-white/92">{whenLine}</p>
+                    </li>
+                  ) : null}
+                  {venueLine ? (
+                    <li className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-white/55">Where</p>
+                      <p className="text-sm leading-snug text-white/86">{venueLine}</p>
+                    </li>
+                  ) : null}
+                  {organizerName ? (
+                    <li className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-white/55">Host</p>
+                      <p className="text-sm font-medium leading-snug text-white/92">{organizerName}</p>
+                    </li>
+                  ) : null}
+                </ul>
+              ) : null}
             </div>
-            <div className="flex flex-col gap-0.5 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <dt className="text-xs font-semibold uppercase tracking-wider text-muted">Issued</dt>
-              <dd className="text-sm tabular-nums font-medium text-foreground">{issued}</dd>
+          </section>
+
+          <section className="px-4 py-6 sm:px-6 sm:py-8 md:px-8 lg:px-8 lg:py-10">
+            <div className="mx-auto max-w-[272px] text-center sm:max-w-[300px]">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Entry code</p>
+              <div
+                className="mt-3 rounded-[var(--radius-card)] bg-gradient-to-b from-white to-neutral-50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_1px_rgba(0,0,0,0.06),0_8px_28px_-12px_rgba(0,0,0,0.15)] ring-1 ring-black/[0.06] sm:p-5"
+                aria-label="Ticket QR code"
+              >
+                <QRCode value={qrValue} size={220} level="M" className="h-auto w-full" />
+              </div>
+              <p className="mt-4 text-xs leading-relaxed text-muted">
+                {isApiCheckoutEnabled()
+                  ? "This QR includes a server-issued nonce and signature for demo check-in."
+                  : "Demo mode: payload is JSON your scanners can read for testing."}
+              </p>
             </div>
-            <div className="flex flex-col gap-0.5 px-4 py-3.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-              <dt className="text-xs font-semibold uppercase tracking-wider text-muted shrink-0">Pass id</dt>
-              <dd className="font-mono text-[11px] leading-relaxed text-foreground break-all text-right sm:max-w-[70%]">
-                {ticket.id}
-              </dd>
+          </section>
+        </div>
+
+        <div className="border-t border-border/70 px-4 pb-6 pt-4 sm:px-6 sm:pb-8 sm:pt-5 md:px-8 md:pb-9 md:pt-6">
+          <dl className="grid gap-2.5 sm:grid-cols-2">
+            <div className="rounded-[var(--radius-card)] border border-border/75 bg-background/35 px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted">Attendee email</dt>
+              <dd className="mt-1.5 text-sm font-medium leading-relaxed text-foreground break-all">{ticket.attendeeEmail}</dd>
             </div>
-          </div>
+            <div className="rounded-[var(--radius-card)] border border-border/75 bg-background/35 px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted">Issued</dt>
+              <dd className="mt-1.5 text-sm tabular-nums font-medium leading-relaxed text-foreground">{issued}</dd>
+            </div>
+            <div className="rounded-[var(--radius-card)] border border-border/75 bg-background/35 px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:col-span-2">
+              <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted">Pass id</dt>
+              <dd className="mt-1.5 font-mono text-[11px] leading-relaxed text-foreground break-all">{ticket.id}</dd>
+            </div>
+          </dl>
         </div>
       </article>
 
-      <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+      <div className="flex flex-col items-stretch gap-3 sm:items-center sm:flex-row sm:justify-center">
         {eventSlugForLink ? (
-          <ArrowCtaLink href={`/e/${eventSlugForLink}`} variant="primary" className="justify-center min-w-[200px]">
+          <ArrowCtaLink
+            href={`/e/${eventSlugForLink}`}
+            variant="primary"
+            className="min-h-11 justify-center px-5 sm:min-w-[200px]"
+          >
             View event page
           </ArrowCtaLink>
         ) : (

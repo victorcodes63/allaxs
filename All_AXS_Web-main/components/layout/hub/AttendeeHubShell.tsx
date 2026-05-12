@@ -4,8 +4,17 @@ import { useMemo } from "react";
 import { HubAppShell, type HubNavSection } from "@/components/layout/hub/HubAppShell";
 
 function attendeePageTitle(pathname: string): string {
+  if (pathname === "/organizer/onboarding" || pathname.startsWith("/organizer/onboarding/")) {
+    return "Become a host";
+  }
+  if (pathname === "/dashboard/events" || pathname.startsWith("/dashboard/events/")) {
+    return "Browse events";
+  }
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
     return "Overview";
+  }
+  if (pathname === "/notifications" || pathname.startsWith("/notifications/")) {
+    return "Notifications";
   }
   if (pathname === "/tickets" || pathname.startsWith("/tickets/")) {
     return pathname === "/tickets" || pathname === "/tickets/" ? "My tickets" : "Pass details";
@@ -30,12 +39,17 @@ export function AttendeeHubShell({
           {
             href: "/dashboard",
             label: "Overview",
-            match: (p) => p === "/dashboard" || p.startsWith("/dashboard/"),
+            match: (p) => p === "/dashboard",
           },
           {
             href: "/tickets",
             label: "My tickets",
             match: (p) => p === "/tickets" || p.startsWith("/tickets/"),
+          },
+          {
+            href: "/notifications",
+            label: "Notifications",
+            match: (p) => p === "/notifications" || p.startsWith("/notifications/"),
           },
         ],
       },
@@ -43,14 +57,14 @@ export function AttendeeHubShell({
         title: "Discover",
         items: [
           {
-            href: "/events",
+            href: "/dashboard/events",
             label: "Browse events",
-            match: (p) => p === "/events" || p.startsWith("/events/"),
+            match: (p) => p === "/dashboard/events" || p.startsWith("/dashboard/events/"),
           },
         ],
       },
     ];
-    if (user.roles?.includes("ORGANIZER") || user.roles?.includes("ADMIN")) {
+    if (user.roles?.includes("ORGANIZER")) {
       base.push({
         title: "Host",
         items: [
@@ -62,13 +76,24 @@ export function AttendeeHubShell({
         ],
       });
     }
+    if (user.roles?.includes("ADMIN")) {
+      base.push({
+        title: "Moderation",
+        items: [
+          {
+            href: "/admin",
+            label: "Admin overview",
+            match: (p) => p === "/admin" || p.startsWith("/admin/"),
+          },
+        ],
+      });
+    }
     return base;
   }, [user.roles]);
 
   return (
     <HubAppShell
       brandHome="/dashboard"
-      brandSubtitle="Your account"
       hubEyebrow="Fan home"
       hubKind="attendee"
       sections={sections}

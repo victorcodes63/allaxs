@@ -6,7 +6,7 @@ import { PaymentGateway, PaymentStatus } from './enums';
 @Entity('payments')
 export class Payment extends BaseEntity {
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'order_id' })
   orderId!: string;
 
   @ManyToOne(() => Order, (o) => o.payments, { onDelete: 'CASCADE' })

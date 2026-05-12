@@ -35,6 +35,7 @@ import { DEMO_CATALOGUE_EVENTS } from './demo-catalogue-seed-data';
 
 const ORG_EMAIL = 'demo-organizer@allaxs.demo';
 const ATT_EMAIL = 'demo-attendee@allaxs.demo';
+const ADMIN_EMAIL = 'demo-admin@allaxs.demo';
 const PASSWORD = 'DemoFlow123!';
 
 /** Stable idempotency key — one seeded PAID order + ticket for the demo attendee wallet. */
@@ -242,6 +243,43 @@ async function syncCatalogueEvents(
   return { created, updated, slugs, walletCatalogueEventId };
 }
 
+/**
+ * Provision the demo admin used to drive the event moderation flow at
+ * /admin/moderation. Idempotent: creates the user when missing, and ensures
+ * the ADMIN role is present without clobbering other roles already on the row.
+ */
+async function ensureDemoAdminUser(
+  users: ReturnType<typeof AppDataSource.getRepository<User>>,
+): Promise<{ id: string; created: boolean; rolesUpdated: boolean }> {
+  const existing = await users.findOne({ where: { email: ADMIN_EMAIL } });
+  if (!existing) {
+    const hash = await bcrypt.hash(PASSWORD, 10);
+    const created = await users.save(
+      users.create({
+        email: ADMIN_EMAIL,
+        name: 'Demo Admin',
+        passwordHash: hash,
+        roles: [Role.ADMIN],
+      }),
+    );
+    return { id: created.id, created: true, rolesUpdated: false };
+  }
+
+  let rolesUpdated = false;
+  if (!existing.roles?.includes(Role.ADMIN)) {
+    existing.roles = [...(existing.roles ?? []), Role.ADMIN];
+    rolesUpdated = true;
+  }
+  if (existing.name !== 'Demo Admin') {
+    existing.name = 'Demo Admin';
+    rolesUpdated = true;
+  }
+  if (rolesUpdated) {
+    await users.save(existing);
+  }
+  return { id: existing.id, created: false, rolesUpdated };
+}
+
 async function main() {
   dotenv.config({ path: path.join(__dirname, '../.env') });
 
@@ -326,12 +364,22 @@ async function main() {
   }
   const walletSeed = await ensureDemoAttendeeSeededTicket(attendeeUser, sync.walletCatalogueEventId);
 
+  const adminSeed = await ensureDemoAdminUser(users);
+
   console.log(
     JSON.stringify(
       {
         message: 'Demo catalogue synced',
         organizer: { email: ORG_EMAIL, password: PASSWORD, userId: organizerUser.id },
         attendee: { email: ATT_EMAIL, password: PASSWORD, userId: attendeeUser.id },
+        admin: {
+          email: ADMIN_EMAIL,
+          password: PASSWORD,
+          userId: adminSeed.id,
+          created: adminSeed.created,
+          rolesUpdated: adminSeed.rolesUpdated,
+          moderationUrl: '/admin/moderation',
+        },
         profileId: profile.id,
         catalogue: {
           eventCount: DEMO_CATALOGUE_EVENTS.length,

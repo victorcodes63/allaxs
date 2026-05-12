@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { DashboardTicketsOverview } from "./DashboardTicketsOverview";
+import { DashboardHostingCard } from "./DashboardHostingCard";
 
 const modules: {
   title: string;
@@ -17,19 +18,8 @@ const modules: {
     title: "Discover",
     blurb: "Search published shows, pick a date, and continue to checkout when you are signed in.",
     links: [
-      { label: "Browse events", href: "/events" },
+      { label: "Browse events", href: "/dashboard/events" },
       { label: "Home", href: "/" },
-    ],
-  },
-  {
-    title: "Hosting",
-    blurb: "Sell your own line-ups on All AXS with payouts, ticket types, and review before going live.",
-    links: [
-      {
-        label: "Start organizer setup",
-        href: "/organizer/onboarding",
-        hint: "Or open Organizer hub if you are already approved",
-      },
     ],
   },
 ];
@@ -52,7 +42,7 @@ export default function DashboardPage() {
         </p>
         <div>
           <Link
-            href="/events"
+            href="/dashboard/events"
             className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] bg-primary px-6 text-sm font-semibold text-white shadow-[var(--btn-shadow-primary)] transition-opacity hover:opacity-92"
           >
             Find events
@@ -96,6 +86,7 @@ export default function DashboardPage() {
               </div>
             </li>
           ))}
+          <DashboardHostingCard />
         </ul>
       </section>
     </div>

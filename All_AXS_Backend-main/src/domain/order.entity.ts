@@ -17,7 +17,7 @@ import { PaymentPlan } from './payment-plan.entity';
 
 @Entity('orders')
 export class Order extends BaseEntity {
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'uuid', nullable: true, name: 'user_id' })
   userId?: string | null;
 
   @ManyToOne(() => User, (u) => u.orders, { onDelete: 'SET NULL' })
@@ -25,7 +25,7 @@ export class Order extends BaseEntity {
   user?: User | null;
 
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'event_id' })
   eventId!: string;
 
   @ManyToOne(() => Event, (e) => e.orders, { onDelete: 'CASCADE' })

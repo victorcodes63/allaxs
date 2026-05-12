@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth";
  * with a compact bar so the experience reads as “in the app” not a guest landing page.
  */
 export function LoggedInBrowseChrome() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -53,6 +53,9 @@ export function LoggedInBrowseChrome() {
     } finally {
       setBusy(false);
     }
+    // Clear shared auth context before navigating so consumers flip to
+    // signed-out state without waiting for a context refetch.
+    setUser(null);
     closeMenu();
     router.replace("/login");
   };
@@ -85,7 +88,7 @@ export function LoggedInBrowseChrome() {
       {link("/tickets", "Tickets")}
       {link("/dashboard", "Dashboard")}
       {showOrganizer ? link("/organizer/dashboard", "Organiser") : null}
-      {user.roles?.includes("ADMIN") ? link("/admin/moderation", "Admin") : null}
+      {user.roles?.includes("ADMIN") ? link("/admin", "Admin") : null}
     </>
   );
 
@@ -221,7 +224,7 @@ export function LoggedInBrowseChrome() {
               ) : null}
               {user.roles?.includes("ADMIN") ? (
                 <Link
-                  href="/admin/moderation"
+                  href="/admin"
                   onClick={closeMenu}
                   className="rounded-lg px-4 py-3 text-base font-medium text-foreground hover:bg-wash"
                 >

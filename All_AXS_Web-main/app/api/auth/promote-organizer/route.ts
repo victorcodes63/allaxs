@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-
-const API_URL = process.env.API_URL || "http://localhost:8080";
+import { extractAuthTokens } from "@/lib/server/auth-tokens";
+import { getServerApiBaseUrl } from "@/lib/server/api-url";
 
 export async function POST() {
+  const API_URL = getServerApiBaseUrl();
   try {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get("accessToken")?.value;
@@ -27,7 +28,8 @@ export async function POST() {
       );
     }
 
-    const { accessToken: newAccess, refreshToken: newRefresh } = data.tokens || {};
+    const { accessToken: newAccess, refreshToken: newRefresh } =
+      extractAuthTokens(data);
 
     if (newAccess) {
       cookieStore.set("accessToken", newAccess, {

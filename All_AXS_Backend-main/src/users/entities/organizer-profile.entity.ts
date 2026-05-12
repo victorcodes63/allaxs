@@ -14,11 +14,11 @@ import { PayoutMethod } from 'src/domain/enums';
 @Entity('organizer_profiles')
 export class OrganizerProfile extends BaseEntity {
   @Index({ unique: true })
-  @Column({ type: 'uuid', unique: true })
+  @Column({ type: 'uuid', unique: true, name: 'user_id' })
   userId!: string;
 
   @OneToOne(() => User, (u) => u.organizer, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: 'user_id' })
   user!: User;
 
   @Column({ type: 'varchar', length: 255 })

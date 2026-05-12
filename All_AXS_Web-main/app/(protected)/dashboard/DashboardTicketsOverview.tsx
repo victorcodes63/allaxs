@@ -5,15 +5,16 @@ import Link from "next/link";
 import { loadAllTickets, type StoredTicket } from "@/lib/checkout-storage";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
 import { mergeTicketsById, normalizeApiTicketsPayload } from "@/lib/tickets-api";
+import QRCode from "react-qr-code";
+import { buildTicketQrPayload } from "@/lib/ticket-qr";
 
 export function DashboardTicketsOverview() {
-  const [tickets, setTickets] = useState<StoredTicket[] | null>(null);
+  const [tickets, setTickets] = useState<StoredTicket[] | null>(() =>
+    isApiCheckoutEnabled() ? null : loadAllTickets()
+  );
 
   useEffect(() => {
-    if (!isApiCheckoutEnabled()) {
-      setTickets(loadAllTickets());
-      return;
-    }
+    if (!isApiCheckoutEnabled()) return;
     let cancelled = false;
     void (async () => {
       const session = loadAllTickets();
@@ -69,7 +70,7 @@ export function DashboardTicketsOverview() {
         </p>
         <div className="mt-4">
           <Link
-            href="/events"
+            href="/dashboard/events"
             className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] bg-primary px-5 text-sm font-semibold text-white shadow-[var(--btn-shadow-primary)] transition-opacity hover:opacity-92"
           >
             Browse events
@@ -79,7 +80,9 @@ export function DashboardTicketsOverview() {
     );
   }
 
-  const preview = tickets.slice(0, 4);
+  const featuredPass = tickets[0];
+  const extraPasses = tickets.slice(1, 4);
+  const featuredQrValue = buildTicketQrPayload(featuredPass);
 
   return (
     <section
@@ -100,20 +103,52 @@ export function DashboardTicketsOverview() {
           View all in wallet →
         </Link>
       </div>
-      <ul className="mt-5 grid gap-3 sm:grid-cols-2">
-        {preview.map((t) => (
-          <li key={t.id}>
-            <Link
-              href={`/tickets/${t.id}`}
-              className="flex flex-col rounded-[var(--radius-card)] border border-border bg-background p-4 transition-all hover:border-primary/35 hover:shadow-md"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-primary">Pass</p>
-              <p className="mt-1 font-display font-semibold text-foreground line-clamp-2">{t.eventTitle}</p>
-              <p className="mt-1 text-xs text-muted">{t.tierName}</p>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <div className="mt-5">
+        <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+          <Link
+            href={`/tickets/${featuredPass.id}`}
+            className="group rounded-[var(--radius-card)] bg-background/35 p-4 shadow-[0_16px_40px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/10 transition-all hover:-translate-y-0.5 hover:ring-primary/35 sm:p-5"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-primary">Featured pass</p>
+            <p className="mt-2 font-display text-xl font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+              {featuredPass.eventTitle || "Your event"}
+            </p>
+            <p className="mt-1 text-sm text-muted">{featuredPass.tierName}</p>
+            <p className="mt-3 text-xs text-muted break-words">{featuredPass.attendeeEmail}</p>
+            <p className="mt-4 inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary/90">
+              Open pass <span aria-hidden>→</span>
+            </p>
+          </Link>
+
+          <Link
+            href={`/tickets/${featuredPass.id}`}
+            className="rounded-[var(--radius-card)] bg-background/35 p-4 text-center shadow-[0_16px_40px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-white/10 transition-all hover:-translate-y-0.5 hover:ring-primary/35 sm:p-5"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">Entry code</p>
+            <div className="mx-auto mt-3 w-full max-w-[180px] rounded-[var(--radius-card)] bg-white p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_0_0_1px_rgba(0,0,0,0.06)]">
+              <QRCode value={featuredQrValue} size={156} level="M" className="h-auto w-full" />
+            </div>
+            <p className="mt-3 text-xs text-muted">Tap to open full pass and scanner details.</p>
+          </Link>
+        </div>
+
+        {extraPasses.length > 0 ? (
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {extraPasses.map((t) => (
+              <li key={t.id}>
+                <Link
+                  href={`/tickets/${t.id}`}
+                  className="flex h-full flex-col rounded-[var(--radius-card)] bg-background/30 p-3.5 shadow-[0_14px_30px_-24px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-white/10 transition-all hover:-translate-y-0.5 hover:ring-primary/35"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-primary">Pass</p>
+                  <p className="mt-1 line-clamp-2 text-sm font-semibold text-foreground">{t.eventTitle || "Your event"}</p>
+                  <p className="mt-1 text-xs text-muted">{t.tierName}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </section>
   );
 }

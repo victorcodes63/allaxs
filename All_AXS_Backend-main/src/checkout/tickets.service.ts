@@ -23,41 +23,8 @@ export class TicketsService {
     private readonly ticketRepository: Repository<Ticket>,
   ) {}
 
-  async findMine(userId: string): Promise<{ tickets: TicketMineRow[] }> {
-    const rows = await this.ticketRepository.find({
-      where: { ownerUserId: userId },
-      relations: ['order', 'order.event', 'ticketType'],
-      order: { createdAt: 'DESC' },
-    });
-
-    const tickets: TicketMineRow[] = rows.map((t) => ({
-      id: t.id,
-      orderId: t.orderId,
-      eventSlug: t.order?.event?.slug ?? '',
-      eventTitle: t.order?.event?.title ?? 'Event',
-      tierName: t.ticketType?.name ?? 'Ticket',
-      attendeeEmail: t.attendeeEmail ?? '',
-      issuedAt: t.createdAt.toISOString(),
-      currency: t.ticketType?.currency ?? 'KES',
-      qrNonce: t.qrNonce,
-      qrSignature: t.qrSignature,
-    }));
-
-    return { tickets };
-  }
-
-  async findOneForOwner(
-    userId: string,
-    ticketId: string,
-  ): Promise<{ ticket: TicketMineRow }> {
-    const t = await this.ticketRepository.findOne({
-      where: { id: ticketId, ownerUserId: userId },
-      relations: ['order', 'order.event', 'ticketType'],
-    });
-    if (!t) {
-      throw new NotFoundException('Ticket not found');
-    }
-    const ticket: TicketMineRow = {
+  private toTicketRow(t: Ticket): TicketMineRow {
+    return {
       id: t.id,
       orderId: t.orderId,
       eventSlug: t.order?.event?.slug ?? '',
@@ -69,6 +36,57 @@ export class TicketsService {
       qrNonce: t.qrNonce,
       qrSignature: t.qrSignature,
     };
+  }
+
+  async findMine(userId: string, userEmail?: string): Promise<{ tickets: TicketMineRow[] }> {
+    if (userEmail) {
+      // Backfill legacy guest/partial account tickets to the signed-in owner.
+      await this.ticketRepository
+        .createQueryBuilder()
+        .update(Ticket)
+        .set({ ownerUserId: userId })
+        .where('ownerUserId IS NULL')
+        .andWhere('attendeeEmail IS NOT NULL')
+        .andWhere('LOWER(attendeeEmail) = LOWER(:email)', { email: userEmail })
+        .execute();
+    }
+
+    const rows = await this.ticketRepository.find({
+      where: { ownerUserId: userId },
+      relations: ['order', 'order.event', 'ticketType'],
+      order: { createdAt: 'DESC' },
+    });
+
+    const tickets: TicketMineRow[] = rows.map((t) => this.toTicketRow(t));
+
+    return { tickets };
+  }
+
+  async findOneForOwner(
+    userId: string,
+    ticketId: string,
+    userEmail?: string,
+  ): Promise<{ ticket: TicketMineRow }> {
+    if (userEmail) {
+      await this.ticketRepository
+        .createQueryBuilder()
+        .update(Ticket)
+        .set({ ownerUserId: userId })
+        .where('id = :ticketId', { ticketId })
+        .andWhere('ownerUserId IS NULL')
+        .andWhere('attendeeEmail IS NOT NULL')
+        .andWhere('LOWER(attendeeEmail) = LOWER(:email)', { email: userEmail })
+        .execute();
+    }
+
+    const t = await this.ticketRepository.findOne({
+      where: { id: ticketId, ownerUserId: userId },
+      relations: ['order', 'order.event', 'ticketType'],
+    });
+    if (!t) {
+      throw new NotFoundException('Ticket not found');
+    }
+    const ticket: TicketMineRow = this.toTicketRow(t);
     return { ticket };
   }
 }

@@ -4,8 +4,8 @@
 
 Users live in `users`. The `roles` column is a **PostgreSQL enum array** (`ADMIN`, `ORGANIZER`, `ATTENDEE`).
 
-- **Attendee (buy tickets):** `roles = {ATTENDEE}` — this is what **`POST /auth/register`** creates by default.
-- **Organizer (create events):** must include **`ORGANIZER`**. An organizer also has a row in **`organizer_profiles`** (linked by `userId`) before they can own events.
+- **Attendee (buy tickets):** `roles = {ATTENDEE}` — this is what `**POST /auth/register`** creates by default.
+- **Organizer (create events):** must include `**ORGANIZER`**. An organizer also has a row in `**organizer_profiles`** (linked by `userId`) before they can own events.
 
 You can inspect or change roles in SQL (example):
 
@@ -19,7 +19,7 @@ WHERE email = 'you@example.com'
 
 ## API: grant yourself ORGANIZER in dev (optional)
 
-When `NODE_ENV` is **not** `production`, or when **`ENABLE_PROMOTE_ORGANIZER_ROLE=true`**:
+When `NODE_ENV` is **not** `production`, or when `**ENABLE_PROMOTE_ORGANIZER_ROLE=true`**:
 
 `POST /auth/promote-organizer-demo`  
 Headers: `Authorization: Bearer <access_token>`
@@ -37,17 +37,30 @@ npm run seed:demo
 
 Creates (if missing):
 
-| Account | Email | Password | Roles |
-|--------|-------|----------|--------|
+
+| Account   | Email                        | Password       | Roles                            |
+| --------- | ---------------------------- | -------------- | -------------------------------- |
 | Organizer | `demo-organizer@allaxs.demo` | `DemoFlow123!` | ATTENDEE + ORGANIZER (+ profile) |
-| Attendee | `demo-attendee@allaxs.demo` | `DemoFlow123!` | ATTENDEE |
+| Attendee  | `demo-attendee@allaxs.demo`  | `DemoFlow123!` | ATTENDEE                         |
+| Admin     | `demo-admin@allaxs.demo`     | `DemoFlow123!` | ADMIN                            |
+
 
 Also creates one **PUBLISHED** public event with two ticket types (paid + free). The script prints `eventId`, `slug`, and `ticketTypeIds`.
 
+### Event review flow (organizer → admin)
+
+The seed admin drives the review queue end-to-end:
+
+1. Sign in as the **organizer** (`demo-organizer@allaxs.demo`), open an event editor, and click **Submit for review** — the event moves to `PENDING_REVIEW` and a notification fires to every admin.
+2. Sign in as the **admin** (`demo-admin@allaxs.demo`), visit `/admin/moderation`, click **Review** on the queued event, and choose **Approve** or **Reject**.
+3. Approval flips the event to `PUBLISHED` (now visible on `/events`); rejection flips it to `REJECTED` and stores the optional reason on `event.metadata.rejectionReason`. Either way, the organizer is notified and the event surfaces under **Needs your attention** until they action it (rejected events are editable and can be **Resubmit**ted).
+
+Re-run `npm run seed:demo` any time — the admin step is idempotent. Existing rows are reconciled to include the `ADMIN` role (other roles are preserved) and the display name is normalised to `Demo Admin`.
+
 ## Persisted demo checkout (Neon)
 
-1. Set **`ENABLE_DEMO_CHECKOUT=true`** in the API environment (required in **production**; in dev it is allowed when `NODE_ENV !== 'production'` without the flag—see `CheckoutService`).
-2. Authenticated **`POST /checkout/demo`** with body:
+1. Set `**ENABLE_DEMO_CHECKOUT=true`** in the API environment (required in **production**; in dev it is allowed when `NODE_ENV !== 'production'` without the flag—see `CheckoutService`).
+2. Authenticated `**POST /checkout/demo`** with body:
 
 ```json
 {
@@ -59,11 +72,11 @@ Also creates one **PUBLISHED** public event with two ticket types (paid + free).
 }
 ```
 
-Creates a **PAID** order, **SUCCESS** Paystack-style payment row (`intentId` prefix `demo_pay_`), increments **`ticket_types.quantity_sold`**, and issues **`tickets`** with `qrNonce` + HMAC `qrSignature` (server secret: `JWT_SECRET`).
+Creates a **PAID** order, **SUCCESS** Paystack-style payment row (`intentId` prefix `demo_pay_`), increments `**ticket_types.quantity_sold`**, and issues `**tickets`** with `qrNonce` + HMAC `qrSignature` (server secret: `JWT_SECRET`).
 
-3. **`GET /tickets/me`** — list passes for the logged-in owner.  
-4. **`GET /tickets/:id`** — one pass (owner only).  
-5. **`GET /checkout/orders/:orderId`** — order summary for confirmation (owner only).
+1. `**GET /tickets/me**` — list passes for the logged-in owner.
+2. `**GET /tickets/:id**` — one pass (owner only).
+3. `**GET /checkout/orders/:orderId**` — order summary for confirmation (owner only).
 
 ## Web app wiring
 

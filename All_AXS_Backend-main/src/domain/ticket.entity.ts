@@ -8,7 +8,7 @@ import { User } from 'src/users/entities/user.entity';
 @Entity('tickets')
 export class Ticket extends BaseEntity {
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'order_id' })
   orderId!: string;
 
   @ManyToOne(() => Order, (o) => o.tickets, { onDelete: 'CASCADE' })
@@ -16,7 +16,7 @@ export class Ticket extends BaseEntity {
   order!: Order;
 
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'ticket_type_id' })
   ticketTypeId!: string;
 
   @ManyToOne(() => TicketType, { onDelete: 'RESTRICT' })
@@ -24,7 +24,7 @@ export class Ticket extends BaseEntity {
   ticketType!: TicketType;
 
   @Index()
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'uuid', nullable: true, name: 'owner_user_id' })
   ownerUserId?: string | null;
 
   @ManyToOne(() => User, (u) => u.tickets, { onDelete: 'SET NULL' })

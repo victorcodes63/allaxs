@@ -73,7 +73,7 @@ const NAV_LINKS = [
 export function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const { user, loading, setUser } = useAuth();
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -106,12 +106,16 @@ export function SiteHeader() {
     setLoggingOut(true);
     try {
       await axios.post("/api/auth/logout");
-      router.replace("/login");
     } catch {
-      router.replace("/login");
+      /* still leave */
     } finally {
       setLoggingOut(false);
+      // Clear the shared auth context immediately so every consumer
+      // (top bar, dashboards, page guards) flips to signed-out state
+      // before navigation completes.
+      setUser(null);
       closeMenu();
+      router.replace("/login");
     }
   };
 
@@ -129,7 +133,7 @@ export function SiteHeader() {
         ...(user.roles?.includes("ORGANIZER") || user.roles?.includes("ADMIN")
           ? ([["/organizer/dashboard", "Organizer"]] as const)
           : []),
-        ...(user.roles?.includes("ADMIN") ? ([["/admin/moderation", "Admin"]] as const) : []),
+        ...(user.roles?.includes("ADMIN") ? ([["/admin", "Admin"]] as const) : []),
       ]
     : [...NAV_LINKS];
 

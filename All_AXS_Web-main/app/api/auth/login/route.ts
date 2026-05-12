@@ -4,6 +4,8 @@ import {
   getServerApiBaseUrl,
   upstreamUnreachableMessage,
 } from "@/lib/server/api-url";
+import { extractAuthTokens } from "@/lib/server/auth-tokens";
+import { formatUpstreamErrorMessage } from "@/lib/server/format-upstream-error-message";
 
 export async function POST(request: NextRequest) {
   const API_URL = getServerApiBaseUrl();
@@ -29,24 +31,31 @@ export async function POST(request: NextRequest) {
       throw err;
     }
 
-    const contentType = response.headers.get("content-type") || "";
-    let data: { message?: string; tokens?: { accessToken?: string; refreshToken?: string }; user?: unknown } = {};
-    if (contentType.includes("application/json")) {
+    const rawBody = await response.text();
+    let data: {
+      message?: unknown;
+      tokens?: { accessToken?: string; refreshToken?: string };
+      user?: unknown;
+    } = {};
+    if (rawBody.trim()) {
       try {
-        data = await response.json();
+        data = JSON.parse(rawBody) as typeof data;
       } catch {
-        data = {};
+        /* non-JSON (e.g. HTML from a proxy); leave data empty */
       }
     }
 
     if (!response.ok) {
       return NextResponse.json(
-        { message: data.message || "Login failed" },
+        {
+          message:
+            formatUpstreamErrorMessage(data) ?? "Login failed",
+        },
         { status: response.status },
       );
     }
 
-    const { accessToken, refreshToken } = data.tokens || {};
+    const { accessToken, refreshToken } = extractAuthTokens(data);
     const cookieStore = await cookies();
 
     if (accessToken) {

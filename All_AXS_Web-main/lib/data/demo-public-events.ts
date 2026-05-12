@@ -116,7 +116,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-03a",
         name: "Live seat",
-        priceCents: 50000,
+        priceCents: 22000,
         currency: "KES",
         quantityTotal: 1200,
         quantitySold: 140,
@@ -144,7 +144,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-04a",
         name: "In person",
-        priceCents: 150000,
+        priceCents: 30000,
         currency: "KES",
         quantityTotal: 180,
         quantitySold: 42,
@@ -155,7 +155,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-04b",
         name: "Online",
-        priceCents: 75000,
+        priceCents: 18000,
         currency: "KES",
         quantityTotal: 400,
         quantitySold: 58,
@@ -211,7 +211,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-06a",
         name: "Participant",
-        priceCents: 44900,
+        priceCents: 21000,
         currency: "KES",
         quantityTotal: 900,
         quantitySold: 0,
@@ -237,7 +237,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-07a",
         name: "Hall",
-        priceCents: 35000,
+        priceCents: 20000,
         currency: "KES",
         quantityTotal: 220,
         quantitySold: 61,
@@ -298,7 +298,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-09a",
         name: "Full weekend",
-        priceCents: 450000,
+        priceCents: 30000,
         currency: "KES",
         quantityTotal: 80,
         quantitySold: 23,
@@ -309,7 +309,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-09b",
         name: "Sunday only",
-        priceCents: 200000,
+        priceCents: 22000,
         currency: "KES",
         quantityTotal: 40,
         quantitySold: 8,
@@ -335,7 +335,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-10a",
         name: "Early bird",
-        priceCents: 80000,
+        priceCents: 16000,
         currency: "KES",
         quantityTotal: 200,
         quantitySold: 112,
@@ -344,7 +344,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
       {
         id: "demo-tt-10b",
         name: "Standard",
-        priceCents: 120000,
+        priceCents: 24000,
         currency: "KES",
         quantityTotal: 300,
         quantitySold: 14,

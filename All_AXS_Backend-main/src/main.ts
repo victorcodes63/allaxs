@@ -3,7 +3,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
+import { mkdirSync } from 'fs';
 import { join } from 'path';
+import type { ServerResponse } from 'http';
 import { AppModule } from './app.module';
 import { Logger } from 'nestjs-pino';
 import { validateEnv } from './common/env-validation';
@@ -20,6 +22,7 @@ try {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    rawBody: true,
   });
 
   app.useLogger(app.get(Logger));
@@ -40,15 +43,38 @@ async function bootstrap() {
     }),
   );
 
-  // Local disk uploads are not usable on Vercel serverless; use STORAGE_DRIVER=spaces (or stub).
-  if (!process.env.VERCEL) {
+  // Local disk uploads are not usable on Vercel serverless; use STORAGE_DRIVER=spaces there.
+  // Mount /static for the local driver — explicit, or the dev default when nothing is set.
+  // Match StorageService.resolveDriverType() so the URL space and the driver always agree.
+  const storageDriver =
+    process.env.STORAGE_DRIVER ||
+    (!process.env.VERCEL &&
+    process.env.NODE_ENV !== 'production' &&
+    process.env.NODE_ENV !== 'test'
+      ? 'local'
+      : 'stub');
+  if (!process.env.VERCEL && storageDriver === 'local') {
     const uploadsDir = join(process.cwd(), 'uploads');
+    mkdirSync(uploadsDir, { recursive: true });
     app.useStaticAssets(uploadsDir, {
       prefix: '/static',
+      // helmet defaults to CORP: same-origin which would block <img src> from
+      // localhost:3000 → localhost:8080. Posters are public assets — opt them
+      // back out so cross-origin embeds (and next/image optimisation) work.
+      setHeaders: (res: ServerResponse) => {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      },
     });
   }
 
-  // Swagger/OpenAPI setup (skip in test environment)
+  const port = parseInt(process.env.PORT ?? '8080', 10);
+  // Listen before Swagger: cold CPU + large OpenAPI graph can push startup past Cloud Run's probe window.
+  // Cloud Run health checks target the container IP — bind all interfaces.
+  await app.listen(port, '0.0.0.0');
+  app.get(Logger).log(`API listening on ${port}`);
+
+  // Swagger/OpenAPI (after listen; skip in test environment)
   if (process.env.NODE_ENV !== 'test') {
     const config = new DocumentBuilder()
       .setTitle('All AXS API')
@@ -61,13 +87,6 @@ async function bootstrap() {
     SwaggerModule.setup('docs-json', app, document, {
       jsonDocumentUrl: '/docs-json',
     });
-  }
-
-  const port = parseInt(process.env.PORT ?? '8080', 10);
-  await app.listen(port);
-
-  app.get(Logger).log(`API listening on ${port}`);
-  if (process.env.NODE_ENV !== 'test') {
     app
       .get(Logger)
       .log(`Swagger docs available at http://localhost:${port}/docs`);
@@ -77,4 +96,7 @@ async function bootstrap() {
   }
 }
 
-void bootstrap();
+bootstrap().catch((err) => {
+  console.error('Bootstrap failed:', err);
+  process.exit(1);
+});

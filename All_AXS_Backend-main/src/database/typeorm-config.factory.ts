@@ -31,6 +31,10 @@ export function createTypeOrmConfig(
       synchronize: false, // migrations only!
       autoLoadEntities: true,
       logging: false,
+      connectTimeoutMS: 15_000,
+      extra: {
+        connectionTimeoutMillis: 15_000,
+      },
     };
   }
 
@@ -47,6 +51,10 @@ export function createTypeOrmConfig(
       synchronize: false, // migrations only!
       autoLoadEntities: true,
       logging: isProd ? ['error'] : ['error', 'schema'],
+      connectTimeoutMS: 15_000,
+      extra: {
+        connectionTimeoutMillis: 15_000,
+      },
     };
   }
 
@@ -83,5 +91,9 @@ export function createTypeOrmConfig(
       configService.get<string>('NODE_ENV') === 'test'
         ? false
         : ['error', 'schema'],
+    connectTimeoutMS: 15_000,
+    extra: {
+      connectionTimeoutMillis: 15_000,
+    },
   };
 }

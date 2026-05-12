@@ -4,6 +4,7 @@ import {
   getServerApiBaseUrl,
   upstreamUnreachableMessage,
 } from "@/lib/server/api-url";
+import { extractAuthTokens } from "@/lib/server/auth-tokens";
 
 export async function POST(request: NextRequest) {
   const API_URL = getServerApiBaseUrl();
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Set cookies for tokens (auto-login after register)
-    const { accessToken, refreshToken } = data.tokens || {};
+    const { accessToken, refreshToken } = extractAuthTokens(data);
     const cookieStore = await cookies();
 
     if (accessToken) {

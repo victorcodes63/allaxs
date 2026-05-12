@@ -42,7 +42,10 @@ export class TicketTypesController {
   @Post('events/:eventId/ticket-types')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @UseInterceptors(TransformTicketTypeDtoInterceptor)
-  @Roles(Role.ORGANIZER)
+  // Admins can create tiers on any event (audit-logged via the same
+  // service hook organisers use). Organisers retain the ownership-scoped
+  // path through `EventsService.ensureOwnership`.
+  @Roles(Role.ORGANIZER, Role.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a ticket type for an event' })
@@ -146,7 +149,7 @@ export class TicketTypesController {
   @Patch('ticket-types/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @UseInterceptors(TransformTicketTypeDtoInterceptor)
-  @Roles(Role.ORGANIZER)
+  @Roles(Role.ORGANIZER, Role.ADMIN)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a ticket type' })
   @ApiParam({ name: 'id', description: 'Ticket type ID' })
@@ -189,7 +192,7 @@ export class TicketTypesController {
 
   @Delete('ticket-types/:id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ORGANIZER)
+  @Roles(Role.ORGANIZER, Role.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a ticket type' })

@@ -6,7 +6,7 @@ import { TicketType } from 'src/events/entities/ticket-type.entity';
 @Entity('order_items')
 export class OrderItem extends BaseEntity {
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'order_id' })
   orderId!: string;
 
   @ManyToOne(() => Order, (o) => o.items, { onDelete: 'CASCADE' })
@@ -14,7 +14,7 @@ export class OrderItem extends BaseEntity {
   order!: Order;
 
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'ticket_type_id' })
   ticketTypeId!: string;
 
   @ManyToOne(() => TicketType, { onDelete: 'RESTRICT' })

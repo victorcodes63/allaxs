@@ -7,6 +7,7 @@ export type OrganizerProfileDisplay = {
   website?: string;
   payoutMethod?: string;
   taxId?: string;
+  verified?: boolean;
 };
 
 function str(v: unknown): string | undefined {
@@ -51,5 +52,6 @@ export function normalizeOrganizerProfilePayload(data: unknown): OrganizerProfil
     website: str(o.website) ?? str(o.web_site),
     payoutMethod: str(o.payoutMethod) ?? str(o.payout_method),
     taxId: str(o.taxId) ?? str(o.tax_id),
+    verified: typeof o.verified === "boolean" ? o.verified : undefined,
   };
 }

@@ -5,7 +5,9 @@ import { User } from '../../users/entities/user.entity';
 import { Role } from '../../domain/enums';
 
 // Mock Resend to prevent actual API calls
-const mockResendSend = jest.fn().mockResolvedValue({ id: 'test-email-id' });
+const mockResendSend = jest
+  .fn()
+  .mockResolvedValue({ data: { id: 'test-email-id' }, error: null });
 
 jest.mock('resend', () => {
   return {

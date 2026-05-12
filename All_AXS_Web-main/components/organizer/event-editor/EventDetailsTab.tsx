@@ -32,11 +32,20 @@ interface Event {
 interface EventDetailsTabProps {
   event: Event;
   onEventUpdate: (event: Event) => void;
+  /**
+   * Set by the admin editor route to bypass the organizer-only status gate
+   * (`DRAFT | PENDING_REVIEW | REJECTED`) so admins can correct typos on
+   * already-published events, and to hide the "Submit for Review" button
+   * (which is irrelevant for admin overrides). Backend audit-logs the
+   * resulting PATCH as ADMIN_UPDATE_EVENT.
+   */
+  canEditOverride?: boolean;
 }
 
 export function EventDetailsTab({
   event,
   onEventUpdate,
+  canEditOverride = false,
 }: EventDetailsTabProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,8 +77,16 @@ export function EventDetailsTab({
 
   const eventType = watch("type");
   const isEditable =
+    canEditOverride ||
     event.status === EventStatus.DRAFT ||
-    event.status === EventStatus.PENDING_REVIEW;
+    event.status === EventStatus.PENDING_REVIEW ||
+    event.status === EventStatus.REJECTED;
+  // Admins editing as an override don't submit for review — they're either
+  // approving via the moderation queue or fixing live event copy.
+  const canSubmitForReview =
+    !canEditOverride &&
+    (event.status === EventStatus.DRAFT ||
+      event.status === EventStatus.REJECTED);
 
   useEffect(() => {
     // Convert ISO date strings to datetime-local format (YYYY-MM-DDTHH:mm)
@@ -155,8 +172,8 @@ export function EventDetailsTab({
   };
 
   const handleSubmitForReview = async () => {
-    if (event.status !== EventStatus.DRAFT) {
-      setError("Event can only be submitted from draft status");
+    if (!canSubmitForReview) {
+      setError("Event can only be submitted from draft or rejected status");
       return;
     }
 
@@ -307,7 +324,7 @@ export function EventDetailsTab({
           >
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>
-          {event.status === EventStatus.DRAFT && (
+          {canSubmitForReview && (
             <Button
               type="button"
               variant="secondary"
@@ -315,7 +332,11 @@ export function EventDetailsTab({
               disabled={isSubmitting}
               className="flex-1"
             >
-              {isSubmitting ? "Submitting..." : "Submit for Review"}
+              {isSubmitting
+                ? "Submitting..."
+                : event.status === EventStatus.REJECTED
+                  ? "Resubmit for Review"
+                  : "Submit for Review"}
             </Button>
           )}
         </div>
@@ -323,7 +344,7 @@ export function EventDetailsTab({
         {!isEditable && (
           <p className="text-sm text-muted">
             This event cannot be edited in its current status. Only events in
-            DRAFT or PENDING_REVIEW status can be edited.
+            DRAFT, PENDING_REVIEW, or REJECTED status can be edited.
           </p>
         )}
       </form>

@@ -10,8 +10,14 @@ import { Event } from './entities/event.entity';
 import { Coupon } from './entities/coupon.entity';
 import { TicketType } from './entities/ticket-type.entity';
 import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
+import { User } from '../users/entities/user.entity';
 import { StorageModule } from '../storage/storage.module';
 import { OrderItem } from '../domain/order-item.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
+// Imported as a plain entity (not the AdminModule) so the events services can
+// write admin audit-log rows directly without introducing a circular module
+// dependency (AdminModule already imports EventsModule).
+import { AdminAuditLog } from '../admin/entities/admin-audit-log.entity';
 
 @Module({
   imports: [
@@ -20,9 +26,12 @@ import { OrderItem } from '../domain/order-item.entity';
       Coupon,
       TicketType,
       OrganizerProfile,
+      User,
       OrderItem,
+      AdminAuditLog,
     ]),
     StorageModule,
+    NotificationsModule,
   ],
   controllers: [EventsController, UploadsController, TicketTypesController],
   providers: [EventsService, TicketTypesService, InstallmentConfigValidator],

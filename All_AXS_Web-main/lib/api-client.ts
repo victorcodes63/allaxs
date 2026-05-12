@@ -115,17 +115,19 @@ function createApiClient(): AxiosInstance {
         }
       }
 
-      // Log errors in dev mode
+      // Diagnostics in dev. Use `console.debug` so Next.js 16's Turbopack
+      // dev overlay doesn't treat every expected 4xx as a "Console Error";
+      // callers still receive the rejection and surface a friendly message.
       if (process.env.NODE_ENV !== "production") {
         if (error.response) {
-          console.error(
-            `API Error [${error.response.status}]:`,
-            error.response.data
+          console.debug(
+            `[apiClient] ${error.config?.method?.toUpperCase() ?? "REQ"} ${error.config?.url ?? ""} → ${error.response.status}`,
+            error.response.data,
           );
         } else if (error.request) {
-          console.error("API Request Error:", error.request);
+          console.debug("[apiClient] no response", error.message);
         } else {
-          console.error("API Error:", error.message);
+          console.debug("[apiClient] request setup failed", error.message);
         }
       }
       return Promise.reject(error);

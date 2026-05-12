@@ -39,13 +39,24 @@ function whatsappDigitsOk(raw: string): boolean {
   return digits.length >= 10;
 }
 
-export function CheckoutExperience({ event }: { event: PublicEvent }) {
+export function CheckoutExperience({
+  event,
+  context = "public",
+}: {
+  event: PublicEvent;
+  context?: "public" | "dashboard";
+}) {
   const router = useRouter();
   const tiers = useMemo(
     () => event.ticketTypes?.filter(tierAvailable) ?? [],
     [event.ticketTypes]
   );
-  const checkoutReturnPath = `/events/${event.id}/checkout`;
+  const eventDetailPath =
+    context === "dashboard" ? `/dashboard/events/${event.slug}` : `/e/${event.slug}`;
+  const checkoutReturnPath =
+    context === "dashboard"
+      ? `/dashboard/events/${event.slug}/checkout`
+      : `/events/${event.id}/checkout`;
   const [step, setStep] = useState<CheckoutStep>("tickets");
   const [qty, setQty] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
@@ -265,7 +276,7 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
           return;
         }
         if (!data.authorizationUrl) {
-          setError("Could not start Paystack checkout.");
+          setError("Could not start payment.");
           return;
         }
         if (typeof window !== "undefined") {
@@ -374,7 +385,7 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
     <div className="axs-content-inner grid lg:grid-cols-[1fr_400px] gap-10 lg:gap-14 items-start pb-12">
       <div>
         <Link
-          href={`/e/${event.slug}`}
+          href={eventDetailPath}
           className="text-sm font-medium text-muted hover:text-primary transition-colors inline-flex items-center gap-1 mb-8"
         >
           ← Event details
@@ -651,7 +662,7 @@ export function CheckoutExperience({ event }: { event: PublicEvent }) {
                 {submitting
                   ? "Processing…"
                   : isApiCheckoutEnabled() && signedIn
-                    ? `Proceed to Paystack — ${subtotal / 100} ${currency}`
+                    ? `Proceed to Pay — ${subtotal / 100} ${currency}`
                     : subtotal === 0
                       ? "Complete checkout — free pass"
                       : `Complete checkout — ${subtotal / 100} ${currency}`}

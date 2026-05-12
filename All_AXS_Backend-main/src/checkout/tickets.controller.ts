@@ -11,12 +11,12 @@ export class TicketsController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   mine(@GetUser() user: CurrentUser) {
-    return this.ticketsService.findMine(user.id);
+    return this.ticketsService.findMine(user.id, user.email);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   one(@GetUser() user: CurrentUser, @Param('id') id: string) {
-    return this.ticketsService.findOneForOwner(user.id, id);
+    return this.ticketsService.findOneForOwner(user.id, id, user.email);
   }
 }

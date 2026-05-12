@@ -29,11 +29,13 @@ export function PublicEventCard({
   event,
   variant = "default",
   className,
+  eventHref,
 }: {
   event: PublicEvent;
   /** Compact: short banner rail. featuredRail: poster-like + details for home featured scroller. listRow: horizontal row (poster left). */
   variant?: "default" | "compact" | "featuredRail" | "listRow";
   className?: string;
+  eventHref?: string;
 }) {
   const compact = variant === "compact";
   const featuredRail = variant === "featuredRail";
@@ -48,11 +50,12 @@ export function PublicEventCard({
     event.ticketTypes && event.ticketTypes.length > 0
       ? event.ticketTypes[0].currency
       : "KES";
+  const href = eventHref ?? `/e/${event.slug}`;
 
   if (listRow) {
     return (
       <Link
-        href={`/e/${event.slug}`}
+        href={href}
         className={[
           "group flex flex-row gap-4 overflow-hidden rounded-[var(--radius-card)] bg-surface/55 p-3.5 text-left ring-1 ring-white/[0.06] transition-[box-shadow,transform,background-color] duration-300 hover:bg-surface/70 hover:shadow-md active:scale-[0.995] sm:gap-5 sm:p-4",
           className,
@@ -114,7 +117,7 @@ export function PublicEventCard({
 
   return (
     <Link
-      href={`/e/${event.slug}`}
+      href={href}
       className={[
         "group flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-border/80 bg-surface/55 ring-1 ring-white/[0.06] transition-all duration-300 hover:border-primary/25",
         featuredRail

@@ -15,6 +15,7 @@ import { CreateTicketTypeDto } from './dto/create-ticket-type.dto';
 import { UpdateTicketTypeDto } from './dto/update-ticket-type.dto';
 import { EventsService } from './events.service';
 import { InstallmentConfigValidator } from './installment-config.validator';
+import { AdminAuditLog } from 'src/admin/entities/admin-audit-log.entity';
 
 @Injectable()
 export class TicketTypesService {
@@ -27,14 +28,64 @@ export class TicketTypesService {
     private readonly eventRepository: Repository<Event>,
     private readonly eventsService: EventsService,
     private readonly installmentValidator: InstallmentConfigValidator,
+    @InjectRepository(AdminAuditLog)
+    private readonly adminAuditLogRepository: Repository<AdminAuditLog>,
   ) {}
 
   /**
-   * Check if event can be edited (only draft or pending status)
+   * Best-effort admin audit-log write for ticket-tier mutations. Mirrors
+   * `EventsService.recordAdminAction` so all admin actions land in the same
+   * table. Failures are swallowed so audit hiccups can't block edits.
+   */
+  private async recordAdminTicketTypeAction(
+    actorId: string,
+    action: string,
+    ticketTypeId: string,
+    metadata: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.adminAuditLogRepository.save(
+        this.adminAuditLogRepository.create({
+          adminUserId: actorId,
+          action,
+          resourceType: 'ticket_type',
+          resourceId: ticketTypeId,
+          metadata,
+          status: 'SUCCESS',
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to record admin audit entry for ${action} on ticket_type ${ticketTypeId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * Check if event can be edited before it is public, including rejected events
+   * that organizers must fix before resubmission.
    */
   private canEditEvent(status: EventStatus): boolean {
     return (
-      status === EventStatus.DRAFT || status === EventStatus.PENDING_REVIEW
+      status === EventStatus.DRAFT ||
+      status === EventStatus.PENDING_REVIEW ||
+      status === EventStatus.REJECTED
+    );
+  }
+
+  private isPriceOnlyUpdate(dto: UpdateTicketTypeDto): boolean {
+    return (
+      dto.priceCents !== undefined &&
+      dto.name === undefined &&
+      dto.description === undefined &&
+      dto.quantity === undefined &&
+      dto.maxPerOrder === undefined &&
+      dto.salesStartAt === undefined &&
+      dto.salesEndAt === undefined &&
+      dto.allowInstallments === undefined &&
+      dto.installmentConfig === undefined
     );
   }
 
@@ -73,14 +124,18 @@ export class TicketTypesService {
     userRoles: Role[],
     dto: CreateTicketTypeDto,
   ): Promise<TicketType> {
-    // Check ownership and get event
-    const event = await this.eventsService.ensureOwnership(eventId, userId);
+    // Ownership check (skipped automatically for admins via userRoles).
+    const event = await this.eventsService.ensureOwnership(
+      eventId,
+      userId,
+      userRoles,
+    );
 
     // Check if event is editable (unless admin)
     const isAdmin = userRoles?.includes(Role.ADMIN);
     if (!isAdmin && !this.canEditEvent(event.status)) {
       throw new BadRequestException(
-        'Ticket types can only be created for events in DRAFT or PENDING_REVIEW status',
+        'Ticket types can only be created for events in DRAFT, PENDING_REVIEW, or REJECTED status',
       );
     }
 
@@ -204,6 +259,21 @@ export class TicketTypesService {
       if (process.env.NODE_ENV !== 'production') {
         this.logger.debug(
           `Created ticket type: ${saved.id} for event: ${eventId}`,
+        );
+      }
+
+      if (isAdmin && event.organizer.userId !== userId) {
+        await this.recordAdminTicketTypeAction(
+          userId,
+          'ADMIN_CREATE_TICKET_TYPE',
+          saved.id,
+          {
+            eventId,
+            organizerUserId: event.organizer.userId,
+            name: saved.name,
+            priceCents: saved.priceCents,
+            quantityTotal: saved.quantityTotal,
+          },
         );
       }
 
@@ -372,18 +442,27 @@ export class TicketTypesService {
   ): Promise<TicketType> {
     const ticketType = await this.findOne(id, userId, userRoles);
 
-    // Check ownership via event
+    // Ownership check (skipped automatically for admins via userRoles).
     const event = await this.eventsService.ensureOwnership(
       ticketType.eventId,
       userId,
+      userRoles,
     );
 
-    // Check if event is editable (unless admin)
+    // Check if event is editable (unless admin). For published events we allow
+    // organizers to update only the price for future purchases.
     const isAdmin = userRoles?.includes(Role.ADMIN);
     if (!isAdmin && !this.canEditEvent(event.status)) {
-      throw new BadRequestException(
-        'Ticket types can only be updated for events in DRAFT or PENDING_REVIEW status',
-      );
+      if (
+        event.status === EventStatus.PUBLISHED &&
+        this.isPriceOnlyUpdate(dto)
+      ) {
+        // Allowed: published event price change for future checkouts.
+      } else {
+        throw new BadRequestException(
+          'Published events only allow price updates. Other ticket fields require DRAFT, PENDING_REVIEW, or REJECTED status.',
+        );
+      }
     }
 
     // Validate sales window if dates are provided
@@ -552,6 +631,20 @@ export class TicketTypesService {
         this.logger.debug(`Updated ticket type: ${saved.id}`);
       }
 
+      if (isAdmin && event.organizer.userId !== userId) {
+        await this.recordAdminTicketTypeAction(
+          userId,
+          'ADMIN_UPDATE_TICKET_TYPE',
+          saved.id,
+          {
+            eventId: event.id,
+            organizerUserId: event.organizer.userId,
+            // The raw DTO captures exactly the fields the admin touched.
+            changes: dto,
+          },
+        );
+      }
+
       return saved;
     } catch (error) {
       // Enhanced error logging for diagnostics
@@ -668,26 +761,46 @@ export class TicketTypesService {
   async remove(id: string, userId: string, userRoles: Role[]): Promise<void> {
     const ticketType = await this.findOne(id, userId, userRoles);
 
-    // Check ownership via event
+    // Ownership check (skipped automatically for admins via userRoles).
     const event = await this.eventsService.ensureOwnership(
       ticketType.eventId,
       userId,
+      userRoles,
     );
 
     // Check if event is editable (unless admin)
     const isAdmin = userRoles?.includes(Role.ADMIN);
     if (!isAdmin && !this.canEditEvent(event.status)) {
       throw new BadRequestException(
-        'Ticket types can only be deleted for events in DRAFT or PENDING_REVIEW status',
+        'Ticket types can only be deleted for events in DRAFT, PENDING_REVIEW, or REJECTED status',
       );
     }
 
     // Hard delete (no soft delete in this codebase)
     try {
+      // Capture identifiers before the entity is destroyed so the audit
+      // payload still has meaningful context.
+      const auditSnapshot = {
+        eventId: event.id,
+        organizerUserId: event.organizer.userId,
+        name: ticketType.name,
+        priceCents: ticketType.priceCents,
+        quantityTotal: ticketType.quantityTotal,
+      };
+
       await this.ticketTypeRepository.remove(ticketType);
 
       if (process.env.NODE_ENV !== 'production') {
         this.logger.debug(`Deleted ticket type: ${id}`);
+      }
+
+      if (isAdmin && event.organizer.userId !== userId) {
+        await this.recordAdminTicketTypeAction(
+          userId,
+          'ADMIN_DELETE_TICKET_TYPE',
+          id,
+          auditSnapshot,
+        );
       }
     } catch (error) {
       if (error instanceof QueryFailedError) {

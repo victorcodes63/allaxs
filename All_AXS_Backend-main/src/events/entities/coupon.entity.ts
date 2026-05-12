@@ -34,7 +34,7 @@ export class Coupon extends BaseEntity {
   perUserLimit?: number;
 
   @Index()
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'uuid', nullable: true, name: 'event_id' })
   eventId?: string | null;
 
   @ManyToOne(() => Event, (e) => e.coupons, { onDelete: 'CASCADE' })

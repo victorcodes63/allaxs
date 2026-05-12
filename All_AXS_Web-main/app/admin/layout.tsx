@@ -1,8 +1,9 @@
 "use client";
 
-import { useAuth } from "@/lib/auth";
-import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { AdminShell } from "@/components/admin/AdminShell";
 
 export default function AdminLayout({
   children,
@@ -14,48 +15,39 @@ export default function AdminLayout({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && user) {
-      const isAdmin = user.roles?.includes("ADMIN");
-      if (!isAdmin) {
-        // Redirect non-admins to dashboard
-        router.replace("/dashboard");
-      }
-    } else if (!loading && !user) {
-      // Redirect unauthenticated users to login
+    if (loading) return;
+    if (!user) {
       const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : "";
       router.replace(`/login${nextParam}`);
+      return;
+    }
+    if (!user.roles?.includes("ADMIN")) {
+      router.replace("/dashboard");
     }
   }, [user, loading, router, pathname]);
 
-  // Show loading state while checking auth
   if (loading || !user) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center space-y-2">
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="space-y-2 text-center">
           <p className="text-lg text-muted">Checking access…</p>
         </div>
       </div>
     );
   }
 
-  // Check if user is admin
-  const isAdmin = user.roles?.includes("ADMIN");
-  if (!isAdmin) {
+  if (!user.roles?.includes("ADMIN")) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center space-y-2">
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="space-y-2 text-center">
           <p className="text-lg text-primary">
             You do not have permission to access this page
           </p>
-          <p className="text-sm text-muted">
-            Admin access is required
-          </p>
+          <p className="text-sm text-muted">Admin access is required</p>
         </div>
       </div>
     );
   }
 
-  // User is authenticated and is an admin, render admin content
-  return <>{children}</>;
+  return <AdminShell user={user}>{children}</AdminShell>;
 }
-

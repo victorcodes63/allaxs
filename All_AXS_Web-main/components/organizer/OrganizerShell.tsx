@@ -7,7 +7,7 @@ import {
 } from "@/components/layout/hub/HubAppShell";
 import { organizerPageTitle } from "@/lib/organizer-nav";
 
-type ShellUser = { name?: string; email: string };
+type ShellUser = { name?: string; email: string; roles?: string[] };
 
 export function OrganizerShell({
   user,
@@ -16,8 +16,8 @@ export function OrganizerShell({
   user: ShellUser;
   children: React.ReactNode;
 }) {
-  const sections: HubNavSection[] = useMemo(
-    () => [
+  const sections: HubNavSection[] = useMemo(() => {
+    const base: HubNavSection[] = [
       {
         title: "Host",
         items: [
@@ -55,9 +55,21 @@ export function OrganizerShell({
           },
         ],
       },
-    ],
-    [],
-  );
+    ];
+    if (user.roles?.includes("ADMIN")) {
+      base.push({
+        title: "Moderation",
+        items: [
+          {
+            href: "/admin",
+            label: "Admin overview",
+            match: (p) => p === "/admin" || p.startsWith("/admin/"),
+          },
+        ],
+      });
+    }
+    return base;
+  }, [user.roles]);
 
   return (
     <HubAppShell

@@ -174,7 +174,7 @@ export function ReviewPanel({
               variant="secondary"
               onClick={() => setRejectDialogOpen(true)}
               disabled={isApproving || isRejecting}
-              className="w-auto bg-red-50 border-red-200 text-red-700 hover:bg-red-100"
+              className="w-auto border-red-400/30 bg-red-500/10 text-red-100 hover:border-red-400/50 hover:bg-red-500/20 hover:text-white"
             >
               Reject
             </Button>
@@ -191,32 +191,32 @@ export function ReviewPanel({
       >
         <div className="space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">
+            <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
               {error}
             </div>
           )}
 
           {successMessage && (
-            <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 text-sm">
+            <div className="rounded-[var(--radius-panel)] border border-emerald-400/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
               {successMessage}
             </div>
           )}
 
-          {/* Event Title */}
           <div>
-            <h3 className="text-xl font-bold mb-2">{event.title}</h3>
-            <p className="text-sm text-black/60">
-              Submitted: {formatDate(event.createdAt)}
+            <h3 className="font-display text-xl font-semibold tracking-tight text-foreground">
+              {event.title}
+            </h3>
+            <p className="mt-1 text-sm text-muted">
+              Submitted {formatDate(event.createdAt)}
             </p>
           </div>
 
-          {/* Banner Preview */}
           {event.bannerUrl && (
             <div>
-              <label className="block text-sm font-medium mb-2 text-black">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
                 Banner
               </label>
-              <div className="relative w-full h-48 rounded-lg border border-black/10 overflow-hidden">
+              <div className="relative h-48 w-full overflow-hidden rounded-[var(--radius-panel)] border border-border bg-wash">
                 <Image
                   src={getEventBannerUrl(event.bannerUrl)}
                   alt={`${event.title} banner`}
@@ -231,96 +231,96 @@ export function ReviewPanel({
             </div>
           )}
 
-          {/* Description */}
           {event.description && (
             <div>
-              <label className="block text-sm font-medium mb-2 text-black">
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
                 Description
               </label>
-              <p className="text-sm text-black/80 whitespace-pre-wrap">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">
                 {event.description}
               </p>
             </div>
           )}
 
-          {/* Event Type */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-black">
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
               Type
             </label>
-            <p className="text-sm text-black/80">{getTypeLabel(event.type)}</p>
+            <p className="text-sm text-foreground/85">
+              {getTypeLabel(event.type)}
+            </p>
           </div>
 
-          {/* Venue (for in-person/hybrid) */}
           {(event.type === "IN_PERSON" || event.type === "HYBRID") &&
             event.venue && (
               <div>
-                <label className="block text-sm font-medium mb-2 text-black">
+                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
                   Venue
                 </label>
-                <p className="text-sm text-black/80">{event.venue}</p>
+                <p className="text-sm text-foreground/85">{event.venue}</p>
                 {(event.city || event.country) && (
-                  <p className="text-sm text-black/60">
+                  <p className="text-sm text-muted">
                     {[event.city, event.country].filter(Boolean).join(", ")}
                   </p>
                 )}
               </div>
             )}
 
-          {/* Dates */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-black">
-              Event Dates
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+              Event dates
             </label>
-            <div className="space-y-1">
-              <p className="text-sm text-black/80">
-                <strong>Start:</strong> {formatDate(event.startAt)}
+            <div className="space-y-1 text-sm text-foreground/85 tabular-nums">
+              <p>
+                <span className="font-semibold text-foreground">Start:</span>{" "}
+                {formatDate(event.startAt)}
               </p>
-              <p className="text-sm text-black/80">
-                <strong>End:</strong> {formatDate(event.endAt)}
+              <p>
+                <span className="font-semibold text-foreground">End:</span>{" "}
+                {formatDate(event.endAt)}
               </p>
             </div>
           </div>
 
-          {/* Organizer Info */}
           <div>
-            <label className="block text-sm font-medium mb-2 text-black">
-              Organizer
+            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+              Organiser
             </label>
             <div className="space-y-1">
-              <p className="text-sm text-black/80">{event.organizer.orgName}</p>
+              <p className="text-sm text-foreground/85">
+                {event.organizer.orgName}
+              </p>
               {event.organizer.user && (
-                <p className="text-sm text-black/60">
+                <p className="text-sm text-muted">
                   {event.organizer.user.name || event.organizer.user.email}
                 </p>
               )}
               {event.organizer.user?.email && (
-                <p className="text-sm text-black/60">
+                <p className="text-sm text-muted">
                   {event.organizer.user.email}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Ticket Types Count */}
           {event.ticketTypes && event.ticketTypes.length > 0 && (
             <div>
-              <label className="block text-sm font-medium mb-2 text-black">
-                Ticket Tiers
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+                Ticket tiers
               </label>
-              <p className="text-sm text-black/80">
-                {event.ticketTypes.length} tier(s) configured
+              <p className="text-sm text-foreground/85">
+                {event.ticketTypes.length} tier
+                {event.ticketTypes.length === 1 ? "" : "s"} configured
               </p>
             </div>
           )}
 
-          {/* Previous Rejection Reason */}
           {event.metadata?.rejectionReason && (
             <div>
-              <label className="block text-sm font-medium mb-2 text-black">
-                Previous Rejection Reason
+              <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">
+                Previous rejection reason
               </label>
-              <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
                 {event.metadata.rejectionReason}
               </p>
             </div>
@@ -356,7 +356,7 @@ export function ReviewPanel({
               variant="primary"
               onClick={handleReject}
               disabled={isRejecting}
-              className="w-auto bg-red-600 hover:bg-red-700"
+              className="w-auto bg-red-600 text-white hover:bg-red-700"
             >
               {isRejecting ? "Rejecting..." : "Reject Event"}
             </Button>
@@ -365,14 +365,14 @@ export function ReviewPanel({
       >
         <div className="space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 text-sm">
+            <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
               {error}
             </div>
           )}
 
-          <p className="text-sm text-black/80">
-            Please provide an optional reason for rejecting this event. This
-            will be visible to the organizer.
+          <p className="text-sm leading-relaxed text-foreground/85">
+            Please provide an optional reason for rejecting this event. The
+            organiser will see it on their event editor.
           </p>
 
           <Textarea

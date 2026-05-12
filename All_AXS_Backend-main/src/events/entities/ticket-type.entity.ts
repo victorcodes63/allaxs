@@ -7,7 +7,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 @Entity('ticket_types')
 export class TicketType extends BaseEntity {
   @Index()
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'event_id' })
   eventId!: string;
 
   @ManyToOne(() => Event, (e) => e.ticketTypes, { onDelete: 'CASCADE' })

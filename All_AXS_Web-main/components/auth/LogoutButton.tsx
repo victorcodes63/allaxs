@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 
 export function LogoutButton() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading, setUser } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleClick = async () => {
@@ -22,13 +22,17 @@ export function LogoutButton() {
     setIsLoggingOut(true);
     try {
       await axios.post("/api/auth/logout");
-      router.replace("/login");
     } catch (error) {
       console.error("Logout error:", error);
-      // Even if logout fails, redirect to login
-      router.replace("/login");
+      // Even if logout fails, fall through to clear local state and redirect.
     } finally {
       setIsLoggingOut(false);
+      // Clear the shared auth context immediately so every consumer
+      // (top bar, dashboards, page guards) flips to signed-out state
+      // before the next navigation. Without this, `useAuth` is now a
+      // shared context that wouldn't otherwise refetch on this client.
+      setUser(null);
+      router.replace("/login");
     }
   };
 
