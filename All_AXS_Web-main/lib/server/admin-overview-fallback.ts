@@ -12,6 +12,11 @@ const ORDER_STATUSES = [
 
 const TREND_DAYS = 14;
 
+/** 401 = JWT rejected but route exists; 200 = ok. 404 = handler missing on this deploy. */
+function routeLikelyExists(status: number): boolean {
+  return status === 200 || status === 401;
+}
+
 function utcDayKeys(): string[] {
   const trendStart = new Date();
   trendStart.setUTCHours(0, 0, 0, 0);
@@ -33,6 +38,16 @@ function emptyOrderTrend(): Array<{
   grossCents: number;
 }> {
   return utcDayKeys().map((date) => ({ date, count: 0, grossCents: 0 }));
+}
+
+function emptyOrderCounts(): Record<string, number> {
+  return ORDER_STATUSES.reduce(
+    (acc, s) => {
+      acc[s] = 0;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 }
 
 async function adminGetJson(
@@ -70,11 +85,7 @@ async function sumOrdersForStatus(
     const path = `/admin/orders?status=${encodeURIComponent(status)}&limit=${limit}&offset=${offset}`;
     const { ok, status: http, data } = await adminGetJson(apiUrl, path, accessToken);
     if (!ok || http !== 200) {
-      throw new Error(
-        typeof data === "object" && data && "message" in data
-          ? String((data as { message: unknown }).message)
-          : `Orders request failed (${http})`,
-      );
+      return { count, grossCents, feesCents };
     }
     const body = data as {
       items?: Array<{ amountCents?: number; feesCents?: number }>;
@@ -94,8 +105,10 @@ async function sumOrdersForStatus(
 }
 
 /**
- * When the deployed Nest API is missing `GET /admin/overview`, rebuild the
- * snapshot using `GET /admin/events`, `GET /admin/orders`, and `GET /admin/users`.
+ * When `GET /admin/overview` is missing on the deployed Nest bundle, rebuild a
+ * compatible snapshot from other admin routes. Older bundles may omit
+ * `/admin/orders` or `/admin/users` — those sections degrade to zeros instead
+ * of failing the whole dashboard.
  */
 export async function buildAdminOverviewFallback(
   apiUrl: string,
@@ -103,38 +116,60 @@ export async function buildAdminOverviewFallback(
 ): Promise<Record<string, unknown>> {
   const eventStatuses = Object.values(EventStatus);
 
+  const [ordersProbe, usersProbe] = await Promise.all([
+    adminGetJson(apiUrl, "/admin/orders?limit=1&offset=0", accessToken),
+    adminGetJson(apiUrl, "/admin/users?limit=1&offset=0", accessToken),
+  ]);
+
+  const ordersUsable = routeLikelyExists(ordersProbe.status);
+  const usersUsable = routeLikelyExists(usersProbe.status);
+
   const [orderCountPairs, roleTotals, paidAgg, refundedAgg, eventListsByStatus, totalUsersRow] =
     await Promise.all([
-      Promise.all(
-        ORDER_STATUSES.map(async (status) => {
-          const { ok, status: http, data } = await adminGetJson(
-            apiUrl,
-            `/admin/orders?status=${encodeURIComponent(status)}&limit=1&offset=0`,
-            accessToken,
-          );
-          if (!ok || http !== 200) {
-            throw new Error(`Order counts unavailable (${http})`);
-          }
-          const total = (data as { total?: number }).total;
-          return [status, typeof total === "number" ? total : 0] as const;
-        }),
-      ),
-      Promise.all(
-        (["ADMIN", "ORGANIZER", "ATTENDEE"] as const).map(async (role) => {
-          const { ok, status: http, data } = await adminGetJson(
-            apiUrl,
-            `/admin/users?role=${encodeURIComponent(role)}&limit=1&offset=0`,
-            accessToken,
-          );
-          if (!ok || http !== 200) {
-            throw new Error(`User role counts unavailable (${http})`);
-          }
-          const total = (data as { total?: number }).total;
-          return [role, typeof total === "number" ? total : 0] as const;
-        }),
-      ),
-      sumOrdersForStatus(apiUrl, accessToken, "PAID", true),
-      sumOrdersForStatus(apiUrl, accessToken, "REFUNDED", false),
+      ordersUsable
+        ? Promise.all(
+            ORDER_STATUSES.map(async (status) => {
+              const { ok, status: http, data } = await adminGetJson(
+                apiUrl,
+                `/admin/orders?status=${encodeURIComponent(status)}&limit=1&offset=0`,
+                accessToken,
+              );
+              if (!ok || http !== 200) {
+                return [status, 0] as const;
+              }
+              const total = (data as { total?: number }).total;
+              return [status, typeof total === "number" ? total : 0] as const;
+            }),
+          )
+        : Promise.resolve(
+            ORDER_STATUSES.map((s) => [s, 0] as const),
+          ),
+      usersUsable
+        ? Promise.all(
+            (["ADMIN", "ORGANIZER", "ATTENDEE"] as const).map(async (role) => {
+              const { ok, status: http, data } = await adminGetJson(
+                apiUrl,
+                `/admin/users?role=${encodeURIComponent(role)}&limit=1&offset=0`,
+                accessToken,
+              );
+              if (!ok || http !== 200) {
+                return [role, 0] as const;
+              }
+              const total = (data as { total?: number }).total;
+              return [role, typeof total === "number" ? total : 0] as const;
+            }),
+          )
+        : Promise.resolve(
+            (["ADMIN", "ORGANIZER", "ATTENDEE"] as const).map(
+              (r) => [r, 0] as const,
+            ),
+          ),
+      ordersUsable
+        ? sumOrdersForStatus(apiUrl, accessToken, "PAID", true)
+        : Promise.resolve({ count: 0, grossCents: 0, feesCents: 0 }),
+      ordersUsable
+        ? sumOrdersForStatus(apiUrl, accessToken, "REFUNDED", false)
+        : Promise.resolve({ count: 0, grossCents: 0, feesCents: 0 }),
       Promise.all(
         eventStatuses.map(async (status) => {
           const { ok, status: http, data } = await adminGetJson(
@@ -142,22 +177,24 @@ export async function buildAdminOverviewFallback(
             `/admin/events?status=${encodeURIComponent(status)}`,
             accessToken,
           );
-          if (!ok || http !== 200) {
-            throw new Error(`Event list unavailable for ${status} (${http})`);
+          if (!ok || http !== 200 || !Array.isArray(data)) {
+            return [];
           }
-          return Array.isArray(data) ? data : [];
+          return data;
         }),
       ),
-      adminGetJson(apiUrl, `/admin/users?limit=1&offset=0`, accessToken),
+      usersUsable
+        ? adminGetJson(apiUrl, `/admin/users?limit=1&offset=0`, accessToken)
+        : Promise.resolve({ ok: false, status: 404, data: {} }),
     ]);
 
-  if (!totalUsersRow.ok || totalUsersRow.status !== 200) {
-    throw new Error(`User total unavailable (${totalUsersRow.status})`);
+  let totalUsersN = 0;
+  if (usersUsable && totalUsersRow.ok && totalUsersRow.status === 200) {
+    const totalUsers = (totalUsersRow.data as { total?: number }).total;
+    totalUsersN = typeof totalUsers === "number" ? totalUsers : 0;
   }
-  const totalUsers = (totalUsersRow.data as { total?: number }).total;
-  const totalUsersN = typeof totalUsers === "number" ? totalUsers : 0;
 
-  const orderCounts: Record<string, number> = {};
+  const orderCounts = emptyOrderCounts();
   for (const [status, n] of orderCountPairs) {
     orderCounts[status] = n;
   }

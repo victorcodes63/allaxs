@@ -1,12 +1,24 @@
 # Deploy the web app on Vercel
 
-Use a **dedicated Vercel project** for this Next.js repository. The Nest API should be a **second** Vercel project (see `All_AXS_Backend-main/docs/VERCEL.md`).
+Use a **dedicated Vercel project** for this Next.js app. The Nest API should be a **second** Vercel project (see `All_AXS_Backend-main/docs/VERCEL.md`).
+
+## Monorepo layout (this Git repository)
+
+The All AXS repo contains **two deployable roots**:
+
+| Directory | Vercel project | Framework | Notes |
+| --------- | -------------- | --------- | ----- |
+| `All_AXS_Web-main` | e.g. `allaxs` | Next.js | Set **Root Directory** to `All_AXS_Web-main` (not repo `.`). |
+| `All_AXS_Backend-main` | e.g. `all-axs-backend-main` | NestJS | Set **Root Directory** to `All_AXS_Backend-main`. Must include `api/index.ts` + `src/` from the same commit (see backend `docs/VERCEL.md`). |
+
+If the API project’s root is the **repository root** (`./`) while the code lives under `All_AXS_Backend-main/`, Vercel will build the wrong tree and you will get **partial** APIs (e.g. `GET /admin/events` works but `GET /admin/overview`, `/admin/orders`, or `/notifications/me` return 404).
 
 ## One-time setup
 
 1. Vercel → **Add New** → **Project** → import this repo.
-2. Framework: **Next.js** (auto-detected). Build: `npm run build`, output default.
-3. Add environment variables (Production and Preview as needed):
+2. Set **Root Directory** to **`All_AXS_Web-main`**.
+3. Framework: **Next.js** (auto-detected). Build: `npm run build`, output default.
+4. Add environment variables (Production and Preview as needed):
 
 ### Public demo (no API yet)
 
