@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-// API routes proxy to backend NestJS API
-const API_URL = process.env.API_URL || "http://localhost:8080";
+import { getServerApiBaseUrl } from "@/lib/server/api-url";
 
 async function getAccessToken() {
   const cookieStore = await cookies();
@@ -12,6 +10,7 @@ async function getAccessToken() {
 // GET /api/admin/events - List events for admin with status filter
 export async function GET(request: NextRequest) {
   try {
+    const API_URL = getServerApiBaseUrl();
     const accessToken = await getAccessToken();
 
     if (!accessToken) {

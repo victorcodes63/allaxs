@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API_URL = process.env.API_URL || "http://localhost:8080";
+import { getServerApiBaseUrl } from "@/lib/server/api-url";
 
 const FORWARDED_PARAMS = [
   "status",
@@ -21,6 +20,7 @@ async function getAccessToken() {
 
 export async function GET(request: Request) {
   try {
+    const API_URL = getServerApiBaseUrl();
     const accessToken = await getAccessToken();
     if (!accessToken) {
       return NextResponse.json(
