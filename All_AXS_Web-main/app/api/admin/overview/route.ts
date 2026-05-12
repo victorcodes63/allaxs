@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API_URL = process.env.API_URL || "http://localhost:8080";
+import { getServerApiBaseUrl } from "@/lib/server/api-url";
 
 async function getAccessToken() {
   const cookieStore = await cookies();
@@ -9,6 +8,7 @@ async function getAccessToken() {
 }
 
 export async function GET() {
+  const API_URL = getServerApiBaseUrl();
   try {
     const accessToken = await getAccessToken();
     if (!accessToken) {
