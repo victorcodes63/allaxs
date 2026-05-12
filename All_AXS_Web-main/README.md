@@ -37,6 +37,8 @@ You can hold **both** roles on one user (`ATTENDEE` + `ORGANIZER`) after promoti
 
 See **[docs/VERCEL.md](docs/VERCEL.md)** for environment variables and how to connect this app to the Nest API (also deployable on Vercel as a second project).
 
+Pushes to `main` trigger a new deployment when this directory is the linked Vercel project root.
+
 ### Build
 ```bash
 npm run build && npm run start
