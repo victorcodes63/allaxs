@@ -4,6 +4,6 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/api/$1" }
+    { "source": "/:path*", "destination": "/api/:path*" }
   ]
 }
