@@ -87,3 +87,7 @@ Use `vercel dev` from this repo (Vercel CLI ≥ 48.4) to approximate production 
 ## 9. Redeploy after API changes
 
 If the Vercel project’s root directory is this API package, push any commit that touches files under `All_AXS_Backend-main/` (or run **Redeploy** in the Vercel dashboard) so new routes such as `GET /admin/overview` are included in the serverless bundle.
+
+### Vercel entrypoint
+
+Production on Vercel uses **`api/index.ts`** at the **root of this package** (same directory as `package.json`). It bootstraps `AppModule` from `src/`. Ensure the Vercel project **Root Directory** is set to **`All_AXS_Backend-main`** (not a stale copy) so this file and `src/` stay in sync with Git.
