@@ -400,7 +400,8 @@ export class AdminController {
       );
     }
 
-    return queryBuilder.getMany();
+    const rows = await queryBuilder.getMany();
+    return rows.map((event) => this.toAdminEventListRow(event));
   }
 
   /**
@@ -431,10 +432,7 @@ export class AdminController {
       order: { createdAt: 'ASC' },
     });
 
-    return {
-      ...event,
-      ticketTypes,
-    };
+    return this.toAdminEventDetail(event, ticketTypes);
   }
 
   /**
@@ -1497,6 +1495,104 @@ export class AdminController {
         roles: targetUser.roles,
         previousRoles: oldRoles,
       },
+    };
+  }
+
+  private toAdminUserSafe(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name ?? null,
+      phone: user.phone ?? null,
+      status: user.status,
+      roles: user.roles,
+    };
+  }
+
+  private toAdminOrganizerSafe(org: OrganizerProfile) {
+    return {
+      id: org.id,
+      userId: org.userId,
+      orgName: org.orgName,
+      legalName: org.legalName ?? null,
+      website: org.website ?? null,
+      supportEmail: org.supportEmail,
+      supportPhone: org.supportPhone ?? null,
+      verified: org.verified,
+      user: org.user ? this.toAdminUserSafe(org.user) : null,
+    };
+  }
+
+  private toAdminEventListRow(event: Event) {
+    return {
+      id: event.id,
+      createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
+      title: event.title,
+      slug: event.slug,
+      description: event.description ?? null,
+      bannerUrl: event.bannerUrl ?? null,
+      venue: event.venue ?? null,
+      city: event.city ?? null,
+      country: event.country ?? null,
+      startAt: event.startAt,
+      endAt: event.endAt,
+      type: event.type,
+      status: event.status,
+      submittedAt: event.submittedAt ?? null,
+      category: event.category ?? null,
+      isPublic: event.isPublic,
+      metadata: event.metadata ?? null,
+      organizerId: event.organizerId,
+      organizer: this.toAdminOrganizerSafe(event.organizer),
+    };
+  }
+
+  private toAdminTicketTypeSafe(t: TicketType) {
+    return {
+      id: t.id,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      eventId: t.eventId,
+      name: t.name,
+      description: t.description ?? null,
+      priceCents: t.priceCents,
+      currency: t.currency,
+      quantityTotal: t.quantityTotal,
+      quantitySold: t.quantitySold,
+      minPerOrder: t.minPerOrder,
+      maxPerOrder: t.maxPerOrder ?? null,
+      salesStart: t.salesStart ?? null,
+      salesEnd: t.salesEnd ?? null,
+      status: t.status,
+      allowInstallments: t.allowInstallments,
+      installmentConfig: t.installmentConfig ?? null,
+    };
+  }
+
+  private toAdminEventDetail(event: Event, ticketTypes: TicketType[]) {
+    return {
+      id: event.id,
+      createdAt: event.createdAt,
+      updatedAt: event.updatedAt,
+      title: event.title,
+      slug: event.slug,
+      description: event.description,
+      bannerUrl: event.bannerUrl ?? null,
+      venue: event.venue,
+      city: event.city,
+      country: event.country,
+      startAt: event.startAt,
+      endAt: event.endAt,
+      type: event.type,
+      status: event.status,
+      submittedAt: event.submittedAt ?? null,
+      category: event.category,
+      isPublic: event.isPublic,
+      metadata: event.metadata ?? null,
+      organizerId: event.organizerId,
+      organizer: this.toAdminOrganizerSafe(event.organizer),
+      ticketTypes: ticketTypes.map((t) => this.toAdminTicketTypeSafe(t)),
     };
   }
 }
