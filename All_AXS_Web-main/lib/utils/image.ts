@@ -13,8 +13,11 @@ const SITE_BASE_URL =
   "http://localhost:3000";
 
 /**
- * Resolved banner for `next/image`: same-origin paths under `public/` (e.g. `/posters/...`)
- * stay relative so the optimizer treats them as local. Remote/API URLs stay absolute.
+ * Resolved banner for `next/image`.
+ * - `/static/*` and `/uploads/*` are served by the API → prefix with `NEXT_PUBLIC_API_BASE_URL`.
+ * - `/posters/*` is used by demo/seed data but those binaries are not shipped in this repo;
+ *   map to a stable remote placeholder so production listings do not 404.
+ * - Absolute URLs pointing at `localhost` (saved from dev) are rewritten to the configured API base.
  */
 export function getEventBannerUrl(bannerUrl: string | null | undefined): string {
   if (!bannerUrl) {
@@ -26,10 +29,28 @@ export function getEventBannerUrl(bannerUrl: string | null | undefined): string 
   }
 
   if (bannerUrl.startsWith("http://") || bannerUrl.startsWith("https://")) {
+    try {
+      const u = new URL(bannerUrl);
+      if (/^(localhost|127\.0\.0\.1)$/i.test(u.hostname)) {
+        return `${API_BASE_URL.replace(/\/$/, "")}${u.pathname}${u.search}`;
+      }
+    } catch {
+      /* ignore parse errors; fall through to return as-is */
+    }
     return bannerUrl;
   }
 
   const path = bannerUrl.startsWith("/") ? bannerUrl : `/${bannerUrl}`;
+
+  if (path.startsWith("/posters/")) {
+    const seed =
+      path
+        .slice("/posters/".length)
+        .replace(/\.[^/.]+$/, "")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .slice(0, 48) || "poster";
+    return `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`;
+  }
 
   if (path.startsWith("/static/") || path.startsWith("/uploads/")) {
     return `${API_BASE_URL}${path}`;
