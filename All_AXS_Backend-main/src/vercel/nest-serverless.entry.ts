@@ -6,8 +6,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import helmet from 'helmet';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
-import { AppModule } from '../src/app.module';
-import { validateEnv } from '../src/common/env-validation';
+import { AppModule } from '../app.module';
+import { validateEnv } from '../common/env-validation';
 
 let cachedHandler:
   | ((req: VercelRequest, res: VercelResponse) => Promise<void> | void)
@@ -59,13 +59,14 @@ async function createHandler() {
     const q = rawUrl.indexOf('?');
     const pathOnly = q === -1 ? rawUrl : rawUrl.slice(0, q);
     const search = q === -1 ? '' : rawUrl.slice(q);
-    // Optional catch-all routes add this query key; Express/Nest would otherwise see a bogus path.
     const sp = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+    // Catch-all route noise (optional vs required) — strip so Express sees a clean path.
     sp.delete('[...segments]');
+    sp.delete('[[...segments]]');
     const rest = sp.toString();
     const withoutCatchAllQuery =
       rest === '' ? pathOnly : `${pathOnly}?${rest}`;
-    // Vercel mounts this file under /api/... ; Nest routes have no /api prefix.
+    // Vercel mounts handlers under /api/... ; Nest routes have no /api prefix.
     const url =
       withoutCatchAllQuery === '/api' ||
       withoutCatchAllQuery.startsWith('/api/')
