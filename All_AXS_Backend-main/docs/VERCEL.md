@@ -91,4 +91,4 @@ Push to **`main`** on this repository (or run **Redeploy** in the Vercel dashboa
 
 ### Vercel entrypoint
 
-Production on Vercel uses **`api/[[...segments]].ts`** plus **`vercel.json` `rewrites`**: `/` → `/api` and `/:path*` → `/api/:path*` (so multi-segment paths like `/auth/login` are preserved), then the handler strips the `/api` prefix so Nest routes match. The Vercel project’s **Root Directory** should be **`.`** (the backend repo root).
+Production on Vercel uses **`api/[[...segments]].ts`** plus **`vercel.json` `rewrites`**: a single rule **`/(.*)` → `/api/$1`** so `/auth/login` becomes `/api/auth/login` (invokes the catch-all function). The handler then strips the `/api` prefix so Nest sees `/auth/login`. **Do not** rewrite to `/api/:segment/...` — that makes Vercel look for non-existent files like `api/auth/login.ts` and every route returns `NOT_FOUND`. The Vercel project’s **Root Directory** should be **`.`** (the backend repo root).

@@ -56,11 +56,21 @@ async function createHandler() {
 
   return (req: VercelRequest, res: VercelResponse) => {
     const rawUrl = req.url ?? '/';
+    const q = rawUrl.indexOf('?');
+    const pathOnly = q === -1 ? rawUrl : rawUrl.slice(0, q);
+    const search = q === -1 ? '' : rawUrl.slice(q);
+    // Optional catch-all routes add this query key; Express/Nest would otherwise see a bogus path.
+    const sp = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+    sp.delete('[...segments]');
+    const rest = sp.toString();
+    const withoutCatchAllQuery =
+      rest === '' ? pathOnly : `${pathOnly}?${rest}`;
     // Vercel mounts this file under /api/... ; Nest routes have no /api prefix.
     const url =
-      rawUrl === '/api' || rawUrl.startsWith('/api/')
-        ? rawUrl.replace(/^\/api/, '') || '/'
-        : rawUrl;
+      withoutCatchAllQuery === '/api' ||
+      withoutCatchAllQuery.startsWith('/api/')
+        ? withoutCatchAllQuery.replace(/^\/api/, '') || '/'
+        : withoutCatchAllQuery;
     (req as { url?: string }).url = url;
     return expressApp(req as any, res as any);
   };

@@ -1,7 +1,11 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { extractAuthTokens } from "@/lib/server/auth-tokens";
-import { getServerApiBaseUrl } from "@/lib/server/api-url";
+import {
+  getServerApiBaseUrl,
+  upstreamUnreachableMessage,
+} from "@/lib/server/api-url";
+import { formatUpstreamErrorMessage } from "@/lib/server/format-upstream-error-message";
 
 export async function POST() {
   const API_URL = getServerApiBaseUrl();
@@ -12,28 +16,51 @@ export async function POST() {
     if (!refreshToken) {
       return NextResponse.json(
         { message: "Refresh token not found" },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
-    const response = await fetch(`${API_URL}/auth/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_URL}/auth/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+    } catch (err) {
+      const unreachable = upstreamUnreachableMessage(err, API_URL);
+      if (unreachable) {
+        return NextResponse.json({ message: unreachable }, { status: 503 });
+      }
+      throw err;
+    }
 
-    const data = await response.json();
+    const rawBody = await response.text();
+    let data: {
+      message?: unknown;
+      user?: unknown;
+      tokens?: { accessToken?: string; refreshToken?: string };
+    } = {};
+    if (rawBody.trim()) {
+      try {
+        data = JSON.parse(rawBody) as typeof data;
+      } catch {
+        /* non-JSON upstream (e.g. HTML from a proxy) */
+      }
+    }
 
     if (!response.ok) {
       return NextResponse.json(
-        { message: data.message || "Token refresh failed" },
-        { status: response.status }
+        {
+          message:
+            formatUpstreamErrorMessage(data) ?? "Token refresh failed",
+        },
+        { status: response.status },
       );
     }
 
-    // Set updated cookies
     const { accessToken, refreshToken: newRefreshToken } = extractAuthTokens(data);
 
     if (accessToken) {
@@ -59,10 +86,13 @@ export async function POST() {
     return NextResponse.json({ user: data.user });
   } catch (error) {
     console.error("Refresh error:", error);
+    const unreachable = upstreamUnreachableMessage(error, API_URL);
+    if (unreachable) {
+      return NextResponse.json({ message: unreachable }, { status: 503 });
+    }
     return NextResponse.json(
       { message: "An error occurred during token refresh" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-
