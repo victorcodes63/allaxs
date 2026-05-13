@@ -56,22 +56,32 @@ async function createHandler() {
 
   return (req: VercelRequest, res: VercelResponse) => {
     const rawUrl = req.url ?? '/';
-    const q = rawUrl.indexOf('?');
-    const pathOnly = q === -1 ? rawUrl : rawUrl.slice(0, q);
-    const search = q === -1 ? '' : rawUrl.slice(q);
-    const sp = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
-    // Catch-all route noise (optional vs required) — strip so Express sees a clean path.
-    sp.delete('[...segments]');
-    sp.delete('[[...segments]]');
-    const rest = sp.toString();
-    const withoutCatchAllQuery =
-      rest === '' ? pathOnly : `${pathOnly}?${rest}`;
-    // Vercel mounts handlers under /api/... ; Nest routes have no /api prefix.
-    const url =
-      withoutCatchAllQuery === '/api' ||
-      withoutCatchAllQuery.startsWith('/api/')
-        ? withoutCatchAllQuery.replace(/^\/api/, '') || '/'
-        : withoutCatchAllQuery;
+    const parsed = new URL(rawUrl, 'https://internal.invalid');
+    const bridged = parsed.searchParams.get('path');
+    parsed.searchParams.delete('path');
+    parsed.searchParams.delete('[...segments]');
+    parsed.searchParams.delete('[[...segments]]');
+
+    let url: string;
+    if (bridged !== null) {
+      let pathname = decodeURIComponent(bridged.replace(/\+/g, '%20'));
+      if (!pathname.startsWith('/')) pathname = `/${pathname}`;
+      if (pathname === '/api' || pathname.startsWith('/api/')) {
+        pathname = pathname.replace(/^\/api/, '') || '/';
+      }
+      const rest = parsed.searchParams.toString();
+      url = rest === '' ? pathname : `${pathname}?${rest}`;
+    } else {
+      const pathOnly = parsed.pathname || '/';
+      const search = parsed.search || '';
+      const combined =
+        search === '' ? pathOnly : `${pathOnly}${search}`;
+      url =
+        combined === '/api' || combined.startsWith('/api/')
+          ? combined.replace(/^\/api/, '') || '/'
+          : combined;
+    }
+
     (req as { url?: string }).url = url;
     return expressApp(req as any, res as any);
   };
