@@ -14,9 +14,8 @@ const SITE_BASE_URL =
 
 /**
  * Resolved banner for `next/image`.
+ * - `/posters/*` is served by this Next app under `public/posters`.
  * - `/static/*` and `/uploads/*` are served by the API → prefix with `NEXT_PUBLIC_API_BASE_URL`.
- * - `/posters/*` is used by demo/seed data but those binaries are not shipped in this repo;
- *   map to a stable remote placeholder so production listings do not 404.
  * - Absolute URLs pointing at `localhost` (saved from dev) are rewritten to the configured API base.
  */
 export function getEventBannerUrl(bannerUrl: string | null | undefined): string {
@@ -41,16 +40,6 @@ export function getEventBannerUrl(bannerUrl: string | null | undefined): string 
   }
 
   const path = bannerUrl.startsWith("/") ? bannerUrl : `/${bannerUrl}`;
-
-  if (path.startsWith("/posters/")) {
-    const seed =
-      path
-        .slice("/posters/".length)
-        .replace(/\.[^/.]+$/, "")
-        .replace(/[^a-zA-Z0-9]/g, "")
-        .slice(0, 48) || "poster";
-    return `https://picsum.photos/seed/${encodeURIComponent(seed)}/1600/900`;
-  }
 
   if (path.startsWith("/static/") || path.startsWith("/uploads/")) {
     return `${API_BASE_URL}${path}`;
