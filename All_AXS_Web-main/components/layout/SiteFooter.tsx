@@ -46,15 +46,15 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
 
   if (authContinuation) {
     return (
-      <footer className="mt-auto shrink-0 border-t border-white/10 bg-[color:var(--footer-panel-bg)] font-sans text-foreground">
+      <footer className="relative z-20 mt-auto shrink-0 border-t border-white/15 bg-[#0c0c0f] font-sans text-foreground shadow-[0_-12px_40px_rgba(0,0,0,0.45)]">
         <div className="axs-page-shell flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-6 sm:gap-y-2 sm:px-6 md:px-8 lg:px-10">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-foreground/55">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-white/45">
               Contact
             </p>
             <a
               href={`mailto:${CONTACT_EMAIL}`}
-              className="truncate text-sm font-medium text-foreground/80 transition-colors hover:text-primary/90"
+              className="truncate text-sm font-medium text-white/90 transition-colors hover:text-primary"
             >
               {CONTACT_EMAIL}
             </a>
@@ -67,7 +67,7 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
               <Link
                 key={href + label}
                 href={href}
-                className="text-foreground/55 transition-colors hover:text-primary/85"
+                className="text-white/65 transition-colors hover:text-primary"
               >
                 {label}
               </Link>
@@ -75,7 +75,7 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
             <AuthFooterDemoLogins />
           </nav>
         </div>
-        <div className="border-t border-[color:var(--footer-legal-border)] bg-[color:var(--footer-legal-bg)] text-white">
+        <div className="border-t border-white/10 bg-[#050506] text-white">
           <div className="axs-page-shell flex flex-col gap-2 px-4 py-2.5 pb-[max(0.5rem,calc(0.5rem+env(safe-area-inset-bottom)))] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 md:px-8 lg:px-10">
             <div className="flex flex-wrap gap-x-5 gap-y-1">
               <Link href="/privacy" className="text-[10px] uppercase tracking-[0.2em] text-white/75 transition-colors hover:text-primary/85">

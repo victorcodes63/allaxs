@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useLayoutEffect } from "react";
+import { Suspense } from "react";
 import { usePathname, useSelectedLayoutSegments } from "next/navigation";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
@@ -58,6 +58,17 @@ function isPublicAuthPath(pathname: string | null): boolean {
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
+/** Sign-in / sign-up — full-bleed auth shell without marketing nav (footer stays). */
+function isSignInSignUpPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname.startsWith("/login/") ||
+    pathname.startsWith("/register/")
+  );
+}
+
 /** Landing — same full marketing header/footer as `/events` when signed in (avoids swapping to browse-only chrome mid-journey). */
 function isPublicHomePath(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -92,32 +103,6 @@ function AppChromeInner({ children }: { children: React.ReactNode }) {
   const shellClass =
     "flex min-h-dvh flex-1 w-full flex-col bg-background text-foreground";
 
-  /** `body` uses `min-h-dvh`; without a hard cap the document can stay taller than the auth shell and scroll empty space below the footer. */
-  useLayoutEffect(() => {
-    if (!isPublicAuthPath(pathname)) return;
-    const html = document.documentElement;
-    const body = document.body;
-    const prev = {
-      htmlOverflow: html.style.overflow,
-      bodyOverflow: body.style.overflow,
-      bodyHeight: body.style.height,
-      bodyMinHeight: body.style.minHeight,
-      bodyOverscroll: body.style.overscrollBehavior,
-    };
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-    body.style.height = "100dvh";
-    body.style.minHeight = "0";
-    body.style.overscrollBehavior = "none";
-    return () => {
-      html.style.overflow = prev.htmlOverflow;
-      body.style.overflow = prev.bodyOverflow;
-      body.style.height = prev.bodyHeight;
-      body.style.minHeight = prev.bodyMinHeight;
-      body.style.overscrollBehavior = prev.bodyOverscroll;
-    };
-  }, [pathname]);
-
   if (isHubPath(pathname, layoutSegments, !!user)) {
     return (
       <div className="flex h-dvh max-h-dvh min-h-0 flex-1 w-full flex-col overflow-hidden bg-background text-foreground">
@@ -128,19 +113,20 @@ function AppChromeInner({ children }: { children: React.ReactNode }) {
 
   if (usesFullMarketingChrome(pathname)) {
     const fullBleedAuthMain = isPublicAuthPath(pathname);
+    const headlessAuth = isSignInSignUpPath(pathname);
     return (
       <div
         className={
           fullBleedAuthMain
-            ? "flex h-dvh max-h-dvh min-h-0 flex-1 w-full flex-col overflow-hidden overscroll-none bg-background text-foreground"
+            ? "flex min-h-dvh flex-1 w-full flex-col bg-transparent text-foreground"
             : "flex min-h-dvh flex-1 w-full flex-col bg-background text-foreground"
         }
       >
-        <SiteHeader />
+        {!headlessAuth ? <SiteHeader /> : null}
         <main
           className={
             fullBleedAuthMain
-              ? "flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent px-0 py-0"
+              ? "relative flex flex-1 flex-col bg-transparent px-0 py-0"
               : "flex-1 axs-page-shell py-8 md:py-10"
           }
         >

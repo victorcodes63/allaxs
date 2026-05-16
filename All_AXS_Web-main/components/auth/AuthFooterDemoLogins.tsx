@@ -18,7 +18,7 @@ export function AuthFooterDemoLogins() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/55 transition-colors hover:text-primary/85"
+        className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65 transition-colors hover:text-primary"
       >
         Demo logins
       </button>
