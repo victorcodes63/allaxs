@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { EmailService } from './email.service';
+import { TicketPdfService } from '../../tickets/ticket-pdf.service';
 import { User } from '../../users/entities/user.entity';
 import { Role } from '../../domain/enums';
 
@@ -43,6 +44,14 @@ describe('EmailService', () => {
               };
               return config[key] ?? defaultValue;
             }),
+          },
+        },
+        {
+          provide: TicketPdfService,
+          useValue: {
+            buildTicketPdfBuffer: jest
+              .fn()
+              .mockResolvedValue(Buffer.from('%PDF-smoke')),
           },
         },
       ],
@@ -117,6 +126,20 @@ describe('EmailService', () => {
     });
   });
 
+  describe('sendPasswordResetConfirmationEmail', () => {
+    it('should send password reset confirmation email successfully', async () => {
+      const user = createMockUser();
+      await service.sendPasswordResetConfirmationEmail(user);
+
+      expect(mockResendSend).toHaveBeenCalledWith({
+        from: 'noreply@test.com',
+        to: 'test@example.com',
+        subject: 'Your Test App password was updated',
+        html: expect.stringContaining('Sign in'),
+      });
+    });
+  });
+
   describe('sendWelcomeEmail', () => {
     it('should send welcome email successfully', async () => {
       const user = createMockUser();
@@ -125,7 +148,7 @@ describe('EmailService', () => {
       expect(mockResendSend).toHaveBeenCalledWith({
         from: 'noreply@test.com',
         to: 'test@example.com',
-        subject: 'Welcome to Test App!',
+        subject: 'Welcome to Test App',
         html: expect.stringContaining('Welcome to Test App'),
       });
     });

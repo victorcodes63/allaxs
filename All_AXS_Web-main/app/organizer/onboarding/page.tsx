@@ -10,12 +10,16 @@ import {
   type OrganizerOnboardingInput,
 } from "@/lib/validation/organizer";
 import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useAuth } from "@/lib/auth";
+import { rolesIncludeAdmin } from "@/lib/auth/hub-routing";
 
 type Step = 1 | 2;
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,8 +39,16 @@ export default function OnboardingPage() {
 
   const payoutMethod = watch("payoutMethod");
 
+  useEffect(() => {
+    if (authLoading) return;
+    if (user && rolesIncludeAdmin(user.roles ?? [])) {
+      router.replace("/admin");
+    }
+  }, [authLoading, user, router]);
+
   // Check if profile already exists on mount
   useEffect(() => {
+    if (authLoading || (user && rolesIncludeAdmin(user.roles ?? []))) return;
     let cancelled = false;
     const checkProfile = async () => {
       try {
@@ -47,7 +59,7 @@ export default function OnboardingPage() {
           try {
             await axios.post("/api/auth/promote-organizer");
           } catch {
-            /* best-effort role sync + legacy dual-role repair */
+            /* best-effort role sync for non-admin hosts */
           }
           // Redirect to dashboard if profile exists
           router.replace("/organizer/dashboard");
@@ -69,7 +81,7 @@ export default function OnboardingPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [authLoading, router, user]);
 
   const validateStep = async (step: Step): Promise<boolean> => {
     if (step === 1) {
@@ -218,7 +230,7 @@ export default function OnboardingPage() {
                 />
 
                 <Input
-                  label="Legal Name"
+                  label="Legal name *"
                   type="text"
                   placeholder="Acme Events Ltd."
                   {...register("legalName")}
@@ -242,9 +254,9 @@ export default function OnboardingPage() {
                 />
 
                 <Input
-                  label="Support Phone"
+                  label="Support phone *"
                   type="tel"
-                  placeholder="+1234567890"
+                  placeholder="+254712345678"
                   {...register("supportPhone")}
                   error={errors.supportPhone?.message}
                 />
@@ -268,9 +280,8 @@ export default function OnboardingPage() {
                   Payout Details
                 </h2>
                 <p className="text-sm text-muted mb-4">
-                  This is a placeholder for payout information. Your payout
-                  details will be finalized when we integrate with payment
-                  service providers.
+                  Add how you want to be paid and your tax reference. These details are used for
+                  compliance and payout runs; you can update them later from your organizer account.
                 </p>
 
                 <div>
@@ -367,24 +378,20 @@ export default function OnboardingPage() {
 
                 {payoutMethod === "OTHER" && (
                   <div className="space-y-4 pl-6 border-l-2 border-primary/20">
-                    <div>
-                      <label className="block font-medium mb-1 text-sm text-foreground">
-                        Payout Instructions
-                      </label>
-                      <textarea
-                        {...register("payoutInstructions")}
-                        rows={3}
-                        className="w-full rounded-lg border border-border bg-background px-4 py-2 text-foreground transition-colors focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="Describe your preferred payout method..."
-                      />
-                    </div>
+                    <Textarea
+                      label="Payout instructions * (min 24 characters)"
+                      rows={4}
+                      placeholder="Include routing details, account identifiers, and any reference codes…"
+                      {...register("payoutInstructions")}
+                      error={errors.payoutInstructions?.message}
+                    />
                   </div>
                 )}
 
                 <Input
-                  label="Tax ID"
+                  label="Tax or business ID *"
                   type="text"
-                  placeholder="Optional"
+                  placeholder="PIN, VAT, or company registration number"
                   {...register("taxId")}
                   error={errors.taxId?.message}
                 />

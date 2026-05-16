@@ -7,7 +7,11 @@ export function getServerApiBaseUrl(): string {
     process.env.API_URL?.trim() ||
     process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
     "http://localhost:8080";
-  return raw.replace(/\/$/, "");
+  // Nest routes are /auth/*, /events/*, etc. The Vercel API project rewrites `/:path*`
+  // → `/api/:path*`. If the base URL already ends with `/api`, calls like
+  // `${base}/auth/login` become `/api/auth/login` on the host, which rewrites to
+  // `/api/api/auth/...` and returns NOT_FOUND (404).
+  return raw.replace(/\/$/, "").replace(/\/api\/?$/i, "");
 }
 
 export function upstreamUnreachableMessage(

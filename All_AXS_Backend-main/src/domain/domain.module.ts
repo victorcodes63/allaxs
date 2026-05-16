@@ -12,6 +12,11 @@ import { CheckIn } from './checkin.entity';
 import { Notification } from './notification.entity';
 import { WebhookEvent } from './webhook-event.entity';
 import { TicketType } from 'src/events/entities/ticket-type.entity';
+import { OrganizerLedgerEntry } from './organizer-ledger-entry.entity';
+import { PayoutBatch } from './payout-batch.entity';
+import { PayoutBatchLine } from './payout-batch-line.entity';
+import { CouponRedemption } from './coupon-redemption.entity';
+import { OrganizerLedgerService } from './organizer-ledger.service';
 
 @Module({
   imports: [
@@ -26,9 +31,18 @@ import { TicketType } from 'src/events/entities/ticket-type.entity';
       CheckIn,
       Notification,
       WebhookEvent,
+      OrganizerLedgerEntry,
+      PayoutBatch,
+      PayoutBatchLine,
+      CouponRedemption,
     ]),
   ],
-  providers: [PaymentPlansService, PaymentProgressHelper],
-  exports: [TypeOrmModule, PaymentPlansService, PaymentProgressHelper],
+  providers: [PaymentPlansService, PaymentProgressHelper, OrganizerLedgerService],
+  exports: [
+    TypeOrmModule,
+    PaymentPlansService,
+    PaymentProgressHelper,
+    OrganizerLedgerService,
+  ],
 })
 export class DomainModule {}

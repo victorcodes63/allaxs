@@ -9,9 +9,9 @@ describe('Home Page', () => {
   });
 
   it('should display the header with logo and navigation', () => {
-    cy.get('header').should('be.visible');
+    cy.get('nav[aria-label="Primary"]').closest('header').should('be.visible');
     cy.contains('All AXS').should('be.visible');
-    cy.get('header').within(() => {
+    cy.get('nav[aria-label="Primary"]').closest('header').within(() => {
       cy.get('img[src*="logo-on-dark"]').should('be.visible');
     });
     cy.contains('a', 'Home').should('be.visible');
@@ -21,10 +21,13 @@ describe('Home Page', () => {
   });
 
   it('should display the footer with copyright and links', () => {
+    cy.get('footer').scrollIntoView();
     cy.get('footer').should('be.visible');
     cy.contains(/© \d{4} All AXS\. All rights reserved\./).should('be.visible');
-    cy.contains('a', 'Terms').should('be.visible');
-    cy.contains('a', 'Privacy').should('be.visible');
+    cy.get('footer').within(() => {
+      cy.contains('a', 'Terms of service').should('be.visible');
+      cy.contains('a', 'Privacy policy').should('be.visible');
+    });
   });
 
   it('should surface the experience sections', () => {

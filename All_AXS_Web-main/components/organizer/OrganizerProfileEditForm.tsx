@@ -114,7 +114,7 @@ export function OrganizerProfileEditForm({
             />
           </div>
           <Input
-            label="Legal name"
+            label="Legal name *"
             type="text"
             placeholder="Acme Events Ltd."
             {...register("legalName")}
@@ -135,7 +135,7 @@ export function OrganizerProfileEditForm({
             error={errors.supportEmail?.message}
           />
           <Input
-            label="Support phone"
+            label="Support phone *"
             type="tel"
             placeholder="+254…"
             {...register("supportPhone")}
@@ -233,9 +233,9 @@ export function OrganizerProfileEditForm({
         {payoutMethod === "OTHER" ? (
           <div className="mt-6 border-l-2 border-primary/25 pl-4 sm:pl-5">
             <Textarea
-              label="Payout instructions"
+              label="Payout instructions * (min 24 characters)"
               rows={4}
-              placeholder="Describe how you want to be paid…"
+              placeholder="Include routing details, account identifiers, and any reference codes…"
               {...register("payoutInstructions")}
               error={errors.payoutInstructions?.message}
             />
@@ -243,7 +243,13 @@ export function OrganizerProfileEditForm({
         ) : null}
 
         <div className="mt-6 max-w-md">
-          <Input label="Tax ID" type="text" placeholder="Optional" {...register("taxId")} error={errors.taxId?.message} />
+          <Input
+            label="Tax or business ID *"
+            type="text"
+            placeholder="PIN, VAT, or company registration number"
+            {...register("taxId")}
+            error={errors.taxId?.message}
+          />
         </div>
       </section>
 

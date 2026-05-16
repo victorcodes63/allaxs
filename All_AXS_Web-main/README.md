@@ -172,11 +172,16 @@ The project uses Cypress for end-to-end testing.
 
 3. **Environment Variables**
 
-   Create `.env.local` for local development:
+   Copy [`.env.example`](.env.example) to `.env.local`, or use:
    ```env
    NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
    API_URL=http://localhost:8080
+   NEXT_PUBLIC_SITE_URL=http://localhost:3000
+   NEXT_PUBLIC_USE_API_CHECKOUT=true
+   NEXT_PUBLIC_USE_DEMO_EVENTS=false
    ```
+
+   **Staging / production:** see [`docs/STAGING_CHECKLIST.md`](docs/STAGING_CHECKLIST.md) for Vercel copy-paste blocks and Paystack/Resend alignment with the API project.
 
    For testing, create `.env.test` or set:
    ```env

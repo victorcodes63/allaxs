@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { AttendeeHubShell } from "@/components/layout/hub/AttendeeHubShell";
+import { buildLoginRedirectFromPath } from "@/lib/auth/post-auth-redirect";
 import { landingPathForNonAttendee } from "@/lib/auth/hub-routing";
 
 export default function ProtectedLayout({
@@ -18,8 +19,9 @@ export default function ProtectedLayout({
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : "";
-      router.replace(`/login${nextParam}`);
+      router.replace(
+        pathname ? buildLoginRedirectFromPath(pathname) : "/login",
+      );
       return;
     }
     // Pure-admin / pure-organizer accounts should never see the fan-home

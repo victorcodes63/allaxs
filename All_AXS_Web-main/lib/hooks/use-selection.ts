@@ -48,19 +48,21 @@ export function useSelection<T>(
   // automatically dismisses if the rows have moved out of the current
   // filter.
   useEffect(() => {
-    setSelected((prev) => {
-      if (prev.size === 0) return prev;
-      const visible = new Set(items.map(getId));
-      let changed = false;
-      const next = new Set<string>();
-      prev.forEach((id) => {
-        if (visible.has(id)) {
-          next.add(id);
-        } else {
-          changed = true;
-        }
+    queueMicrotask(() => {
+      setSelected((prev) => {
+        if (prev.size === 0) return prev;
+        const visible = new Set(items.map(getId));
+        let changed = false;
+        const next = new Set<string>();
+        prev.forEach((id) => {
+          if (visible.has(id)) {
+            next.add(id);
+          } else {
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
       });
-      return changed ? next : prev;
     });
   }, [items, getId]);
 

@@ -388,8 +388,9 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                   Continue to checkout
                 </ArrowCtaLink>
                 <p className="mt-3 px-1 text-center text-xs leading-relaxed text-muted">
-                  Sign in or create an account to save passes to My tickets, or continue as a guest and get details by
-                  email / WhatsApp. Demo checkout delivers QR passes instantly on this device.
+                  Sign in or create an account to complete checkout and save passes to My tickets. You can also continue
+                  with Google where enabled. Local demo mode can still issue browser-only passes when API checkout is
+                  off.
                 </p>
                 <div className="mt-4 flex justify-center">
                   <ArrowBackCtaLink href="/events" size="compact" aria-label="Back to all events">

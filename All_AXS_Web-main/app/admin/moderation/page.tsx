@@ -346,7 +346,7 @@ function AdminModerationPageContent() {
         </div>
       ) : null}
 
-      <div className="sticky top-0 z-30 -mx-4 flex flex-col gap-3 border-b border-border/40 bg-background/95 px-4 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:flex-row sm:items-end sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="sticky top-0 z-20 -mx-4 flex flex-col gap-3 border-b border-border/40 bg-background/95 px-4 py-3 backdrop-blur-md supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:flex-row sm:items-end sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex-[2]">
           <label
             htmlFor="admin-moderation-search"

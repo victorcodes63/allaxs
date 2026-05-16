@@ -5,7 +5,6 @@ import { motion, useReducedMotion, type Variants } from "framer-motion";
 import type { PublicEvent } from "@/lib/utils/api-server";
 import HomeHero from "@/components/home/HomeHero";
 import { HomeAboutIntro } from "@/components/home/HomeAboutIntro";
-import { HomeParallaxBand } from "@/components/home/HomeParallaxBand";
 import {
   HomeOrganizerChecklistNewsletter,
   HomeQuickBrowseChips,
@@ -298,36 +297,7 @@ export function HomeView({
       {/* 6. Social proof */}
       <HomeQuotesAndBuyerSection />
 
-      {/* 7. On-site alignment */}
-      <motion.div
-        className="py-14 md:py-20"
-        initial={reduce ? false : { opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, amount: 0.15 }}
-        transition={{ duration: 0.65 }}
-      >
-        <HomeParallaxBand
-          focal="right"
-          imageSrc={marketingImages.parallaxSession}
-          alt="Facilitator leading a workshop at a conference table"
-        >
-          <motion.div
-            initial={reduce ? false : { opacity: 0, x: 28 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-            className="ml-auto max-w-xl space-y-4 text-right md:pl-8"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">At the venue</p>
-            <p className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-foreground [text-shadow:0_2px_24px_rgba(255,255,255,0.88)]">
-              Your listing, checkout, and door experience stay aligned—so on-site feels like the promise
-              you sold online.
-            </p>
-          </motion.div>
-        </HomeParallaxBand>
-      </motion.div>
-
-      {/* 8. Organizers */}
+      {/* 7. Organizers */}
       <HomeOrganizerChecklistNewsletter />
     </div>
   );

@@ -30,7 +30,7 @@ export function AuthPageShell({ children }: { children: React.ReactNode }) {
       />
 
       <div className="relative z-[2] flex min-h-0 w-full flex-1 flex-col items-stretch overflow-hidden">
-        <div className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6">
+        <div className="mx-auto flex min-h-0 w-full max-w-[min(100%,52rem)] flex-1 flex-col overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6">
           <div className="my-auto flex w-full flex-col py-1">{children}</div>
         </div>
       </div>

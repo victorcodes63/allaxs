@@ -23,9 +23,17 @@ export function organizerProfileApiToFormValues(
     ? (rawPm as OrganizerOnboardingInput["payoutMethod"])
     : "BANK_ACCOUNT";
 
+  const fromDetails =
+    o.payoutDetails &&
+    typeof o.payoutDetails === "object" &&
+    o.payoutDetails !== null &&
+    "instructions" in o.payoutDetails
+      ? str((o.payoutDetails as { instructions?: unknown }).instructions as string)
+      : undefined;
+
   return {
     orgName: display.orgName,
-    legalName: display.legalName || undefined,
+    legalName: (display.legalName?.trim() || display.orgName || "").trim(),
     website: display.website || "",
     supportEmail: display.supportEmail,
     supportPhone: display.supportPhone || "",
@@ -35,7 +43,8 @@ export function organizerProfileApiToFormValues(
     bankAccountNumber: str(o.bankAccountNumber) || str(o.bank_account_number) || undefined,
     mpesaPaybill: str(o.mpesaPaybill) || str(o.mpesa_paybill) || undefined,
     mpesaTillNumber: str(o.mpesaTillNumber) || str(o.mpesa_till_number) || undefined,
-    payoutInstructions: str(o.payoutInstructions) || str(o.payout_instructions) || undefined,
-    taxId: display.taxId || str(o.taxId) || str(o.tax_id) || undefined,
+    payoutInstructions:
+      str(o.payoutInstructions) || str(o.payout_instructions) || fromDetails || undefined,
+    taxId: (display.taxId || str(o.taxId) || str(o.tax_id) || "").trim(),
   };
 }

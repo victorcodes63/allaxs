@@ -36,6 +36,9 @@
     "seed:demo": "ts-node -r tsconfig-paths/register scripts/seed-demo-flow.ts",
     "ensure-admin-user": "ts-node -r tsconfig-paths/register scripts/ensure-admin-user.ts",
     "smoke:resend": "ts-node -r tsconfig-paths/register scripts/smoke-resend.ts",
+    "smoke:all-emails": "ts-node -r tsconfig-paths/register scripts/smoke-all-emails.ts",
+    "smoke:ticket-email": "ts-node -r tsconfig-paths/register scripts/smoke-ticket-email.ts",
+    "sync:brand-assets": "mkdir -p src/assets/brand && cp \"${WEB_BRAND_DIR:-../All_AXS_Web-main/public/brand}/logo-mark-white.png\" src/assets/brand/logo-mark-white.png",
     "shift:events:3w": "ts-node -r tsconfig-paths/register scripts/shift-events-into-upcoming-window.ts",
     "fix:ticket-prices": "ts-node -r tsconfig-paths/register scripts/sync-zero-ticket-prices-from-catalogue.ts"
   },
@@ -59,6 +62,7 @@
     "class-validator": "^0.14.2",
     "helmet": "^8.1.0",
     "ioredis": "^5.8.2",
+    "jspdf": "^4.2.1",
     "multer": "^2.0.2",
     "nestjs-pino": "^4.4.1",
     "nodemailer": "^7.0.10",

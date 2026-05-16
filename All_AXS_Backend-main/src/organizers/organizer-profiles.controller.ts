@@ -27,7 +27,7 @@ export class OrganizerProfilesController {
       throw new NotFoundException('Organizer profile not found');
     }
 
-    return profile;
+    return this.organizerProfilesService.serializeOrganizerProfile(profile);
   }
 
   @Post('profile')
@@ -40,6 +40,6 @@ export class OrganizerProfilesController {
       dto,
     );
 
-    return profile;
+    return this.organizerProfilesService.serializeOrganizerProfile(profile);
   }
 }

@@ -10,7 +10,6 @@ import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { SwapCtaLink } from "@/components/ui/SwapCtaLink";
 import { shouldUnoptimizeEventImage } from "@/lib/utils/image";
 import { marketingImages } from "@/lib/marketing-images";
-import { HomeParallaxBand } from "@/components/home/HomeParallaxBand";
 
 type QuickLink = { label: string; href: string };
 
@@ -273,7 +272,7 @@ export function HomeQuotesAndBuyerSection() {
   }, [reduce, n]);
 
   return (
-    <div className="space-y-10 md:space-y-14">
+    <div className="space-y-12 md:space-y-20">
       <motion.section
         className="relative -mx-[var(--axs-page-gutter)] overflow-hidden bg-background px-[var(--axs-page-gutter)] py-14 text-foreground md:py-20"
         initial={reduce ? false : { opacity: 0, y: 28 }}
@@ -403,81 +402,67 @@ export function HomeQuotesAndBuyerSection() {
         </div>
       </motion.section>
 
-      <motion.div
-        className="py-14 md:py-20"
-        initial={reduce ? false : { opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.7 }}
-      >
-        <HomeParallaxBand
-          imageSrc="/images/hero_image.jpg"
-          alt="Speaker presenting in a bright conference room"
-          imageClassName="scale-105 sm:scale-100"
-        >
-          <motion.div
-            initial={reduce ? false : { opacity: 0, x: -32 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.7, ease }}
-            className="max-w-xl space-y-4"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Event venues</p>
-            <p className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-foreground [text-shadow:0_2px_24px_rgba(255,255,255,0.85)]">
-              Listings and checkout that match the rigour of your keynote stage.
-            </p>
-            <p className="text-foreground/75 text-base md:text-lg leading-relaxed [text-shadow:0_1px_16px_rgba(255,255,255,0.75)]">
-              Built for multi-day summits: clear agendas, transparent fees, and passes delegates can open even when
-              the venue Wi‑Fi is under load.
-            </p>
-          </motion.div>
-        </HomeParallaxBand>
-      </motion.div>
-
       <motion.section
-        className="relative min-h-[320px] overflow-hidden rounded-[var(--radius-panel)] ring-1 ring-white/[0.05]"
-        initial={reduce ? false : { opacity: 0, scale: 0.99 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.7, ease }}
+        className="py-10 md:py-14"
+        initial={reduce ? false : { opacity: 0, y: 22 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.12 }}
+        transition={{ duration: 0.65, ease }}
+        aria-labelledby="home-buyer-trust-heading"
       >
-        <Image
-          src={marketingImages.buyerBand}
-          alt="Team collaborating in a bright professional workspace"
-          fill
-          className="object-cover"
-          sizes="100vw"
-          unoptimized={shouldUnoptimizeEventImage(marketingImages.buyerBand)}
-        />
-        <div className="absolute inset-0 bg-linear-to-r from-foreground/88 via-foreground/72 to-foreground/45" />
-        <div className="relative z-10 axs-content-inner flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8 p-10 md:p-14 text-background">
-          <div className="max-w-xl space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-background/90">Buyer protection</p>
-            <h3 className="font-display text-2xl md:text-3xl font-semibold leading-tight">Policies you can point to—before and after purchase</h3>
-            <ul className="space-y-2.5 text-background/90 text-sm md:text-base leading-relaxed">
-              {buyerPoints.map((p) => (
-                <li key={p} className="flex gap-2">
-                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-                  <span>{p}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex w-full max-w-md shrink-0 flex-col gap-2.5 sm:max-w-sm lg:ml-auto lg:items-stretch">
-            <ArrowCtaLink
-              href="/events"
-              variant="outline"
-              fullWidth
-              className="border-white/35 bg-background text-foreground shadow-[var(--btn-shadow-outline)] hover:border-white/50 hover:bg-background/92 hover:text-foreground"
-            >
-              Browse events
-            </ArrowCtaLink>
-            <Link
-              href="/terms"
-              className="inline-flex min-h-[var(--btn-min-h)] w-full items-center justify-center rounded-[var(--radius-button)] border border-white/30 bg-white/5 px-[var(--btn-pad-x)] py-[var(--btn-pad-y)] text-center text-sm font-semibold text-background transition hover:border-white/45 hover:bg-white/12"
-            >
-              Terms, fees & policies
-            </Link>
+        <div className="axs-content-inner">
+          <div className="overflow-hidden rounded-[var(--radius-panel)] border border-border/80 bg-surface shadow-[0_12px_40px_-24px_rgba(0,0,0,0.35)] ring-1 ring-white/[0.05]">
+            <div className="grid lg:grid-cols-2 lg:items-stretch">
+              <div className="relative aspect-[16/10] min-h-[200px] shrink-0 lg:aspect-auto lg:min-h-[300px] lg:order-2">
+                <Image
+                  src={marketingImages.buyerBand}
+                  alt="Team collaborating in a bright professional workspace"
+                  fill
+                  className="object-cover"
+                  sizes="(min-width: 1024px) 40vw, 100vw"
+                  unoptimized={shouldUnoptimizeEventImage(marketingImages.buyerBand)}
+                />
+                <div
+                  className="pointer-events-none absolute inset-0 bg-linear-to-t from-background/45 via-transparent to-transparent lg:bg-linear-to-l lg:from-background/35"
+                  aria-hidden
+                />
+              </div>
+              <div className="flex flex-col justify-center gap-5 p-8 md:p-10 lg:order-1 lg:pr-8">
+                <p
+                  id="home-buyer-trust-heading"
+                  className="text-xs font-semibold uppercase tracking-[0.22em] text-primary"
+                >
+                  Buyer protection
+                </p>
+                <h3 className="font-display text-2xl font-semibold leading-tight tracking-tight text-foreground md:text-3xl">
+                  Policies you can point to—before and after purchase
+                </h3>
+                <p className="text-sm leading-relaxed text-muted md:text-base">
+                  Listings and checkout stay worthy of flagship venues: transparent fees, mobile-readable agendas, and
+                  passes that still open when Wi‑Fi is patchy. At the door, the experience matches what buyers saw
+                  online.
+                </p>
+                <ul className="space-y-2.5 text-sm leading-relaxed text-foreground/90 md:text-base">
+                  {buyerPoints.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-col gap-2.5 pt-1 sm:flex-row sm:flex-wrap sm:items-center">
+                  <ArrowCtaLink href="/events" variant="primary" className="justify-center sm:min-w-[11rem]">
+                    Browse events
+                  </ArrowCtaLink>
+                  <Link
+                    href="/terms"
+                    className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-border bg-background/70 px-[var(--btn-pad-x)] py-[var(--btn-pad-y)] text-center text-sm font-semibold text-foreground transition hover:border-primary/40 hover:bg-primary/5 sm:min-w-[11rem]"
+                  >
+                    Terms, fees & policies
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </motion.section>

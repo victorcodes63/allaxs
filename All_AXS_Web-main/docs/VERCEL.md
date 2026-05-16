@@ -33,8 +33,11 @@ Point `API_URL` and `NEXT_PUBLIC_API_BASE_URL` at the **production URL** of the 
 | -------------------------------- | ----- |
 | `NEXT_PUBLIC_API_BASE_URL`       | `https://your-api-project.vercel.app` |
 | `API_URL`                        | Same as `NEXT_PUBLIC_API_BASE_URL` |
-| `NEXT_PUBLIC_SITE_URL`           | This app’s URL (used for metadata and absolute links) |
+| `NEXT_PUBLIC_SITE_URL`           | This app’s URL (used for metadata and absolute links; must match API `FRONTEND_URL`) |
 | `NEXT_PUBLIC_USE_DEMO_EVENTS`    | `false` (or omit; production then uses the API for public events) |
+| `NEXT_PUBLIC_USE_API_CHECKOUT`   | `true` for Paystack + persisted orders/tickets |
+
+**Staging / go-live:** copy-paste env blocks and smoke-test steps in **[STAGING_CHECKLIST.md](./STAGING_CHECKLIST.md)**. API Paystack, Resend, and `FRONTEND_URL` live on the **backend** Vercel project.
 
 Push to `main` (or your production branch) and Vercel redeploys automatically.
 

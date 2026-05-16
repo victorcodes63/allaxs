@@ -39,6 +39,7 @@ export type OrganizerSalesEventRow = {
   ordersCount: number;
   grossCents: number;
   feesCents: number;
+  netCents: number;
 };
 
 export type OrganizerSalesOrderRow = {
@@ -51,6 +52,7 @@ export type OrganizerSalesOrderRow = {
   buyerName: string;
   amountCents: number;
   feesCents: number;
+  netCents: number;
   currency: string;
   ticketsInOrder: number;
   lineSummary: string;
@@ -88,6 +90,7 @@ export class OrganizerSalesService {
     rollup: {
       grossCents: number;
       feesCents: number;
+      netCents: number;
       ticketsSold: number;
       ordersCount: number;
       currency: string;
@@ -107,6 +110,7 @@ export class OrganizerSalesService {
         rollup: {
           grossCents: 0,
           feesCents: 0,
+          netCents: 0,
           ticketsSold: 0,
           ordersCount: 0,
           currency: 'KES',
@@ -162,6 +166,8 @@ export class OrganizerSalesService {
       const currency =
         (e.ticketTypes ?? []).find((t) => t.currency)?.currency ?? 'KES';
       const o = orderByEvent.get(e.id);
+      const gross = o?.grossCents ?? 0;
+      const fees = o?.feesCents ?? 0;
       return {
         eventId: e.id,
         title: e.title,
@@ -172,8 +178,9 @@ export class OrganizerSalesService {
         capacityTotal: caps,
         ticketsSold: ticketsByEvent.get(e.id) ?? 0,
         ordersCount: o?.ordersCount ?? 0,
-        grossCents: o?.grossCents ?? 0,
-        feesCents: o?.feesCents ?? 0,
+        grossCents: gross,
+        feesCents: fees,
+        netCents: Math.max(0, gross - fees),
       };
     });
 
@@ -181,6 +188,7 @@ export class OrganizerSalesService {
       (acc, r) => ({
         grossCents: acc.grossCents + r.grossCents,
         feesCents: acc.feesCents + r.feesCents,
+        netCents: acc.netCents + r.netCents,
         ticketsSold: acc.ticketsSold + r.ticketsSold,
         ordersCount: acc.ordersCount + r.ordersCount,
         currency: acc.currency || r.currency,
@@ -188,6 +196,7 @@ export class OrganizerSalesService {
       {
         grossCents: 0,
         feesCents: 0,
+        netCents: 0,
         ticketsSold: 0,
         ordersCount: 0,
         currency: '',
@@ -258,6 +267,8 @@ export class OrganizerSalesService {
             ? parts.join(', ')
             : `${parts[0]} + ${parts.length - 1} more`;
 
+      const fees = o.feesCents ?? 0;
+      const gross = o.amountCents;
       return {
         id: o.id,
         createdAt: o.createdAt.toISOString(),
@@ -266,8 +277,9 @@ export class OrganizerSalesService {
         eventTitle: o.event?.title ?? 'Event',
         buyerEmail: o.email,
         buyerName: parseBuyerNameFromNotes(o.notes),
-        amountCents: o.amountCents,
-        feesCents: o.feesCents ?? 0,
+        amountCents: gross,
+        feesCents: fees,
+        netCents: Math.max(0, gross - fees),
         currency: o.currency,
         ticketsInOrder,
         lineSummary,

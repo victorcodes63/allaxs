@@ -10,7 +10,6 @@ import {
   useScroll,
   useTransform,
 } from "framer-motion";
-import { HomeParallaxBand } from "@/components/home/HomeParallaxBand";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { shouldUnoptimizeEventImage } from "@/lib/utils/image";
 import { marketingImages } from "@/lib/marketing-images";
@@ -347,6 +346,13 @@ function FeatureMosaic({ reduce }: { reduce: boolean }) {
           >
             What you’re actually configuring
           </motion.h2>
+          <motion.p
+            variants={fadeUp(reduce, 0.08)}
+            className="mt-4 max-w-3xl text-base leading-relaxed text-muted md:text-lg"
+          >
+            On site, your listing, checkout, and check-in stay aligned—delegates experience what you sold
+            online, without a separate “ops” story.
+          </motion.p>
         </motion.div>
         <div className="grid gap-6 md:grid-cols-2">
           {blocks.map((b, i) => (
@@ -417,6 +423,14 @@ function ChecklistSection({ reduce }: { reduce: boolean }) {
             <motion.p variants={fadeUp(reduce, 0.1)} className="mt-4 text-muted text-lg leading-relaxed">
               You can save drafts while you gather assets. Completing the checklist below speeds up
               review and avoids back-and-forth.
+            </motion.p>
+            <motion.p
+              variants={fadeUp(reduce, 0.12)}
+              className="mt-5 border-l-2 border-primary/30 pl-4 text-sm leading-relaxed text-muted"
+            >
+              <span className="font-semibold text-foreground/90">Review note.</span> Submitted listings are
+              checked for completeness and platform fit—placeholders, missing artwork, or unclear tier copy
+              are the usual reasons for notes. Solid drafts move fastest.
             </motion.p>
             <ul className="mt-8 space-y-4">
               {CHECKLIST.map((line, i) => (
@@ -638,63 +652,8 @@ export function OrganizersMarketingPage() {
       <OrganizersParallaxHero />
       <ValueProps reduce={reduce} />
       <JourneySection reduce={reduce} />
-      <motion.div
-        className={SECTION}
-        initial={reduce ? false : { opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.6 }}
-      >
-        <HomeParallaxBand
-          focal="left"
-          overlayTone="dark"
-          imageSrc={marketingImages.organizerParallax}
-          alt="On-site event operations and check-in"
-        >
-          <motion.div
-            initial={reduce ? false : { opacity: 0, x: -24 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.65, ease }}
-            className="max-w-xl space-y-4"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">On site</p>
-            <p className="font-display text-2xl sm:text-3xl md:text-4xl leading-tight text-white [text-shadow:0_2px_28px_rgba(0,0,0,0.45)]">
-              Your listing, checkout, and check-in experience stay aligned—so what delegates experience
-              on the ground matches the event you sold online.
-            </p>
-          </motion.div>
-        </HomeParallaxBand>
-      </motion.div>
       <FeatureMosaic reduce={reduce} />
       <ChecklistSection reduce={reduce} />
-      <motion.section
-        className={SECTION}
-        initial="hidden"
-        whileInView="show"
-        viewport={{ once: true }}
-        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
-      >
-        <div className="axs-page-shell">
-          <div className="axs-content-inner">
-          <motion.div
-            variants={fadeUp(reduce)}
-            className="rounded-[var(--radius-panel)] border border-border bg-wash/80 px-6 py-8 md:px-10 md:py-10"
-          >
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Moderation</p>
-            <h2 className="font-display mt-3 text-2xl font-semibold text-foreground md:text-3xl">
-              Quality bar for public listings
-            </h2>
-            <p className="mt-4 text-muted leading-relaxed max-w-3xl">
-              Submitted events are reviewed for completeness, clarity, and fit with platform
-              standards. This protects buyers and keeps the catalogue trustworthy. Incomplete
-              placeholders, missing artwork, or unclear tier copy are the usual reasons a submission
-              comes back with notes—use the checklist above to sail through.
-            </p>
-          </motion.div>
-          </div>
-        </div>
-      </motion.section>
       <FaqSection reduce={reduce} />
       <FinalCta reduce={reduce} />
     </div>

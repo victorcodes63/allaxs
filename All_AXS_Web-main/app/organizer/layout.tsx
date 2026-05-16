@@ -5,6 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { OrganizerShell } from "@/components/organizer/OrganizerShell";
 import { AttendeeHubShell } from "@/components/layout/hub/AttendeeHubShell";
+import {
+  normalizeWebUserRoles,
+  rolesIncludeAdmin,
+  shouldOfferOrganizerHub,
+} from "@/lib/auth/hub-routing";
+import { buildAuthQuery } from "@/lib/auth/post-auth-redirect";
 
 export default function OrganizerLayout({
   children,
@@ -21,13 +27,18 @@ export default function OrganizerLayout({
   useEffect(() => {
     if (loading) return;
     if (!user) {
+      const nextPath = pathname || "/organizer/dashboard";
       router.replace(
-        `/login?next=${encodeURIComponent(pathname || "/organizer/dashboard")}`,
+        `/login${buildAuthQuery({ next: nextPath, intent: "host" })}`,
       );
       return;
     }
-    const canOrganizerApp =
-      user.roles?.includes("ORGANIZER") || user.roles?.includes("ADMIN");
+    const roles = normalizeWebUserRoles(user.roles);
+    if (rolesIncludeAdmin(roles)) {
+      router.replace("/admin");
+      return;
+    }
+    const canOrganizerApp = shouldOfferOrganizerHub(roles);
     if (!onOnboarding && !canOrganizerApp) {
       router.replace("/organizer/onboarding");
     }
@@ -41,8 +52,16 @@ export default function OrganizerLayout({
     );
   }
 
-  const canOrganizerApp =
-    user.roles?.includes("ORGANIZER") || user.roles?.includes("ADMIN");
+  const roles = normalizeWebUserRoles(user.roles);
+  if (rolesIncludeAdmin(roles)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <p className="text-muted">Redirecting…</p>
+      </div>
+    );
+  }
+
+  const canOrganizerApp = shouldOfferOrganizerHub(roles);
   if (!onOnboarding && !canOrganizerApp) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">

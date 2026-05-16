@@ -54,7 +54,62 @@ async function ensureDemoAttendeeSeededTicket(
     where: { reference: SEED_ATTENDEE_WALLET_ORDER_REF },
   });
   if (existing) {
-    return { created: false, orderId: existing.id };
+    const existingTicket = await AppDataSource.getRepository(Ticket).findOne({
+      where: { orderId: existing.id, ownerUserId: attendee.id },
+      order: { createdAt: 'ASC' },
+    });
+    if (existingTicket) {
+      return { created: false, orderId: existing.id, ticketId: existingTicket.id };
+    }
+
+    const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+    return AppDataSource.transaction(async (manager) => {
+      const dupTicket = await manager.findOne(Ticket, {
+        where: { orderId: existing.id, ownerUserId: attendee.id },
+        order: { createdAt: 'ASC' },
+      });
+      if (dupTicket) {
+        return { created: false, orderId: existing.id, ticketId: dupTicket.id };
+      }
+
+      const orderItem = await manager.findOne(OrderItem, {
+        where: { orderId: existing.id },
+        order: { createdAt: 'ASC' },
+      });
+      const resolvedTicketTypeId = orderItem
+        ? orderItem.ticketTypeId
+        : (
+            await manager.findOne(TicketType, {
+              where: { eventId: existing.eventId },
+              order: { createdAt: 'ASC' },
+            })
+          )?.id;
+      if (!resolvedTicketTypeId) {
+        throw new Error(
+          `Seed wallet: existing order "${existing.id}" has no order item and no ticket type on event "${existing.eventId}".`,
+        );
+      }
+
+      const qrNonce = `qr_${crypto.randomUUID().replace(/-/g, '')}`;
+      const ticket = manager.create(Ticket, {
+        orderId: existing.id,
+        ticketTypeId: resolvedTicketTypeId,
+        ownerUserId: attendee.id,
+        attendeeName: attendee.name,
+        attendeeEmail: attendee.email,
+        qrNonce,
+        qrSignature: '',
+      });
+      await manager.save(ticket);
+      const sig = crypto
+        .createHmac('sha256', jwtSecret)
+        .update(`${ticket.id}:${qrNonce}`)
+        .digest('hex');
+      ticket.qrSignature = sig;
+      await manager.save(ticket);
+
+      return { created: true, orderId: existing.id, ticketId: ticket.id };
+    });
   }
 
   const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
@@ -266,8 +321,13 @@ async function ensureDemoAdminUser(
   }
 
   let rolesUpdated = false;
-  if (!existing.roles?.includes(Role.ADMIN)) {
-    existing.roles = [...(existing.roles ?? []), Role.ADMIN];
+  const canonicalRoles = [Role.ADMIN];
+  const current = existing.roles ?? [];
+  const needsRoleReset =
+    current.length !== canonicalRoles.length ||
+    !canonicalRoles.every((role) => current.includes(role));
+  if (needsRoleReset) {
+    existing.roles = canonicalRoles;
     rolesUpdated = true;
   }
   if (existing.name !== 'Demo Admin') {

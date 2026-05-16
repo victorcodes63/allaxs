@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
-import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 
 export interface RefundOrderTarget {
@@ -26,34 +25,21 @@ function formatMajor(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
-function parseMajorToCents(value: string): number | null {
-  if (!value.trim()) return null;
-  const cleaned = value.replace(/[^0-9.\-]/g, "");
-  if (!cleaned) return null;
-  const major = Number(cleaned);
-  if (!Number.isFinite(major) || major <= 0) return null;
-  return Math.round(major * 100);
-}
-
 /**
- * Refund flow for the admin /admin/orders view. Defaults to a full refund
- * (whatever the order's `amountCents` is) but lets an admin enter a partial
- * amount. Posts to `POST /api/admin/orders/:id/refund` which is proxied to
- * the existing NestJS endpoint and writes an audit log entry.
+ * Refund flow for the admin /admin/orders view — full order total only.
+ * Posts to `POST /api/admin/orders/:id/refund` (Nest + Paystack when applicable).
  */
 export function RefundOrderDialog({
   order,
   onClose,
   onRefunded,
 }: RefundOrderDialogProps) {
-  const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (order) {
-      setAmount(formatMajor(order.amountCents));
       setReason("");
       setError(null);
     }
@@ -66,20 +52,9 @@ export function RefundOrderDialog({
   const submit = async () => {
     setError(null);
 
-    const requestedCents = parseMajorToCents(amount);
-    if (requestedCents === null) {
-      setError("Enter a positive refund amount.");
-      return;
-    }
-    if (requestedCents > order.amountCents) {
-      setError(`Refund cannot exceed the order total of ${totalLabel}.`);
-      return;
-    }
-
     setSubmitting(true);
     try {
       await axios.post(`/api/admin/orders/${order.id}/refund`, {
-        amountCents: requestedCents,
         reason: reason.trim() || undefined,
       });
       onRefunded();
@@ -173,15 +148,6 @@ export function RefundOrderDialog({
           </div>
         </dl>
 
-        <Input
-          label={`Refund amount (${order.currency})`}
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
-          placeholder={formatMajor(order.amountCents)}
-          inputMode="decimal"
-          autoFocus
-        />
-
         <Textarea
           label="Reason (optional)"
           value={reason}
@@ -191,9 +157,9 @@ export function RefundOrderDialog({
         />
 
         <p className="text-xs leading-relaxed text-muted">
-          Refunds change the order status to REFUNDED and are logged in the
-          admin audit trail. Payment-provider refunds are not
-          triggered automatically — handle those in the provider dashboard.
+          This refunds the <strong className="text-foreground">full order total</strong> ({totalLabel}). It voids
+          tickets, restores tier inventory, sets the order to REFUNDED, and is logged in the admin audit trail. Live
+          Paystack payments are refunded via Paystack first (requires API keys). Demo orders skip the provider.
         </p>
       </div>
     </Dialog>

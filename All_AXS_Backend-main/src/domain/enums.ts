@@ -79,3 +79,18 @@ export enum TicketTypeStatus {
   DISABLED = 'DISABLED',
   SOLD_OUT = 'SOLD_OUT',
 }
+
+/** Organizer ledger / settlement (signed amount_cents: positive = owed to organizer). */
+export enum LedgerEntryType {
+  ORDER_EARNINGS = 'ORDER_EARNINGS',
+  ORDER_REFUND_REVERSAL = 'ORDER_REFUND_REVERSAL',
+  PAYOUT = 'PAYOUT',
+}
+
+export enum PayoutBatchStatus {
+  DRAFT = 'DRAFT',
+  APPROVED = 'APPROVED',
+  EXPORTED = 'EXPORTED',
+  MARKED_PAID = 'MARKED_PAID',
+  CANCELLED = 'CANCELLED',
+}

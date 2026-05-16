@@ -46,6 +46,7 @@ function isAuthEntryPath(pathname: string): boolean {
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/resend-verification",
   ] as const;
   return authPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
@@ -83,15 +84,17 @@ export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get("accessToken")?.value;
 
   if (isAuthEntryPath(pathname)) {
+    // Let the auth page load even when a session cookie exists. Client-side
+    // `useReplaceIfAuthenticated` uses role-aware routing (e.g. `/admin` for
+    // admins). A hard edge redirect to `/dashboard` here bypassed that and
+    // trapped every signed-in user on the attendee hub.
     if (!accessTokenNeedsRotation(accessToken)) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.next();
     }
 
     const renewed = await tryRefreshAndContinue(request);
     if (renewed) {
-      const redirect = NextResponse.redirect(new URL("/dashboard", request.url));
-      forwardSetCookies(renewed, redirect);
-      return redirect;
+      return renewed;
     }
 
     return NextResponse.next();
@@ -103,6 +106,18 @@ export async function middleware(request: NextRequest) {
 
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
+    if (pathname.startsWith("/organizer")) {
+      loginUrl.searchParams.set("intent", "host");
+    } else if (
+      pathname === "/dashboard" ||
+      pathname.startsWith("/dashboard/") ||
+      pathname === "/tickets" ||
+      pathname.startsWith("/tickets/") ||
+      pathname === "/notifications" ||
+      pathname.startsWith("/notifications/")
+    ) {
+      loginUrl.searchParams.set("intent", "attend");
+    }
     return NextResponse.redirect(loginUrl);
   }
 
@@ -116,10 +131,11 @@ export const config = {
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/resend-verification",
     "/dashboard/:path*",
     "/organizer/:path*",
     "/admin/:path*",
     "/account/:path*",
-    /* Checkout is public: buyers choose sign-in / new account or guest delivery; /tickets stays public for session passes. */
+    /* Public checkout URL: buyers sign in or register before Paystack; /tickets stays public for session passes. */
   ],
 };

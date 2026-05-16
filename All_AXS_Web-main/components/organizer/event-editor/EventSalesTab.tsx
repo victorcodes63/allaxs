@@ -17,6 +17,7 @@ export function EventSalesTab({
   const [error, setError] = useState<string | null>(null);
   const [grossCents, setGrossCents] = useState(0);
   const [feesCents, setFeesCents] = useState(0);
+  const [netCents, setNetCents] = useState(0);
   const [ticketsSold, setTicketsSold] = useState(0);
   const [ordersCount, setOrdersCount] = useState(0);
   const [capacityTotal, setCapacityTotal] = useState(0);
@@ -36,6 +37,7 @@ export function EventSalesTab({
       if (!row) {
         setGrossCents(0);
         setFeesCents(0);
+        setNetCents(0);
         setTicketsSold(0);
         setOrdersCount(0);
         setCapacityTotal(0);
@@ -44,6 +46,7 @@ export function EventSalesTab({
       }
       setGrossCents(row.grossCents);
       setFeesCents(row.feesCents);
+      setNetCents(row.netCents);
       setTicketsSold(row.ticketsSold);
       setOrdersCount(row.ordersCount);
       setCapacityTotal(row.capacityTotal);
@@ -97,7 +100,7 @@ export function EventSalesTab({
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-[var(--radius-panel)] border border-border bg-surface/90 p-4">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Gross sales</p>
           <p className="mt-2 font-display text-2xl font-semibold tabular-nums text-foreground">
@@ -117,9 +120,15 @@ export function EventSalesTab({
           </p>
         </div>
         <div className="rounded-[var(--radius-panel)] border border-border bg-surface/90 p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Fees recorded</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Fees (platform)</p>
           <p className="mt-2 font-display text-2xl font-semibold tabular-nums text-foreground">
             {formatMoneyFromCents(feesCents, currency)}
+          </p>
+        </div>
+        <div className="rounded-[var(--radius-panel)] border border-border bg-surface/90 p-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Net (organizer)</p>
+          <p className="mt-2 font-display text-2xl font-semibold tabular-nums text-foreground">
+            {formatMoneyFromCents(netCents, currency)}
           </p>
         </div>
       </div>

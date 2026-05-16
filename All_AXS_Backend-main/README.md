@@ -340,7 +340,7 @@ UPLOAD_MAX_MB=10                   # Max file size for uploads
 UPLOAD_ALLOWED_MIME=image/jpeg,image/png,image/webp  # Allowed MIME types
 ```
 
-See **[ENV_SETUP.md](ENV_SETUP.md)** for complete reference.
+See **[`.env.example`](.env.example)** and **[`docs/VERCEL.md`](docs/VERCEL.md)** for staging/production variables. Web staging checklist: `All_AXS_Web-main/docs/STAGING_CHECKLIST.md`.
 
 ---
 
@@ -367,7 +367,7 @@ Start with **[LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md)** for complete setup i
 
 ### 2. Configure Environment
 
-Copy `env.example` to `.env` and update values.
+Copy `.env.example` to `.env` and update values.
 
 ### 3. Run Migrations
 

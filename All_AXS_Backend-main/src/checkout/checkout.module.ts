@@ -12,6 +12,8 @@ import { Ticket } from '../domain/ticket.entity';
 import { Payment } from '../domain/payment.entity';
 import { Event } from '../events/entities/event.entity';
 import { TicketType } from '../events/entities/ticket-type.entity';
+import { DomainModule } from '../domain/domain.module';
+import { EventsModule } from '../events/events.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { TicketType } from '../events/entities/ticket-type.entity';
       TicketType,
     ]),
     AuthModule,
+    DomainModule,
+    EventsModule,
   ],
   controllers: [CheckoutController, PaystackWebhookController, TicketsController],
   providers: [CheckoutService, TicketsService],

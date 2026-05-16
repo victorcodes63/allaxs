@@ -18,6 +18,7 @@ import { EmailVerificationService } from './services/email-verification.service'
 import { PasswordResetService } from './services/password-reset.service';
 import { TokenCleanupTask } from './tasks/token-cleanup.task';
 import { EmailService } from './services/email.service';
+import { TicketPdfService } from '../tickets/ticket-pdf.service';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { EmailService } from './services/email.service';
     EmailVerificationService,
     PasswordResetService,
     EmailService,
+    TicketPdfService,
     TokenCleanupTask,
     JwtStrategy,
     JwtAuthGuard,

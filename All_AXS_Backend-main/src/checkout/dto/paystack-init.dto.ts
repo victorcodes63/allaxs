@@ -40,4 +40,14 @@ export class PaystackInitDto {
   @IsOptional()
   @IsString()
   buyerPhone?: string;
+
+  /**
+   * Optional coupon code applied at checkout. See COUPONS_SPEC §5.1.
+   * The backend re-validates and locks the coupon row inside the
+   * checkout transaction, so the value supplied here is a hint that
+   * must still survive the authoritative redeem step.
+   */
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

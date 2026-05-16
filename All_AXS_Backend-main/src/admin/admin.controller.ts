@@ -37,12 +37,14 @@ import { User } from '../users/entities/user.entity';
 import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
 import { AdminAuditLog } from './entities/admin-audit-log.entity';
 import { AdminAuditService } from './admin-audit.service';
+import { OrderRefundService } from './order-refund.service';
 import { AdminAction } from './decorators/admin-action.decorator';
 import { AdminAuditInterceptor } from './interceptors/admin-audit.interceptor';
 import { EventsService } from '../events/events.service';
 import { AuthService } from '../auth/auth.service';
 import { RejectEventDto } from '../events/dto/reject-event.dto';
 import type { Request } from 'express';
+import { OrganizerProfilesService } from '../organizers/organizer-profiles.service';
 
 @ApiTags('admin')
 @Controller('admin')
@@ -66,6 +68,8 @@ export class AdminController {
     private readonly adminAuditService: AdminAuditService,
     private readonly eventsService: EventsService,
     private readonly authService: AuthService,
+    private readonly orderRefundService: OrderRefundService,
+    private readonly organizerProfilesService: OrganizerProfilesService,
   ) {}
 
   @Get('ping')
@@ -865,41 +869,29 @@ export class AdminController {
   @Post('orders/:id/refund')
   async refundOrder(
     @Param('id') orderId: string,
-    @Body() body: { reason?: string; amountCents?: number },
+    @Body() body: { reason?: string },
     @GetUser() user: CurrentUser,
     @Req() request: Request,
   ) {
-    const order = await this.orderRepository.findOne({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    if (order.status === OrderStatus.REFUNDED) {
-      throw new BadRequestException('Order is already refunded');
-    }
-
-    const previousStatus = order.status;
-    const refundAmount = body.amountCents || order.amountCents;
-
-    // Update order status
-    order.status = OrderStatus.REFUNDED;
-    await this.orderRepository.save(order);
+    const result = await this.orderRefundService.refundPaidOrder(orderId, body);
+    const o = result.order;
 
     await this.adminAuditService.logAction({
       adminUserId: user.id,
       action: 'REFUND_ORDER',
       resourceType: 'order',
-      resourceId: order.id,
+      resourceId: o.id,
       metadata: {
-        previousStatus,
-        newStatus: order.status,
-        refundAmountCents: refundAmount,
-        originalAmountCents: order.amountCents,
-        currency: order.currency,
+        previousStatus: o.previousStatus,
+        newStatus: o.status,
+        refundAmountCents: o.refundAmountCents,
+        originalAmountCents: o.originalAmountCents,
+        currency: o.currency,
         reason: body.reason || null,
+        ...(o.paystackRefundId !== undefined
+          ? { paystackRefundId: o.paystackRefundId }
+          : {}),
+        ...(o.paystackRefundSkipped ? { paystackRefundSkipped: true } : {}),
       },
       ipAddress:
         request.ip ||
@@ -912,10 +904,10 @@ export class AdminController {
     return {
       message: 'Order refunded successfully',
       order: {
-        id: order.id,
-        status: order.status,
-        previousStatus,
-        refundAmountCents: refundAmount,
+        id: o.id,
+        status: o.status,
+        previousStatus: o.previousStatus,
+        refundAmountCents: o.refundAmountCents,
       },
     };
   }
@@ -1140,16 +1132,9 @@ export class AdminController {
         updatedAt: user.updatedAt,
       },
       organizerProfile: organizerProfile
-        ? {
-            id: organizerProfile.id,
-            orgName: organizerProfile.orgName,
-            legalName: organizerProfile.legalName ?? null,
-            supportEmail: organizerProfile.supportEmail ?? null,
-            supportPhone: organizerProfile.supportPhone ?? null,
-            website: organizerProfile.website ?? null,
-            verified: organizerProfile.verified,
-            createdAt: organizerProfile.createdAt,
-          }
+        ? this.organizerProfilesService.serializeOrganizerProfile(
+            organizerProfile,
+          )
         : null,
       hostedEvents: {
         byStatus: eventStatusCounts,
@@ -1264,6 +1249,72 @@ export class AdminController {
           }
         : null,
     }));
+  }
+
+  /**
+   * Finance / compliance: mark organizer payout profile as verified after KYC
+   * or document checks. Hosts see this in `payoutProfile.readyForSettlement`.
+   */
+  @Patch('organizer-profiles/:id/verification')
+  @ApiOperation({ summary: 'Set organizer payout profile verification flag' })
+  @ApiParam({ name: 'id', description: 'Organizer profile ID' })
+  @ApiResponse({ status: 200, description: 'Verification updated' })
+  @ApiResponse({ status: 404, description: 'Organizer profile not found' })
+  async setOrganizerProfileVerification(
+    @Param('id') profileId: string,
+    @Body() body: { verified: boolean },
+    @GetUser() user: CurrentUser,
+    @Req() request: Request,
+  ) {
+    if (typeof body?.verified !== 'boolean') {
+      throw new BadRequestException('Request body must include verified: boolean');
+    }
+    const profile = await this.organizerProfileRepository.findOne({
+      where: { id: profileId },
+    });
+    if (!profile) {
+      throw new NotFoundException('Organizer profile not found');
+    }
+    const previous = profile.verified;
+    if (previous === body.verified) {
+      return {
+        message: 'Verification unchanged',
+        organizerProfile:
+          this.organizerProfilesService.serializeOrganizerProfile(profile),
+      };
+    }
+    profile.verified = body.verified;
+    await this.organizerProfileRepository.save(profile);
+
+    await this.adminAuditService.logAction({
+      adminUserId: user.id,
+      action: 'UPDATE_ORGANIZER_VERIFICATION',
+      resourceType: 'organizer_profile',
+      resourceId: profile.id,
+      metadata: {
+        previousVerified: previous,
+        verified: profile.verified,
+        orgName: profile.orgName,
+      },
+      ipAddress:
+        request.ip ||
+        (request.headers['x-forwarded-for'] as string)
+          ?.split(',')[0]
+          ?.trim() ||
+        (request.headers['x-real-ip'] as string) ||
+        null,
+      userAgent: (request.headers['user-agent'] as string) || null,
+    });
+
+    const fresh = await this.organizerProfileRepository.findOne({
+      where: { id: profileId },
+    });
+    return {
+      message: 'Organizer verification updated',
+      organizerProfile: this.organizerProfilesService.serializeOrganizerProfile(
+        fresh!,
+      ),
+    };
   }
 
   /**

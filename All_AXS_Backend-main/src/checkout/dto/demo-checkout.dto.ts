@@ -41,4 +41,13 @@ export class DemoCheckoutDto {
   @IsOptional()
   @IsString()
   buyerPhone?: string;
+
+  /**
+   * Optional coupon code. Mirrors `PaystackInitDto.couponCode` — the
+   * demo path applies the same redeem logic so dev environments can
+   * exercise coupons end-to-end without Paystack.
+   */
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }

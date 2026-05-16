@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -32,15 +32,12 @@ interface BulkRefundDialogProps {
 
 /**
  * Bulk-refund flow for the admin orders view. Always issues a FULL refund
- * per selected order (the per-row dialog covers partial refunds for the
- * single-order case). Sequential calls via `Promise.allSettled` so a
+ * per selected order. Sequential calls via `Promise.allSettled` so a
  * single failure doesn't abort the batch; the summary banner on
  * `/admin/orders` reports succeeded/failed counts.
  *
- * Why a hard cap? Refunds are money operations and the upstream payment
- * provider is NOT triggered automatically. Forcing admins to do
- * batches of <= 20 keeps the manual provider-side reconciliation
- * tractable and limits the blast radius of a misclick.
+ * Why a hard cap? Refunds are money operations (Paystack refund + DB).
+ * Batches of <= 20 limit the blast radius of a misclick.
  */
 export const BULK_REFUND_MAX = 20;
 
@@ -53,12 +50,7 @@ export function BulkRefundDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (orders) {
-      setReason("");
-      setError(null);
-    }
-  }, [orders]);
+  const ordersKey = orders?.map((o) => o.id).join(",") ?? "none";
 
   // Per-currency totals so the user can see exactly what's about to be
   // moved, even when (rare) multiple currencies are mixed in a batch.
@@ -95,7 +87,6 @@ export function BulkRefundDialog({
     const results = await Promise.allSettled(
       orders.map((order) =>
         axios.post(`/api/admin/orders/${order.id}/refund`, {
-          amountCents: order.amountCents,
           reason: trimmedReason,
         }),
       ),
@@ -124,6 +115,7 @@ export function BulkRefundDialog({
 
   return (
     <Dialog
+      key={ordersKey}
       open={!!orders}
       onClose={() => {
         if (!submitting) onClose();
@@ -222,12 +214,10 @@ export function BulkRefundDialog({
         />
 
         <div className="rounded-[var(--radius-panel)] border border-amber-400/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100">
-          <strong className="font-semibold">Provider refunds are not
-            automatic.</strong>{" "}
-          Each order&apos;s payment-provider refund must still be
-          issued from that provider's dashboard. This action only updates the
-          order status to REFUNDED on All AXS and writes an admin audit log
-          entry per order.
+          <strong className="font-semibold">Money path.</strong> Each row calls the refund API with
+          Paystack for live card payments (then voids passes in All AXS). Demo checkouts skip the
+          provider. If Paystack rejects a row, that order stays paid — use the summary banner and
+          provider dashboard to reconcile failures.
         </div>
       </div>
     </Dialog>

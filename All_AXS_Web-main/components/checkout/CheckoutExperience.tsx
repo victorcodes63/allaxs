@@ -17,6 +17,10 @@ import {
   type StoredOrder,
 } from "@/lib/checkout-storage";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
+import {
+  previewCheckoutCoupon,
+  type CouponPreviewResponse,
+} from "@/lib/checkout-coupons";
 import { ArrowButton } from "@/components/ui/ArrowCta";
 
 function tierAvailable(tier: NonNullable<PublicEvent["ticketTypes"]>[0]) {
@@ -33,11 +37,6 @@ function remaining(tier: NonNullable<PublicEvent["ticketTypes"]>[0]) {
 }
 
 type CheckoutStep = "tickets" | "buyer";
-
-function whatsappDigitsOk(raw: string): boolean {
-  const digits = raw.replace(/\D/g, "");
-  return digits.length >= 10;
-}
 
 export function CheckoutExperience({
   event,
@@ -69,11 +68,17 @@ export function CheckoutExperience({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [signedIn, setSignedIn] = useState(false);
-  /** When signed out: null = not chosen yet; false = account path (must auth); true = guest checkout */
-  const [guestMode, setGuestMode] = useState<boolean | null>(null);
-  const [notifyWhatsapp, setNotifyWhatsapp] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Coupon state. `applied` is the latest valid preview from the
+  // backend; mutating the cart resets it so the buyer always sees the
+  // discount the server is currently willing to honour.
+  const [couponInput, setCouponInput] = useState("");
+  const [couponApplying, setCouponApplying] = useState(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] =
+    useState<CouponPreviewResponse | null>(null);
 
   useEffect(() => {
     const init: Record<string, number> = {};
@@ -88,19 +93,11 @@ export function CheckoutExperience({
       }
       setQty(merged);
       setStep(draft.step === "buyer" ? "buyer" : "tickets");
-      setGuestMode(draft.guestMode);
     } else {
       setQty(init);
       setStep("tickets");
-      setGuestMode(null);
     }
-    setNotifyWhatsapp(false);
   }, [event.id, tiers]);
-
-  useEffect(() => {
-    if (!signedIn) return;
-    setGuestMode(null);
-  }, [signedIn]);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,6 +145,75 @@ export function CheckoutExperience({
   );
   const currency = tiers[0]?.currency ?? "KES";
 
+  // Reset the applied coupon whenever the cart changes so the buyer
+  // can't carry a stale preview into the pay step. They can re-apply
+  // the same code with one click.
+  const lineSignature = useMemo(
+    () =>
+      lineItems
+        .map((li) => `${li.ticketTypeId}:${li.quantity}`)
+        .sort()
+        .join("|"),
+    [lineItems]
+  );
+  useEffect(() => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+  }, [lineSignature]);
+
+  const discountCents =
+    appliedCoupon?.valid && appliedCoupon.discountCents > 0
+      ? Math.min(appliedCoupon.discountCents, subtotal)
+      : 0;
+  const dueToday = Math.max(0, subtotal - discountCents);
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) {
+      setCouponError("Enter a code to apply.");
+      return;
+    }
+    if (lineItems.length === 0) {
+      setCouponError("Add tickets to your cart before applying a code.");
+      return;
+    }
+    setCouponError(null);
+    setCouponApplying(true);
+    try {
+      const result = await previewCheckoutCoupon({
+        eventId: event.id,
+        couponCode: code,
+        lines: lineItems.map((li) => ({
+          ticketTypeId: li.ticketTypeId,
+          quantity: li.quantity,
+        })),
+        buyerEmail: email.trim() || undefined,
+      });
+      if (!result.valid) {
+        setAppliedCoupon(null);
+        setCouponError(
+          result.message || "This coupon can't be used on this order."
+        );
+        return;
+      }
+      setAppliedCoupon(result);
+      setCouponInput(result.code);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to preview coupon";
+      setCouponError(message);
+      setAppliedCoupon(null);
+    } finally {
+      setCouponApplying(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+    setCouponInput("");
+  };
+
   const bannerUrl = getEventBannerUrl(event.bannerUrl);
   const placeholderUrl = generatePlaceholderImage(event.title);
 
@@ -187,7 +253,7 @@ export function CheckoutExperience({
       }
     }
     setStep("buyer");
-    saveCheckoutDraft({ eventId: event.id, qty, step: "buyer", guestMode });
+    saveCheckoutDraft({ eventId: event.id, qty, step: "buyer" });
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -198,8 +264,8 @@ export function CheckoutExperience({
       setStep("tickets");
       return;
     }
-    if (!signedIn && guestMode !== true) {
-      setError("Choose guest checkout, or sign in / create an account to continue.");
+    if (!signedIn) {
+      setError("Sign in or create an account to continue to payment.");
       return;
     }
     if (!name.trim() || !email.trim()) {
@@ -209,10 +275,6 @@ export function CheckoutExperience({
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
     if (!emailOk) {
       setError("Enter a valid email.");
-      return;
-    }
-    if (!signedIn && notifyWhatsapp && !whatsappDigitsOk(phone)) {
-      setError("Enter a valid mobile number for WhatsApp (at least 10 digits).");
       return;
     }
 
@@ -236,13 +298,7 @@ export function CheckoutExperience({
       }
     }
 
-    const ticketDelivery =
-      signedIn
-        ? "account"
-        : notifyWhatsapp && phone.trim()
-          ? "email_and_whatsapp"
-          : "email";
-    const guestCheckout = !signedIn;
+    const ticketDelivery = "account" as const;
 
     setSubmitting(true);
     try {
@@ -260,13 +316,17 @@ export function CheckoutExperience({
             buyerName: name.trim(),
             buyerEmail: email.trim(),
             buyerPhone: phone.trim() || undefined,
+            couponCode: appliedCoupon?.valid ? appliedCoupon.code : undefined,
           }),
         });
         const data = (await res.json().catch(() => ({}))) as {
           message?: string | string[];
           orderId?: string;
           reference?: string;
-          authorizationUrl?: string;
+          authorizationUrl?: string | null;
+          status?: "PAID" | "AUTH_REQUIRED";
+          discountCents?: number;
+          amountCents?: number;
         };
         if (!res.ok) {
           const msg = Array.isArray(data.message)
@@ -275,11 +335,69 @@ export function CheckoutExperience({
           setError(msg);
           return;
         }
-        if (!data.authorizationUrl) {
-          setError("Could not start payment.");
+
+        // 100%-off coupon: server skipped Paystack and finalized the
+        // order. Drop the buyer straight onto the confirmation page.
+        if (data.status === "PAID" || !data.authorizationUrl) {
+          if (data.status !== "PAID") {
+            setError("Could not start payment.");
+            return;
+          }
+          if (typeof window !== "undefined") {
+            const paidDiscount =
+              typeof data.discountCents === "number" && data.discountCents > 0
+                ? data.discountCents
+                : appliedCoupon?.valid
+                  ? appliedCoupon.discountCents
+                  : 0;
+            const paidTotal =
+              typeof data.amountCents === "number"
+                ? data.amountCents
+                : Math.max(0, subtotal - paidDiscount);
+            const paid: StoredOrder = {
+              orderId: data.orderId || "",
+              createdAt: new Date().toISOString(),
+              eventId: event.id,
+              eventSlug: event.slug,
+              eventTitle: event.title,
+              buyerName: name.trim(),
+              buyerEmail: email.trim(),
+              buyerPhone: phone.trim() || undefined,
+              lineItems,
+              totalCents: paidTotal,
+              currency,
+              subtotalCents: subtotal,
+              ...(paidDiscount > 0 ? { discountCents: paidDiscount } : {}),
+              ...(appliedCoupon?.valid
+                ? {
+                    coupon: {
+                      code: appliedCoupon.code,
+                      discountCents: paidDiscount,
+                    },
+                  }
+                : {}),
+              guestCheckout: false,
+              ticketDelivery: "account",
+            };
+            saveOrderForSession(paid);
+            saveOrderSnapshot(paid);
+            clearCheckoutDraft();
+            router.push(`/orders/${data.orderId}/confirmation`);
+          }
           return;
         }
+
         if (typeof window !== "undefined") {
+          const pendingDiscount =
+            typeof data.discountCents === "number" && data.discountCents > 0
+              ? data.discountCents
+              : appliedCoupon?.valid
+                ? appliedCoupon.discountCents
+                : 0;
+          const pendingTotal =
+            typeof data.amountCents === "number"
+              ? data.amountCents
+              : Math.max(0, subtotal - pendingDiscount);
           const pending: StoredOrder = {
             orderId: data.orderId || "",
             createdAt: new Date().toISOString(),
@@ -290,8 +408,18 @@ export function CheckoutExperience({
             buyerEmail: email.trim(),
             buyerPhone: phone.trim() || undefined,
             lineItems,
-            totalCents: subtotal,
+            totalCents: pendingTotal,
             currency,
+            subtotalCents: subtotal,
+            ...(pendingDiscount > 0 ? { discountCents: pendingDiscount } : {}),
+            ...(appliedCoupon?.valid
+              ? {
+                  coupon: {
+                    code: appliedCoupon.code,
+                    discountCents: pendingDiscount,
+                  },
+                }
+              : {}),
             guestCheckout: false,
             ticketDelivery: "account",
           };
@@ -302,25 +430,43 @@ export function CheckoutExperience({
         return;
       }
 
-      const orderId = crypto.randomUUID();
-      const snapshot: StoredOrder = {
-        orderId,
-        createdAt: new Date().toISOString(),
-        eventId: event.id,
-        eventSlug: event.slug,
-        eventTitle: event.title,
-        buyerName: name.trim(),
-        buyerEmail: email.trim(),
-        buyerPhone: phone.trim() || undefined,
-        lineItems,
-        totalCents: subtotal,
-        currency,
-        guestCheckout,
-        ticketDelivery,
-      };
-      saveOrderSnapshot(snapshot);
-      clearCheckoutDraft();
-      router.push(`/orders/${orderId}/confirmation`);
+      if (!isApiCheckoutEnabled()) {
+        const orderId = crypto.randomUUID();
+        const demoDiscount = appliedCoupon?.valid
+          ? appliedCoupon.discountCents
+          : 0;
+        const snapshot: StoredOrder = {
+          orderId,
+          createdAt: new Date().toISOString(),
+          eventId: event.id,
+          eventSlug: event.slug,
+          eventTitle: event.title,
+          buyerName: name.trim(),
+          buyerEmail: email.trim(),
+          buyerPhone: phone.trim() || undefined,
+          lineItems,
+          totalCents: Math.max(0, subtotal - demoDiscount),
+          currency,
+          subtotalCents: subtotal,
+          ...(demoDiscount > 0 ? { discountCents: demoDiscount } : {}),
+          ...(appliedCoupon?.valid
+            ? {
+                coupon: {
+                  code: appliedCoupon.code,
+                  discountCents: demoDiscount,
+                },
+              }
+            : {}),
+          guestCheckout: false,
+          ticketDelivery,
+        };
+        saveOrderSnapshot(snapshot);
+        clearCheckoutDraft();
+        router.push(`/orders/${orderId}/confirmation`);
+        return;
+      }
+
+      setError("Could not start checkout. Check that API checkout is configured.");
     } finally {
       setSubmitting(false);
     }
@@ -399,24 +545,23 @@ export function CheckoutExperience({
         <p className="text-muted mt-2 max-w-xl">
           {step === "tickets" ? (
             <>
-              Demo checkout: no card or wallet is charged. Choose how you want to receive passes—signed-in
-              buyers can use <strong>My tickets</strong>; guests get email / WhatsApp details in production
-              and instant QR on this device in fallback mode.
+              {isApiCheckoutEnabled()
+                ? "You need a signed-in account to pay. Pick your tickets, then sign in or create an account on the next step before Paystack."
+                : "Local demo mode: no card is charged. Sign in so passes can be tied to My tickets, or complete in-browser demo passes after you authenticate."}
             </>
           ) : (
             <>
               {signedIn ? (
                 <>
-                  Signed in—confirm the attendee name and email on the passes.{" "}
+                  Confirm the attendee name and email on the passes.{" "}
                   {isApiCheckoutEnabled()
-                    ? "Your order will sync to your account."
-                    : "Demo mode still stores QR passes in this browser."}
+                    ? "Your order will sync to this account and you will be redirected to pay."
+                    : "Demo mode stores QR passes in this browser for this account."}
                 </>
               ) : (
                 <>
-                  Choose <strong>account checkout</strong> (sign in or register) to save passes to My tickets,
-                  or <strong>guest checkout</strong> to continue with email and optional WhatsApp—fallback mode issues
-                  QR passes on this device right away.
+                  Sign in or create an account to continue—same flow as major ticketing sites. Your basket is saved in
+                  this browser until you return.
                 </>
               )}
             </>
@@ -454,97 +599,119 @@ export function CheckoutExperience({
                 ← Edit tickets
               </button>
 
-              {!signedIn && guestMode === null && (
+              {!signedIn && (
                 <section className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-6">
-                  <h2 className="font-display text-lg font-semibold text-foreground">How do you want to continue?</h2>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setError(null);
-                        setGuestMode(false);
-                        saveCheckoutDraft({ eventId: event.id, qty, step: "buyer", guestMode: false });
-                      }}
-                      className="rounded-[var(--radius-card)] border border-border bg-background p-5 text-left transition-colors hover:border-primary/50 hover:bg-wash/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                  <h2 className="font-display text-lg font-semibold text-foreground">Sign in to continue</h2>
+                  <p className="text-sm text-muted leading-relaxed max-w-xl">
+                    Checkout is available to signed-in buyers only. Use the same email you want on your tickets—you
+                    will return to this page with your quantities saved.
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <Link
+                      href={`/login${buildAuthQuery({ next: checkoutReturnPath, intent: "attend" })}`}
+                      onClick={() => saveCheckoutDraft({ eventId: event.id, qty, step: "buyer" })}
+                      className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-4 text-sm font-semibold text-foreground shadow-sm transition-colors hover:border-primary/45 hover:bg-primary/5"
                     >
-                      <p className="font-semibold text-foreground">Account checkout</p>
-                      <p className="mt-2 text-sm text-muted leading-relaxed">
-                        Sign in or create a free account. Passes show up under My tickets and stay with your profile
-                        when API checkout is enabled.
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setError(null);
-                        setGuestMode(true);
-                        saveCheckoutDraft({ eventId: event.id, qty, step: "buyer", guestMode: true });
-                      }}
-                      className="rounded-[var(--radius-card)] border border-border bg-background p-5 text-left transition-colors hover:border-primary/50 hover:bg-wash/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                      Sign in
+                    </Link>
+                    <Link
+                      href={`/register${buildAuthQuery({ next: checkoutReturnPath, intent: "attend" })}`}
+                      onClick={() => saveCheckoutDraft({ eventId: event.id, qty, step: "buyer" })}
+                      className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-transparent bg-primary px-4 text-sm font-semibold text-white shadow-[var(--btn-shadow-primary)] transition-colors hover:bg-primary-dark"
                     >
-                      <p className="font-semibold text-foreground">Guest checkout</p>
-                      <p className="mt-2 text-sm text-muted leading-relaxed">
-                        No account. In production we&apos;d email your receipt and links; you can optionally add
-                        WhatsApp for the same details.
-                      </p>
-                    </button>
+                      Create account
+                    </Link>
                   </div>
                 </section>
               )}
 
-              {!signedIn && guestMode === false && (
-                <section className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-4">
-                  <h2 className="font-display text-lg font-semibold text-foreground">Sign in or create an account</h2>
-                  <div className="space-y-4 rounded-[var(--radius-card)] border border-dashed border-border bg-background/60 p-5">
-                    <p className="text-sm text-muted leading-relaxed">
-                      Use the same email you&apos;ll use for tickets. After you sign in or register, you&apos;ll land
-                      back here with your basket restored.
+              {signedIn && (
+                <section
+                  aria-labelledby="coupon-section-title"
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-4"
+                >
+                  <div>
+                    <h2
+                      id="coupon-section-title"
+                      className="font-display text-lg font-semibold text-foreground"
+                    >
+                      Have a code?
+                    </h2>
+                    <p className="mt-1 text-sm text-muted">
+                      Enter your promo code to apply a discount before payment.
                     </p>
-                    <div className="flex flex-wrap gap-3">
-                      <Link
-                        href={`/login${buildAuthQuery({ next: checkoutReturnPath, intent: "attend" })}`}
-                        onClick={() =>
-                          saveCheckoutDraft({ eventId: event.id, qty, step: "buyer", guestMode: false })
-                        }
-                        className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-4 text-sm font-semibold text-foreground shadow-sm transition-colors hover:border-primary/45 hover:bg-primary/5"
-                      >
-                        Sign in
-                      </Link>
-                      <Link
-                        href={`/register${buildAuthQuery({ next: checkoutReturnPath, intent: "attend" })}`}
-                        onClick={() =>
-                          saveCheckoutDraft({ eventId: event.id, qty, step: "buyer", guestMode: false })
-                        }
-                        className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-transparent bg-primary px-4 text-sm font-semibold text-white shadow-[var(--btn-shadow-primary)] transition-colors hover:bg-primary-dark"
-                      >
-                        Create account
-                      </Link>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setGuestMode(null);
-                        saveCheckoutDraft({ eventId: event.id, qty, step: "buyer", guestMode: null });
-                      }}
-                      className="text-sm font-medium text-muted hover:text-primary"
-                    >
-                      ← Other options
-                    </button>
                   </div>
-                </section>
-              )}
 
-              {(signedIn || guestMode === true) && (
-                <section className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-4">
-                  <h2 className="font-display text-lg font-semibold text-foreground">
-                    {signedIn ? "Attendee details" : "Guest details"}
-                  </h2>
-                  {signedIn && (
-                    <p className="text-sm text-muted">
-                      Completing as <span className="font-medium text-foreground">{email}</span>
-                      {isApiCheckoutEnabled() ? " — order will be tied to this account." : null}
+                  {appliedCoupon?.valid ? (
+                    <div className="rounded-[var(--radius-card)] border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-foreground">
+                            <span className="font-mono">{appliedCoupon.code}</span>{" "}
+                            applied
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted">
+                            You save {(discountCents / 100).toFixed(0)}{" "}
+                            {appliedCoupon.currency || currency}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={removeCoupon}
+                          className="text-xs font-medium text-muted underline hover:text-foreground"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        value={couponInput}
+                        onChange={(e) =>
+                          setCouponInput(e.target.value.toUpperCase())
+                        }
+                        placeholder="e.g. EARLY2026"
+                        maxLength={64}
+                        spellCheck={false}
+                        autoCapitalize="characters"
+                        className="flex-1 rounded-[var(--radius-card)] border border-border bg-background px-4 py-3 text-sm font-mono uppercase tracking-wide focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void applyCoupon();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void applyCoupon()}
+                        disabled={couponApplying || !couponInput.trim()}
+                        className="rounded-[var(--radius-button)] border border-border bg-surface px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/40 hover:bg-wash disabled:opacity-50"
+                      >
+                        {couponApplying ? "Applying…" : "Apply"}
+                      </button>
+                    </div>
+                  )}
+
+                  {couponError && (
+                    <p
+                      role="alert"
+                      className="text-sm text-primary-dark"
+                    >
+                      {couponError}
                     </p>
                   )}
+                </section>
+              )}
+
+              {signedIn && (
+                <section className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-4">
+                  <h2 className="font-display text-lg font-semibold text-foreground">Attendee details</h2>
+                  <p className="text-sm text-muted">
+                    Completing as <span className="font-medium text-foreground">{email}</span>
+                    {isApiCheckoutEnabled() ? " — order will be tied to this account." : null}
+                  </p>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <label className="block sm:col-span-2">
                       <span className="text-xs font-semibold uppercase tracking-wider text-muted">
@@ -567,80 +734,24 @@ export function CheckoutExperience({
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        readOnly={signedIn}
+                        readOnly
                         className="mt-2 w-full rounded-[var(--radius-card)] border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 read-only:opacity-80"
                         autoComplete="email"
                       />
                     </label>
-                    {!signedIn && (
-                      <div className="sm:col-span-2 space-y-3">
-                        <label className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-card)] border border-border bg-background/80 p-4">
-                          <input
-                            type="checkbox"
-                            checked={notifyWhatsapp}
-                            onChange={(e) => setNotifyWhatsapp(e.target.checked)}
-                            className="mt-1 size-4 rounded border-border text-primary focus:ring-primary/30"
-                          />
-                          <span>
-                            <span className="text-sm font-medium text-foreground">
-                              Also send ticket details to WhatsApp
-                            </span>
-                            <span className="mt-1 block text-xs text-muted leading-relaxed">
-                              Demo only shows this on the confirmation page; production would message this number.
-                            </span>
-                          </span>
-                        </label>
-                        <label className="block">
-                          <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-                            Mobile for WhatsApp {notifyWhatsapp ? "(required)" : "(optional)"}
-                          </span>
-                          <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            placeholder="+254 …"
-                            className="mt-2 w-full rounded-[var(--radius-card)] border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                            autoComplete="tel"
-                          />
-                        </label>
-                      </div>
-                    )}
-                    {signedIn && (
-                      <label className="block sm:col-span-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted">
-                          Phone (optional)
-                        </span>
-                        <input
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="mt-2 w-full rounded-[var(--radius-card)] border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                          autoComplete="tel"
-                        />
-                      </label>
-                    )}
+                    <label className="block sm:col-span-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                        Phone (optional)
+                      </span>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="mt-2 w-full rounded-[var(--radius-card)] border border-border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        autoComplete="tel"
+                      />
+                    </label>
                   </div>
-                  {!signedIn && guestMode === true && (
-                    <>
-                      {isApiCheckoutEnabled() && (
-                        <p className="text-xs text-muted leading-relaxed">
-                          Server-backed checkout is available to signed-in buyers only. As a guest, fallback mode still
-                          creates your QR passes in this browser right away.
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGuestMode(null);
-                          setNotifyWhatsapp(false);
-                          saveCheckoutDraft({ eventId: event.id, qty, step: "buyer", guestMode: null });
-                        }}
-                        className="text-sm font-medium text-muted hover:text-primary"
-                      >
-                        ← Other options
-                      </button>
-                    </>
-                  )}
                 </section>
               )}
 
@@ -652,22 +763,20 @@ export function CheckoutExperience({
 
               <ArrowButton
                 type="submit"
-                disabled={
-                  submitting ||
-                  tiers.length === 0 ||
-                  (!signedIn && guestMode !== true)
-                }
+                disabled={submitting || tiers.length === 0 || !signedIn}
                 className="w-full sm:w-auto"
               >
                 {submitting
                   ? "Processing…"
-                  : isApiCheckoutEnabled() && signedIn
-                    ? `Proceed to Pay — ${subtotal / 100} ${currency}`
-                    : subtotal === 0
-                      ? "Complete checkout — free pass"
-                      : `Complete checkout — ${subtotal / 100} ${currency}`}
+                  : dueToday === 0 && appliedCoupon?.valid
+                    ? "Complete checkout — free with coupon"
+                    : isApiCheckoutEnabled() && signedIn
+                      ? `Proceed to Pay — ${dueToday / 100} ${currency}`
+                      : dueToday === 0
+                        ? "Complete checkout — free pass"
+                        : `Complete checkout — ${dueToday / 100} ${currency}`}
               </ArrowButton>
-              {(signedIn || guestMode === true) && (
+              {signedIn && (
                 <p className="text-xs text-muted max-w-md">
                   By continuing you agree to our{" "}
                   <Link href="/terms" className="underline hover:text-foreground">
@@ -728,6 +837,19 @@ export function CheckoutExperience({
                 {subtotal / 100} {currency}
               </dd>
             </div>
+            {appliedCoupon?.valid && discountCents > 0 && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-foreground">
+                  Discount{" "}
+                  <span className="font-mono text-xs text-muted">
+                    ({appliedCoupon.code})
+                  </span>
+                </dt>
+                <dd className="font-medium text-emerald-500 tabular-nums">
+                  −{discountCents / 100} {currency}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4">
               <dt>Fees</dt>
               <dd className="text-muted">Calculated at payment</dd>
@@ -735,7 +857,7 @@ export function CheckoutExperience({
             <div className="flex justify-between gap-4 pt-2 border-t border-border text-foreground font-semibold">
               <dt>Due today</dt>
               <dd className="tabular-nums">
-                {subtotal / 100} {currency}
+                {dueToday / 100} {currency}
               </dd>
             </div>
           </dl>

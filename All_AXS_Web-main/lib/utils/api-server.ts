@@ -18,7 +18,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:8080";
 
-function useDemoEvents(): boolean {
+function isDemoEventsMode(): boolean {
   const flag = process.env.NEXT_PUBLIC_USE_DEMO_EVENTS;
   if (flag === "false") return false;
   if (flag === "true") return true;
@@ -80,7 +80,7 @@ export async function fetchPublicEvents(options: {
   dateTo?: string;
   city?: string;
 }): Promise<PublicEventsResponse> {
-  if (useDemoEvents()) {
+  if (isDemoEventsMode()) {
     return filterDemoPublicEvents(options);
   }
 
@@ -113,7 +113,7 @@ export async function fetchPublicEvents(options: {
  * Fetch event by slug
  */
 export async function fetchEventBySlug(slug: string): Promise<PublicEvent> {
-  if (useDemoEvents()) {
+  if (isDemoEventsMode()) {
     const found = DEMO_PUBLIC_EVENTS.find((e) => e.slug === slug);
     if (!found) {
       throw new Error("Event not found");
@@ -144,7 +144,7 @@ export async function fetchEventBySlug(slug: string): Promise<PublicEvent> {
  * Get event slug by ID (for redirects)
  */
 export async function getEventSlugById(id: string): Promise<string> {
-  if (useDemoEvents()) {
+  if (isDemoEventsMode()) {
     const found = DEMO_PUBLIC_EVENTS.find((e) => e.id === id);
     if (!found) {
       throw new Error("Event not found");

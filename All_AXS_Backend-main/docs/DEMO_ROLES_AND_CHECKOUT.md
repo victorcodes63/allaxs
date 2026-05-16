@@ -86,3 +86,19 @@ Set:
 - `NEXT_PUBLIC_USE_API_CHECKOUT=true` — checkout + tickets use the proxied API instead of session-only stubs.
 
 See the web `README.md` “Demo attendee journey (API checkout)” section.
+
+## Platform fees (Phase 1)
+
+Optional env vars on the API (defaults keep `feesCents` at **0**):
+
+| Variable | Meaning |
+| -------- | ------- |
+| `PLATFORM_FEE_BPS` | Basis points on the order subtotal (e.g. `500` = 5%). |
+| `PLATFORM_FEE_FIXED_CENTS` | Flat fee per order (added to the percent part). |
+| `PLATFORM_FEE_MAX_CENTS` | Cap on the computed fee (after percent + fixed). |
+
+Buyer still pays the ticket subtotal (`orders.amountCents`). `orders.feesCents` is the platform share; organizer-facing **net** is `amountCents − feesCents` (shown in organizer sales APIs and the web hub).
+
+## Admin refunds
+
+`POST /admin/orders/:id/refund` calls Paystack’s refund API for non-demo orders (requires `PAYSTACK_SECRET_KEY`), then voids tickets, restores `ticket_types.quantity_sold`, and sets order + payment to **REFUNDED**. Orders whose `reference` starts with `demo_` skip Paystack. Partial refund amounts are rejected until supported end-to-end.

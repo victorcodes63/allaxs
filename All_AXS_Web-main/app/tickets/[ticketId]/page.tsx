@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import QRCode from "react-qr-code";
 import { findTicketById, loadOrderSnapshot, type StoredTicket } from "@/lib/checkout-storage";
-import { buildTicketQrPayload } from "@/lib/ticket-qr";
+import { buildTicketQrUrl } from "@/lib/ticket-qr";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
 import { normalizeApiTicketPayload } from "@/lib/tickets-api";
 import type { PublicEvent } from "@/lib/types/public-event";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
+import { downloadTicketPdf } from "@/lib/ticket-pdf";
 
 function formatEventWhen(iso: string): string {
   try {
@@ -63,6 +64,13 @@ export default function TicketDetailPage() {
   const [ticket, setTicket] = useState<StoredTicket | null | undefined>(undefined);
   const [eventDetails, setEventDetails] = useState<PublicEvent | null>(null);
   const [eventLoading, setEventLoading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") setOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,9 +147,9 @@ export default function TicketDetailPage() {
   }, [ticket]);
 
   const qrValue = useMemo(() => {
-    if (ticket === undefined || ticket === null) return "";
-    return buildTicketQrPayload(ticket);
-  }, [ticket]);
+    if (ticket === undefined || ticket === null || !origin) return "";
+    return buildTicketQrUrl(origin, ticket);
+  }, [ticket, origin]);
 
   if (ticket === undefined) {
     return (
@@ -215,6 +223,34 @@ export default function TicketDetailPage() {
   const organizerName = eventDetails?.organizer?.orgName;
   const formatChip = eventDetails?.type ? eventTypeLabel(eventDetails.type) : null;
   const hasEventMeta = Boolean(whenLine || venueLine || organizerName);
+
+  const downloadPdf = async () => {
+    if (!ticket || !qrValue) return;
+    if (typeof window === "undefined") return;
+    setPdfError(null);
+    setDownloadingPdf(true);
+    try {
+      await downloadTicketPdf(
+        {
+          headline,
+          tierName: ticket.tierName,
+          attendeeEmail: ticket.attendeeEmail,
+          ticketId: ticket.id,
+          issuedAtLabel: issued,
+          qrPayload: qrValue,
+          whenLine,
+          venueLine,
+          organizerName: organizerName ?? null,
+          formatChip,
+        },
+        { origin: window.location.origin }
+      );
+    } catch {
+      setPdfError("Could not generate PDF right now. Please try again.");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   return (
     <div className="axs-content-inner mx-auto max-w-2xl space-y-5 pb-16 pt-2 sm:space-y-6 sm:pb-20 md:pt-4">
@@ -294,12 +330,16 @@ export default function TicketDetailPage() {
                 className="mt-3 rounded-[var(--radius-card)] bg-gradient-to-b from-white to-neutral-50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_0_0_1px_rgba(0,0,0,0.06),0_8px_28px_-12px_rgba(0,0,0,0.15)] ring-1 ring-black/[0.06] sm:p-5"
                 aria-label="Ticket QR code"
               >
-                <QRCode value={qrValue} size={220} level="M" className="h-auto w-full" />
+                <QRCode
+                  value={qrValue}
+                  size={220}
+                  level="M"
+                  className="h-auto w-full"
+                  title="Ticket entry QR code"
+                />
               </div>
               <p className="mt-4 text-xs leading-relaxed text-muted">
-                {isApiCheckoutEnabled()
-                  ? "This QR includes a server-issued nonce and signature for demo check-in."
-                  : "Demo mode: payload is JSON your scanners can read for testing."}
+                Scan with your phone camera to open your pass, or show this code at the door for staff to verify.
               </p>
             </div>
           </section>
@@ -324,6 +364,14 @@ export default function TicketDetailPage() {
       </article>
 
       <div className="flex flex-col items-stretch gap-3 sm:items-center sm:flex-row sm:justify-center">
+        <button
+          type="button"
+          onClick={() => void downloadPdf()}
+          disabled={downloadingPdf}
+          className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-5 text-sm font-semibold text-foreground transition-colors hover:border-primary/45 disabled:opacity-70"
+        >
+          {downloadingPdf ? "Generating PDF..." : "Download PDF ticket"}
+        </button>
         {eventSlugForLink ? (
           <ArrowCtaLink
             href={`/e/${eventSlugForLink}`}
@@ -338,6 +386,7 @@ export default function TicketDetailPage() {
           </p>
         )}
       </div>
+      {pdfError ? <p className="text-center text-sm text-primary">{pdfError}</p> : null}
     </div>
   );
 }

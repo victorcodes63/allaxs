@@ -8,6 +8,12 @@ export type OrganizerProfileDisplay = {
   payoutMethod?: string;
   taxId?: string;
   verified?: boolean;
+  payoutProfile?: {
+    isComplete: boolean;
+    missingItems: string[];
+    adminVerified: boolean;
+    readyForSettlement: boolean;
+  };
 };
 
 function str(v: unknown): string | undefined {
@@ -44,6 +50,20 @@ export function normalizeOrganizerProfilePayload(data: unknown): OrganizerProfil
 
   if (!orgName || !supportEmail) return null;
 
+  const payoutProfileRaw = o.payoutProfile;
+  let payoutProfile: OrganizerProfileDisplay["payoutProfile"];
+  if (payoutProfileRaw && typeof payoutProfileRaw === "object") {
+    const pp = payoutProfileRaw as Record<string, unknown>;
+    payoutProfile = {
+      isComplete: pp.isComplete === true,
+      missingItems: Array.isArray(pp.missingItems)
+        ? (pp.missingItems as unknown[]).map((x) => String(x))
+        : [],
+      adminVerified: pp.adminVerified === true,
+      readyForSettlement: pp.readyForSettlement === true,
+    };
+  }
+
   return {
     orgName,
     legalName: str(o.legalName) ?? str(o.legal_name),
@@ -53,5 +73,6 @@ export function normalizeOrganizerProfilePayload(data: unknown): OrganizerProfil
     payoutMethod: str(o.payoutMethod) ?? str(o.payout_method),
     taxId: str(o.taxId) ?? str(o.tax_id),
     verified: typeof o.verified === "boolean" ? o.verified : undefined,
+    payoutProfile,
   };
 }

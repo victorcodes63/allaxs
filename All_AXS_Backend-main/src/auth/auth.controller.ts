@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
   Post,
+  Query,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -17,8 +18,10 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from './decorators/current-user.decorator';
 import type { CurrentUser } from './decorators/current-user.decorator';
@@ -130,6 +133,32 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Get('reset-password/validate')
+  async validateResetPasswordToken(@Query('token') token: string) {
+    if (!token) {
+      throw new UnauthorizedException('Verification token is required');
+    }
+    await this.authService.validateResetPasswordToken(token);
+    return { message: 'Token is valid.' };
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @GetUser() user: CurrentUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    await this.authService.changePassword(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    return { message: 'Password changed successfully.' };
+  }
+
+  @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
@@ -138,10 +167,11 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
-  @Post('verify-email')
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
+  @Post('google')
   @HttpCode(HttpStatus.OK)
-  async verifyEmail(@Body() dto: VerifyEmailDto) {
-    return this.authService.verifyEmail(dto.token);
+  async googleAuth(@Body() dto: GoogleAuthDto, @Req() req: Request) {
+    const metadata = this.extractMetadata(req);
+    return this.authService.signInWithGoogle(dto.credential, metadata);
   }
 }

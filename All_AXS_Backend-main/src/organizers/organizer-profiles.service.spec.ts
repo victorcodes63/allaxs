@@ -21,7 +21,14 @@ describe('OrganizerProfilesService', () => {
     id: 'profile-id',
     userId: 'user-id',
     orgName: 'Test Org',
+    legalName: 'Test Org Legal',
     supportEmail: 'support@test.org',
+    supportPhone: '+254712345678',
+    payoutMethod: PayoutMethod.BANK_ACCOUNT,
+    bankName: 'Bank',
+    bankAccountName: 'Acct Name',
+    bankAccountNumber: '123456789',
+    taxId: 'TAX123456',
     verified: false,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -88,9 +95,14 @@ describe('OrganizerProfilesService', () => {
   describe('upsertForUser', () => {
     const createDto = {
       orgName: 'New Org',
+      legalName: 'New Org Legal Ltd',
       supportEmail: 'support@neworg.com',
+      supportPhone: '+254798765432',
+      taxId: 'PIN987654',
       payoutMethod: PayoutMethod.BANK_ACCOUNT,
       bankName: 'Test Bank',
+      bankAccountName: 'New Org',
+      bankAccountNumber: '9988776655',
     };
 
     it('should create new profile and add ORGANIZER role to user', async () => {
@@ -115,7 +127,15 @@ describe('OrganizerProfilesService', () => {
       expect(organizerProfileRepository.findOne).toHaveBeenCalled();
       expect(organizerProfileRepository.create).toHaveBeenCalledWith({
         userId: 'user-id',
-        ...createDto,
+        orgName: 'New Org',
+        legalName: 'New Org Legal Ltd',
+        supportEmail: 'support@neworg.com',
+        supportPhone: '+254798765432',
+        taxId: 'PIN987654',
+        payoutMethod: PayoutMethod.BANK_ACCOUNT,
+        bankName: 'Test Bank',
+        bankAccountName: 'New Org',
+        bankAccountNumber: '9988776655',
       });
       expect(userRepository.findOne).toHaveBeenCalledWith({
         where: { id: 'user-id' },
@@ -137,7 +157,14 @@ describe('OrganizerProfilesService', () => {
 
       const result = await service.upsertForUser('user-id', {
         orgName: 'Updated Org',
+        legalName: 'Test Org Legal',
         supportEmail: 'support@test.org',
+        supportPhone: '+254712345678',
+        taxId: 'TAX123456',
+        payoutMethod: PayoutMethod.BANK_ACCOUNT,
+        bankName: 'Bank',
+        bankAccountName: 'Acct Name',
+        bankAccountNumber: '123456789',
       });
 
       expect(organizerProfileRepository.findOne).toHaveBeenCalled();
@@ -195,6 +222,7 @@ describe('OrganizerProfilesService', () => {
       organizerProfileRepository.findOne.mockResolvedValue(null);
       organizerProfileRepository.create.mockReturnValue({
         ...mockProfile,
+        ...dtoWithInstructions,
         payoutDetails: { instructions: 'Send payment to account X' },
       } as OrganizerProfile);
       organizerProfileRepository.save.mockResolvedValue({
@@ -213,9 +241,14 @@ describe('OrganizerProfilesService', () => {
       expect(organizerProfileRepository.create).toHaveBeenCalledWith({
         userId: 'user-id',
         orgName: 'New Org',
+        legalName: 'New Org Legal Ltd',
         supportEmail: 'support@neworg.com',
+        supportPhone: '+254798765432',
+        taxId: 'PIN987654',
         payoutMethod: PayoutMethod.BANK_ACCOUNT,
         bankName: 'Test Bank',
+        bankAccountName: 'New Org',
+        bankAccountNumber: '9988776655',
         payoutDetails: { instructions: 'Send payment to account X' },
       });
     });
@@ -238,7 +271,14 @@ describe('OrganizerProfilesService', () => {
 
       const result = await service.upsertForUser('user-id', {
         orgName: 'Updated Org',
+        legalName: 'Test Org Legal',
         supportEmail: 'support@test.org',
+        supportPhone: '+254712345678',
+        taxId: 'TAX123456',
+        payoutMethod: PayoutMethod.BANK_ACCOUNT,
+        bankName: 'Bank',
+        bankAccountName: 'Acct Name',
+        bankAccountNumber: '123456789',
         payoutInstructions: 'New payment instructions',
       });
 

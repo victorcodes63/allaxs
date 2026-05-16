@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import axios from "axios";
+import { normalizeWebUserRoles } from "@/lib/auth/hub-routing";
 
 export interface AuthUser {
   id: string;
@@ -30,21 +31,33 @@ export interface AuthState {
 const AuthContext = createContext<AuthState | null>(null);
 
 async function fetchAuthUser(): Promise<AuthUser | null> {
+  const coerce = (raw: unknown): AuthUser | null => {
+    if (!raw || typeof raw !== "object") return null;
+    const o = raw as Record<string, unknown>;
+    const id =
+      (typeof o.id === "string" && o.id) ||
+      (typeof o.sub === "string" && o.sub) ||
+      "";
+    const email = typeof o.email === "string" ? o.email : "";
+    if (!email && !id) return null;
+    return {
+      id,
+      email,
+      name: typeof o.name === "string" ? o.name : undefined,
+      roles: normalizeWebUserRoles(o.roles),
+    };
+  };
+
   try {
     const response = await axios.get("/api/auth/me");
-    if (response.data?.user) {
-      return response.data.user as AuthUser;
-    }
-    return null;
+    return coerce(response.data?.user);
   } catch (error) {
     if (
       (error as { response?: { status?: number } }).response?.status === 401
     ) {
       try {
         const refreshResponse = await axios.post("/api/auth/refresh");
-        if (refreshResponse.data?.user) {
-          return refreshResponse.data.user as AuthUser;
-        }
+        return coerce(refreshResponse.data?.user);
       } catch {
         return null;
       }

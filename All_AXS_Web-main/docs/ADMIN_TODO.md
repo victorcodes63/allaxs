@@ -107,28 +107,30 @@ audit-logged endpoint. Overview tiles deep-link into the filtered view.
 - [x] New `/admin/orders` route with filters (status, event, organiser,
       date range), search by reference/email, and pagination. Backed by
       new endpoint `GET /admin/orders` (offset-based, max 100 per page).
-- [x] Inline drawer for refund — collect amount + reason, hits
+- [x] Inline drawer for refund — collect reason (optional), hits
       `POST /admin/orders/:id/refund`. Implemented via
-      `components/admin/RefundOrderDialog.tsx` with full-amount default and
-      partial-amount support.
+      `components/admin/RefundOrderDialog.tsx`; refunds are always the full
+      order amount (Paystack full refund only).
 - [x] Surface refund totals on the admin overview dashboard alongside paid
       gross/net. Overview payload extended with `orders.refunded.count` +
       `grossCents`; sales card now has a 4th tile for Refunded gross and
       status counters are clickable.
 - [x] Wire the revenue strip on `/admin/events/[id]` to deep-link into
       `/admin/orders?eventId=...&status=...`.
-- [ ] Trigger provider-side refunds (Paystack etc.) automatically when the
-      admin issues a refund — currently the dialog warns admins to do that
-      manually in the provider dashboard.
+- [x] Trigger provider-side refunds (Paystack) when the admin issues a
+      refund — `OrderRefundService` calls `POST https://api.paystack.co/refund`
+      before voiding tickets and restoring tier inventory. Demo orders
+      (`reference` prefix `demo_`) skip Paystack. Refunds are full order only;
+      admin UI matches (no partial amounts).
 - [ ] Allow undoing an accidental refund (revert to PAID) within a short
       grace period.
 - [x] Bulk-refund selection on the orders list. Backed by
       `lib/hooks/use-selection.ts` (added in Section 3) and
       `components/admin/BulkRefundDialog.tsx`. Hard-capped at
-      `BULK_REFUND_MAX = 20` per batch (refunds are money operations and
-      the provider-side refund is still manual — keep the blast radius
-      tractable). Always issues full refunds per row; the per-row dialog
-      remains for partial refunds. Mixed-currency selections show
+      `BULK_REFUND_MAX = 20` per batch (refunds are money operations — keep
+      the blast radius tractable). Always issues full refunds per row; the
+      per-row dialog is for single-order full refunds with an optional reason.
+      Mixed-currency selections show
       per-currency totals in the confirm step. Result banner reports
       succeeded + failed counts and the list reloads.
 

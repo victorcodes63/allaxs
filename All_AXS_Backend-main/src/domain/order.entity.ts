@@ -5,6 +5,7 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
 } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { OrderStatus } from './enums';
@@ -13,7 +14,9 @@ import { OrderItem } from './order-item.entity';
 import { Payment } from './payment.entity';
 import { Ticket } from './ticket.entity';
 import { Event } from 'src/events/entities/event.entity';
+import { Coupon } from 'src/events/entities/coupon.entity';
 import { PaymentPlan } from './payment-plan.entity';
+import { CouponRedemption } from './coupon-redemption.entity';
 
 @Entity('orders')
 export class Order extends BaseEntity {
@@ -41,6 +44,26 @@ export class Order extends BaseEntity {
 
   @Column({ type: 'integer', default: 0 })
   feesCents!: number;
+
+  /**
+   * Discount in minor units applied at order creation time, locked for
+   * the lifetime of the order. `amountCents` is already net of this
+   * value (buyer-paid total); gross = `amountCents + discountCents`.
+   * See `All_AXS_Web-main/docs/COUPONS_SPEC.md` §4.
+   */
+  @Column({ type: 'integer', default: 0, name: 'discount_cents' })
+  discountCents!: number;
+
+  @Index()
+  @Column({ type: 'uuid', nullable: true, name: 'applied_coupon_id' })
+  appliedCouponId?: string | null;
+
+  @ManyToOne(() => Coupon, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'applied_coupon_id' })
+  appliedCoupon?: Coupon | null;
+
+  @OneToOne(() => CouponRedemption, (r) => r.order)
+  couponRedemption?: CouponRedemption;
 
   @Column({ type: 'char', length: 3, default: 'KES' })
   currency!: string;

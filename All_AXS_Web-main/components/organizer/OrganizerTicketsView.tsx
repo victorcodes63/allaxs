@@ -211,6 +211,11 @@ export function OrganizerTicketsContent(): ReactElement {
               or ticket id. Check guests in at the door or void passes that should not be honoured.
             </p>
             <div className="flex flex-wrap gap-3">
+              <Link href="/organizer/tickets/scan">
+                <Button variant="primary" className="w-auto min-w-[8.5rem]">
+                  Door scan
+                </Button>
+              </Link>
               <Link href="/organizer/sales">
                 <Button variant="secondary" className="w-auto min-w-[8.5rem]">
                   Sales &amp; orders

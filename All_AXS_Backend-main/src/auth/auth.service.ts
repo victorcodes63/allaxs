@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -21,6 +22,7 @@ import {
 } from './services/refresh-token.service';
 import { EmailVerificationService } from './services/email-verification.service';
 import { PasswordResetService } from './services/password-reset.service';
+import { EmailService } from './services/email.service';
 
 export interface AuthTokens {
   accessToken: string;
@@ -48,6 +50,7 @@ export class AuthService {
     private readonly refreshTokenService: RefreshTokenService,
     private readonly emailVerificationService: EmailVerificationService,
     private readonly passwordResetService: PasswordResetService,
+    private readonly emailService: EmailService,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepository: Repository<RefreshToken>,
   ) {}
@@ -107,6 +110,13 @@ export class AuthService {
       );
     }
 
+    const existing = await this.usersService.findByIdOrFail(userId);
+    if (existing.roles?.includes(Role.ADMIN)) {
+      throw new ForbiddenException(
+        'Admin accounts cannot be promoted to organizer via this endpoint.',
+      );
+    }
+
     await this.usersService.addOrganizerRole(userId);
     const user = await this.usersService.findByIdOrFail(userId);
     const tokens = await this.issueTokensForUser(user, metadata);
@@ -161,6 +171,65 @@ export class AuthService {
       },
       tokens,
     };
+  }
+
+  async signInWithGoogle(
+    credential: string,
+    metadata?: TokenMetadata,
+  ): Promise<AuthResponse> {
+    const { email, name } = await this.verifyGoogleIdToken(credential);
+    const user = await this.usersService.upsertGoogleOAuthUser({ email, name });
+    const tokens = await this.issueTokensForUser(user, metadata);
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name || '',
+        roles: user.roles,
+      },
+      tokens,
+    };
+  }
+
+  private async verifyGoogleIdToken(
+    idToken: string,
+  ): Promise<{ email: string; name: string }> {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID')?.trim();
+    if (!clientId) {
+      throw new BadRequestException(
+        'Google sign-in is not configured (GOOGLE_CLIENT_ID).',
+      );
+    }
+    const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
+    let res: Response;
+    try {
+      res = await fetch(url);
+    } catch (e) {
+      this.logger.warn(`Google tokeninfo fetch failed: ${String(e)}`);
+      throw new UnauthorizedException('Unable to verify Google credential');
+    }
+    const data = (await res.json()) as Record<string, string | undefined>;
+    if (!res.ok) {
+      this.logger.warn(`Google tokeninfo error: ${JSON.stringify(data)}`);
+      throw new UnauthorizedException('Invalid Google credential');
+    }
+    if (data.aud !== clientId) {
+      throw new UnauthorizedException('Google credential audience mismatch');
+    }
+    if (data.email_verified !== 'true') {
+      throw new UnauthorizedException('Google email is not verified');
+    }
+    const email = (data.email ?? '').trim().toLowerCase();
+    if (!email) {
+      throw new UnauthorizedException('Google token missing email');
+    }
+    const name =
+      `${data.given_name ?? ''} ${data.family_name ?? ''}`.trim() ||
+      (data.name ?? '').trim() ||
+      email.split('@')[0] ||
+      'User';
+    return { email, name };
   }
 
   async refreshTokens(
@@ -386,21 +455,55 @@ export class AuthService {
    * Validates token, updates password, and revokes all existing sessions
    */
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    // Verify token
     const passwordReset =
       await this.passwordResetService.verifyResetToken(token);
 
-    // Hash new password
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
-    // Update password
     await this.usersService.updatePassword(passwordReset.userId, passwordHash);
 
-    // Mark token as used
     await this.passwordResetService.markTokenAsUsed(token);
 
-    // Revoke all existing sessions for security
     await this.logoutAll(passwordReset.userId);
+
+    const user =
+      passwordReset.user ??
+      (await this.usersService.findByIdOrFail(passwordReset.userId));
+    try {
+      await this.emailService.sendPasswordResetConfirmationEmail(user);
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `Failed to send password reset confirmation to ${user.email}: ${err.message}`,
+        err.stack,
+      );
+    }
+  }
+
+  async validateResetPasswordToken(token: string): Promise<void> {
+    await this.passwordResetService.verifyResetToken(token);
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersService.findByIdOrFail(userId);
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'Password sign-in is not enabled for this account.',
+      );
+    }
+
+    const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!ok) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.usersService.updatePassword(userId, passwordHash);
+    await this.logoutAll(userId);
   }
 
   /**
@@ -442,7 +545,16 @@ export class AuthService {
    * Verify email using a token
    */
   async verifyEmail(token: string): Promise<{ message: string }> {
-    await this.emailVerificationService.verifyEmail(token);
+    const user = await this.emailVerificationService.verifyEmail(token);
+    try {
+      await this.emailService.sendWelcomeEmail(user);
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `Failed to send welcome email to ${user.email}: ${err.message}`,
+        err.stack,
+      );
+    }
     return {
       message: 'Email verified successfully.',
     };

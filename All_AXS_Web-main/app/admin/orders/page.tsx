@@ -218,7 +218,7 @@ function AdminOrdersPageContent() {
     offset,
   ]);
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data]);
   const total = data?.total ?? 0;
   const start = total === 0 ? 0 : offset + 1;
   const end = Math.min(offset + items.length, total);

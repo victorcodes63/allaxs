@@ -22,6 +22,30 @@ import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
 
 type UserStatus = "ACTIVE" | "SUSPENDED";
 
+type AdminPayoutProfileSummary = {
+  isComplete: boolean;
+  missingItems: string[];
+  adminVerified: boolean;
+  readyForSettlement: boolean;
+};
+
+/** Matches `serializeOrganizerProfile` from the backend admin + organizer APIs. */
+type AdminOrganizerProfile = {
+  id: string;
+  userId?: string;
+  orgName: string;
+  legalName: string | null;
+  supportEmail: string | null;
+  supportPhone: string | null;
+  website: string | null;
+  verified: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  payoutMethod?: string | null;
+  taxId?: string | null;
+  payoutProfile?: AdminPayoutProfileSummary | null;
+};
+
 interface AdminUserDetail {
   user: {
     id: string;
@@ -33,16 +57,7 @@ interface AdminUserDetail {
     createdAt: string;
     updatedAt: string;
   };
-  organizerProfile: {
-    id: string;
-    orgName: string;
-    legalName: string | null;
-    supportEmail: string | null;
-    supportPhone: string | null;
-    website: string | null;
-    verified: boolean;
-    createdAt: string;
-  } | null;
+  organizerProfile: AdminOrganizerProfile | null;
   hostedEvents: {
     byStatus: Record<string, number>;
     items: Array<{
@@ -178,6 +193,7 @@ function actionLabel(action: string): string {
     UPDATE_USER_ROLES: "Updated roles",
     UPDATE_USER_STATUS: "Updated status",
     FORCE_USER_LOGOUT: "Forced sign-out",
+    UPDATE_ORGANIZER_VERIFICATION: "Organizer payout verification",
   };
   if (map[action]) return map[action];
   return action
@@ -458,7 +474,12 @@ function AdminUserDetailPageContent() {
               ) : null
             }
           />
-          <OrganizerProfileCard profile={organizerProfile} />
+          <OrganizerProfileCard
+            profile={organizerProfile}
+            onOrganizerProfileUpdated={(next) =>
+              setDetail((d) => (d ? { ...d, organizerProfile: next } : null))
+            }
+          />
 
           <PanelHeader
             title="Hosted events"
@@ -621,12 +642,49 @@ function StatusSummary({ record }: { record: Record<string, number> }) {
 
 function OrganizerProfileCard({
   profile,
+  onOrganizerProfileUpdated,
 }: {
-  profile: AdminUserDetail["organizerProfile"];
+  profile: AdminOrganizerProfile | null;
+  onOrganizerProfileUpdated?: (next: AdminOrganizerProfile) => void;
 }) {
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
   if (!profile) {
     return <EmptyPanel message="This user does not have an organizer profile." />;
   }
+
+  const pp = profile.payoutProfile;
+  const canVerify = typeof onOrganizerProfileUpdated === "function";
+
+  const patchVerification = async (verified: boolean) => {
+    if (!canVerify) return;
+    if (!verified) {
+      const ok = window.confirm(
+        "Revoke organizer payout verification for this host? They will no longer be treated as cleared for settlement until re-verified.",
+      );
+      if (!ok) return;
+    }
+    setVerifyError(null);
+    setVerifyBusy(true);
+    try {
+      const res = await axios.patch<{
+        message?: string;
+        organizerProfile: AdminOrganizerProfile;
+      }>(`/api/admin/organizer-profiles/${profile.id}/verification`, {
+        verified,
+      });
+      onOrganizerProfileUpdated(res.data.organizerProfile);
+    } catch (err) {
+      const message = isAxiosError(err)
+        ? (err.response?.data as { message?: string } | undefined)?.message ||
+          err.message
+        : "Could not update verification.";
+      setVerifyError(message);
+    } finally {
+      setVerifyBusy(false);
+    }
+  };
 
   return (
     <div className="rounded-[var(--radius-panel)] border border-border bg-surface/80 p-3.5 sm:p-4">
@@ -641,18 +699,90 @@ function OrganizerProfileCard({
               : "border-white/10 bg-white/[0.06] text-muted"
           }`}
         >
-          {profile.verified ? "verified" : "unverified"}
+          {profile.verified ? "Payout verified" : "Payout not verified"}
         </span>
       </div>
       {profile.legalName ? (
         <p className="mt-1 text-sm text-muted">{profile.legalName}</p>
       ) : null}
+
+      {pp ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span
+            className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+              pp.isComplete
+                ? "border-emerald-400/25 bg-emerald-500/12 text-emerald-100"
+                : "border-amber-400/25 bg-amber-500/12 text-amber-100"
+            }`}
+          >
+            Profile form {pp.isComplete ? "complete" : "incomplete"}
+          </span>
+          <span
+            className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+              pp.readyForSettlement
+                ? "border-emerald-400/25 bg-emerald-500/12 text-emerald-100"
+                : "border-white/10 bg-white/[0.06] text-muted"
+            }`}
+          >
+            {pp.readyForSettlement ? "Ready for settlement" : "Not ready for settlement"}
+          </span>
+        </div>
+      ) : null}
+
+      {pp && !pp.isComplete && pp.missingItems.length > 0 ? (
+        <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-50/95">
+          <p className="font-semibold uppercase tracking-wide text-amber-100">Missing for completeness</p>
+          <ul className="mt-1.5 list-inside list-disc space-y-0.5">
+            {pp.missingItems.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
         <InfoItem label="Support email" value={profile.supportEmail} />
         <InfoItem label="Support phone" value={profile.supportPhone} />
         <InfoItem label="Website" value={profile.website} />
+        {profile.taxId ? <InfoItem label="Tax ID" value={profile.taxId} /> : null}
+        {profile.payoutMethod ? (
+          <InfoItem
+            label="Payout method"
+            value={profile.payoutMethod.replace(/_/g, " ")}
+          />
+        ) : null}
         <InfoItem label="Created" value={formatDate(profile.createdAt)} />
       </dl>
+
+      {verifyError ? (
+        <p className="mt-3 text-sm text-primary" role="alert">
+          {verifyError}
+        </p>
+      ) : null}
+
+      {canVerify ? (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-border/80 pt-4">
+          {!profile.verified ? (
+            <button
+              type="button"
+              disabled={verifyBusy}
+              onClick={() => void patchVerification(true)}
+              className={ROW_ACTION_PRIMARY}
+            >
+              {verifyBusy ? "Updating…" : "Mark payout profile verified"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={verifyBusy}
+              onClick={() => void patchVerification(false)}
+              className={ROW_ACTION_DANGER}
+            >
+              {verifyBusy ? "Updating…" : "Revoke verification"}
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   normalizeOrganizerProfilePayload,
   type OrganizerProfileDisplay,
 } from "@/lib/organizer-profile-display";
+import { rolesIncludeAdmin, shouldOfferOrganizerHub } from "@/lib/auth/hub-routing";
 
 type HostingState =
   | "loading"
@@ -76,7 +77,9 @@ function modelForState(state: HostingState, profile: OrganizerProfileDisplay | n
 
 export function DashboardHostingCard() {
   const { user, loading } = useAuth();
-  const hasOrganizerRole = user?.roles?.includes("ORGANIZER") ?? false;
+  const roles = user?.roles ?? [];
+  const hasOrganizerRole = shouldOfferOrganizerHub(roles);
+  const hideForAdmin = rolesIncludeAdmin(roles);
   const [state, setState] = useState<HostingState>("loading");
   const [profile, setProfile] = useState<OrganizerProfileDisplay | null>(null);
 
@@ -121,6 +124,10 @@ export function DashboardHostingCard() {
         : state;
   const model = useMemo(() => modelForState(effectiveState, profile), [effectiveState, profile]);
   const loadingState = effectiveState === "loading";
+
+  if (hideForAdmin) {
+    return null;
+  }
 
   return (
     <li className="flex flex-col rounded-[var(--radius-panel)] border border-border bg-background p-5 shadow-[0_1px_0_rgba(0,0,0,0.03)]">

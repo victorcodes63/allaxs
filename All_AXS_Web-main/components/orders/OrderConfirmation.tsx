@@ -39,6 +39,8 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<StoredOrder | null | undefined>(undefined);
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
+  const [resendInFlight, setResendInFlight] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sent" | "failed">("idle");
 
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
@@ -77,11 +79,15 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
             status: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED" | "DRAFT";
             eventId: string;
             totalCents: number;
+            subtotalCents?: number;
+            discountCents?: number;
+            feesCents?: number;
             currency: string;
             eventTitle: string;
             eventSlug: string;
             buyerName: string;
             buyerEmail: string;
+            coupon?: { code: string; discountCents: number } | null;
             lineItems: {
               ticketTypeId: string;
               name: string;
@@ -110,6 +116,12 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
           })),
           totalCents: o.totalCents,
           currency: o.currency,
+          ...(typeof o.feesCents === "number" && o.feesCents > 0 ? { feesCents: o.feesCents } : {}),
+          ...(typeof o.subtotalCents === "number" ? { subtotalCents: o.subtotalCents } : {}),
+          ...(typeof o.discountCents === "number" && o.discountCents > 0
+            ? { discountCents: o.discountCents }
+            : {}),
+          ...(o.coupon ? { coupon: o.coupon } : {}),
         });
       } catch {
         if (!cancelled) setOrder(null);
@@ -156,6 +168,47 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
       /* ignore */
     }
   }, [passUrls]);
+
+  const resendTicketEmail = useCallback(async (): Promise<boolean> => {
+    setResendInFlight(true);
+    try {
+      const res = await fetch(`/api/checkout/orders/${orderId}/resend-tickets`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        setResendState("failed");
+        return false;
+      }
+      setResendState("sent");
+      return true;
+    } catch {
+      setResendState("failed");
+      return false;
+    } finally {
+      setResendInFlight(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!order) return;
+    if (!isApiCheckoutEnabled()) return;
+    if (order.guestCheckout === true) return;
+    if (typeof window === "undefined") return;
+
+    const sentKey = `ticket-email-sent:${order.orderId}`;
+    if (window.localStorage.getItem(sentKey) === "true") {
+      setResendState("sent");
+      return;
+    }
+
+    void (async () => {
+      const sent = await resendTicketEmail();
+      if (sent) {
+        window.localStorage.setItem(sentKey, "true");
+      }
+    })();
+  }, [order, resendTicketEmail]);
 
   if (order === undefined) {
     return (
@@ -331,12 +384,35 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
               </span>
             </li>
           ))}
+          {(order.discountCents ?? 0) > 0 ? (
+            <li className="flex justify-between gap-4 py-3 text-foreground">
+              <span>
+                Discount
+                {order.coupon ? (
+                  <span className="ml-2 inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                    {order.coupon.code}
+                  </span>
+                ) : null}
+              </span>
+              <span className="tabular-nums font-medium text-primary">
+                −{(order.discountCents ?? 0) / 100} {order.currency}
+              </span>
+            </li>
+          ) : null}
           <li className="flex justify-between gap-4 py-4 font-semibold text-foreground">
-            <span>Total</span>
+            <span>Total paid</span>
             <span className="tabular-nums">
               {order.totalCents / 100} {order.currency}
             </span>
           </li>
+          {apiCheckout && order.feesCents != null && order.feesCents > 0 ? (
+            <li className="flex justify-between gap-4 pb-2 text-xs leading-relaxed text-muted">
+              <span>Platform fee (from organiser proceeds — not added on top)</span>
+              <span className="shrink-0 tabular-nums">
+                {order.feesCents / 100} {order.currency}
+              </span>
+            </li>
+          ) : null}
         </ul>
         <p className="text-xs text-muted">
           {guest ? (
@@ -361,15 +437,19 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         {apiCheckout ? (
           <button
             type="button"
-            onClick={async () => {
-              await fetch(`/api/checkout/orders/${order.orderId}/resend-tickets`, {
-                method: "POST",
-                credentials: "same-origin",
-              });
+            onClick={() => {
+              void resendTicketEmail();
             }}
+            disabled={resendInFlight}
             className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/45"
           >
-            Resend ticket email
+            {resendInFlight
+              ? "Sending ticket email…"
+              : resendState === "sent"
+                ? "Ticket email sent"
+                : resendState === "failed"
+                  ? "Retry ticket email"
+                  : "Resend ticket email"}
           </button>
         ) : null}
         {passes[0] ? (

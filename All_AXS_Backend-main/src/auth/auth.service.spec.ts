@@ -8,6 +8,7 @@ import { UsersService } from '../users/users.service';
 import { RefreshTokenService } from './services/refresh-token.service';
 import { EmailVerificationService } from './services/email-verification.service';
 import { PasswordResetService } from './services/password-reset.service';
+import { EmailService } from './services/email.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -100,6 +101,13 @@ describe('AuthService', () => {
             createAndSendPasswordResetEmail: jest.fn(),
             verifyResetToken: jest.fn(),
             markTokenAsUsed: jest.fn(),
+          },
+        },
+        {
+          provide: EmailService,
+          useValue: {
+            sendWelcomeEmail: jest.fn(),
+            sendPasswordResetConfirmationEmail: jest.fn(),
           },
         },
         {

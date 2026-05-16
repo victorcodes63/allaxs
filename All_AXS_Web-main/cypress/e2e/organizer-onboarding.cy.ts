@@ -1,4 +1,11 @@
 describe('Organizer Onboarding', () => {
+  const fillStep1Required = () => {
+    cy.get('input[name="orgName"]').type('Test Organization');
+    cy.get('input[name="supportEmail"]').type('support@test.org');
+    cy.get('input[name="legalName"]').type('Test Organization Legal');
+    cy.get('input[name="supportPhone"]').type('+254712345678');
+  };
+
   beforeEach(() => {
     // Mock the /api/auth/me endpoint to return a logged-in user
     cy.intercept('GET', '/api/auth/me', {
@@ -67,9 +74,7 @@ describe('Organizer Onboarding', () => {
     cy.visit('/organizer/onboarding');
     cy.wait('@getProfile');
     
-    // Fill required fields
-    cy.get('input[name="orgName"]').type('Test Organization');
-    cy.get('input[name="supportEmail"]').type('support@test.org');
+    fillStep1Required();
     
     // Click Next
     cy.contains('button', 'Next').click();
@@ -83,9 +88,7 @@ describe('Organizer Onboarding', () => {
     cy.visit('/organizer/onboarding');
     cy.wait('@getProfile');
     
-    // Fill Step 1 and proceed
-    cy.get('input[name="orgName"]').type('Test Organization');
-    cy.get('input[name="supportEmail"]').type('support@test.org');
+    fillStep1Required();
     cy.contains('button', 'Next').click();
     
     // Should be on Step 2
@@ -104,9 +107,7 @@ describe('Organizer Onboarding', () => {
     cy.visit('/organizer/onboarding');
     cy.wait('@getProfile');
     
-    // Fill Step 1
-    cy.get('input[name="orgName"]').type('Test Organization');
-    cy.get('input[name="supportEmail"]').type('support@test.org');
+    fillStep1Required();
     cy.contains('button', 'Next').click();
     
     // Fill Step 2 with bank account
@@ -114,6 +115,7 @@ describe('Organizer Onboarding', () => {
     cy.get('input[name="bankName"]').type('Test Bank');
     cy.get('input[name="bankAccountName"]').type('Test Account');
     cy.get('input[name="bankAccountNumber"]').type('123456789');
+    cy.get('input[name="taxId"]').type('TAX123456');
     
     // Submit
     cy.contains('button', 'Save & Continue').click();
@@ -127,6 +129,7 @@ describe('Organizer Onboarding', () => {
         bankName: 'Test Bank',
         bankAccountName: 'Test Account',
         bankAccountNumber: '123456789',
+        taxId: 'TAX123456',
       });
     });
     
@@ -138,14 +141,13 @@ describe('Organizer Onboarding', () => {
     cy.visit('/organizer/onboarding');
     cy.wait('@getProfile');
     
-    // Fill Step 1
-    cy.get('input[name="orgName"]').type('Test Organization');
-    cy.get('input[name="supportEmail"]').type('support@test.org');
+    fillStep1Required();
     cy.contains('button', 'Next').click();
     
     // Fill Step 2 with MPESA
     cy.get('input[value="MPESA"]').check();
     cy.get('input[name="mpesaPaybill"]').type('123456');
+    cy.get('input[name="taxId"]').type('TAX123456');
     
     // Submit
     cy.contains('button', 'Save & Continue').click();
@@ -157,6 +159,7 @@ describe('Organizer Onboarding', () => {
         supportEmail: 'support@test.org',
         payoutMethod: 'MPESA',
         mpesaPaybill: '123456',
+        taxId: 'TAX123456',
       });
     });
   });
@@ -190,12 +193,14 @@ describe('Organizer Onboarding', () => {
     cy.visit('/organizer/onboarding');
     cy.wait('@getProfile');
     
-    // Fill and submit form
-    cy.get('input[name="orgName"]').type('Test');
-    cy.get('input[name="supportEmail"]').type('test@example.com');
+    fillStep1Required();
     cy.contains('button', 'Next').click();
     
     cy.get('input[value="OTHER"]').check();
+    cy.get('textarea[name="payoutInstructions"]').type(
+      'Wire to account 1234567890 at Example Bank, SWIFT EXAMPLEXX, reference ORG-PAYOUT.',
+    );
+    cy.get('input[name="taxId"]').type('TAX123456');
     cy.contains('button', 'Save & Continue').click();
     
     cy.wait('@createProfileError');

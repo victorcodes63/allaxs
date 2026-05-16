@@ -32,9 +32,19 @@ export function OrganizerShell({
             match: (p) => p === "/organizer/sales",
           },
           {
+            href: "/organizer/earnings",
+            label: "Earnings",
+            match: (p) => p === "/organizer/earnings",
+          },
+          {
             href: "/organizer/tickets",
             label: "Tickets",
             match: (p) => p === "/organizer/tickets",
+          },
+          {
+            href: "/organizer/tickets/scan",
+            label: "Door scan",
+            match: (p) => p === "/organizer/tickets/scan",
           },
           {
             href: "/organizer/events",

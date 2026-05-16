@@ -190,7 +190,11 @@ export function OrganizerSalesContent(): ReactElement {
           <aside className="w-full shrink-0 rounded-[var(--radius-panel)] border border-border bg-surface/90 p-5 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] lg:max-w-sm">
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">Money flow</p>
             <p className="mt-3 text-sm leading-relaxed text-muted">
-              Ticket revenue settles according to your contract. Keep payout instructions accurate in{" "}
+              Ticket revenue settles according to your contract. See{" "}
+              <Link href="/organizer/earnings" className="font-medium text-primary hover:underline">
+                Earnings
+              </Link>{" "}
+              for ledger balance and payout reservations; keep payout instructions accurate in{" "}
               <Link href="/organizer/account" className="font-medium text-primary hover:underline">
                 Account
               </Link>
@@ -224,11 +228,11 @@ export function OrganizerSalesContent(): ReactElement {
           >
             All events (paid orders)
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4">
             <RollupTile
               label="Gross sales"
               value={formatMoneyFromCents(rollup.grossCents, rollup.currency)}
-              hint="Sum of paid order totals."
+              hint="Sum of paid order totals (buyer checkout amounts)."
             />
             <RollupTile
               label="Tickets sold"
@@ -243,7 +247,12 @@ export function OrganizerSalesContent(): ReactElement {
             <RollupTile
               label="Fees (platform)"
               value={formatMoneyFromCents(rollup.feesCents, rollup.currency)}
-              hint="Recorded on each order; net = gross − fees when applicable."
+              hint="All AXS share recorded per order."
+            />
+            <RollupTile
+              label="Net (organizer)"
+              value={formatMoneyFromCents(rollup.netCents, rollup.currency)}
+              hint="Gross sales minus platform fees."
             />
           </div>
         </section>
@@ -267,6 +276,8 @@ export function OrganizerSalesContent(): ReactElement {
                   <th className="px-4 py-3 text-right">Sold / cap</th>
                   <th className="px-4 py-3 text-right">Sales</th>
                   <th className="px-4 py-3 text-right">Gross</th>
+                  <th className="px-4 py-3 text-right">Fees</th>
+                  <th className="px-4 py-3 text-right">Net</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -295,6 +306,12 @@ export function OrganizerSalesContent(): ReactElement {
                       <td className="px-4 py-3 text-right tabular-nums">{row.ordersCount}</td>
                       <td className="px-4 py-3 text-right tabular-nums font-medium">
                         {formatMoneyFromCents(row.grossCents, row.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-muted">
+                        {formatMoneyFromCents(row.feesCents, row.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium">
+                        {formatMoneyFromCents(row.netCents, row.currency)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex flex-wrap justify-end gap-x-2 gap-y-1">
@@ -382,6 +399,8 @@ export function OrganizerSalesContent(): ReactElement {
                   <th className="px-4 py-3">Line items</th>
                   <th className="px-4 py-3 text-right">Tickets</th>
                   <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-right">Fees</th>
+                  <th className="px-4 py-3 text-right">Net</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
@@ -404,6 +423,12 @@ export function OrganizerSalesContent(): ReactElement {
                     <td className="px-4 py-3 text-right tabular-nums">{o.ticketsInOrder}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
                       {formatMoneyFromCents(o.amountCents, o.currency)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted">
+                      {formatMoneyFromCents(o.feesCents, o.currency)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      {formatMoneyFromCents(o.netCents, o.currency)}
                     </td>
                     <td className="px-4 py-3 text-xs uppercase text-muted">{o.status.replace(/_/g, " ")}</td>
                   </tr>

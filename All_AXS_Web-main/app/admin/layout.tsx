@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { buildLoginRedirectFromPath } from "@/lib/auth/post-auth-redirect";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 export default function AdminLayout({
@@ -17,8 +18,9 @@ export default function AdminLayout({
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      const nextParam = pathname ? `?next=${encodeURIComponent(pathname)}` : "";
-      router.replace(`/login${nextParam}`);
+      router.replace(
+        pathname ? buildLoginRedirectFromPath(pathname) : "/login",
+      );
       return;
     }
     if (!user.roles?.includes("ADMIN")) {

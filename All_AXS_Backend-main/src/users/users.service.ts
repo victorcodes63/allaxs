@@ -1,12 +1,13 @@
 import {
-  Injectable,
   ConflictException,
+  Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
-import { Role } from 'src/domain/enums';
+import { Role, UserStatus } from 'src/domain/enums';
 
 @Injectable()
 export class UsersService {
@@ -63,6 +64,46 @@ export class UsersService {
    * - add ORGANIZER access (host tools)
    * Also repairs legacy organizer-only role arrays.
    */
+  /**
+   * Find or create a user from a verified Google ID token (email pre-verified by Google).
+   * Existing password accounts keep their password; Google can still be used to sign in.
+   */
+  async upsertGoogleOAuthUser(params: {
+    email: string;
+    name: string;
+  }): Promise<User> {
+    const email = params.email.trim().toLowerCase();
+    if (!email) {
+      throw new ConflictException('Email is required');
+    }
+
+    let user = await this.findByEmail(email);
+    if (user) {
+      if (user.status !== UserStatus.ACTIVE) {
+        throw new UnauthorizedException({
+          message: 'Account suspended. Please contact support.',
+          code: 'accountSuspended',
+        });
+      }
+      const nextName = params.name.trim();
+      if (nextName && (!user.name || !user.name.trim())) {
+        user.name = nextName;
+        await this.userRepository.save(user);
+      }
+      return user;
+    }
+
+    const displayName =
+      params.name.trim() || email.split('@')[0] || 'All AXS user';
+    const created = this.userRepository.create({
+      email,
+      name: displayName,
+      roles: [Role.ATTENDEE],
+      status: UserStatus.ACTIVE,
+    });
+    return this.userRepository.save(created);
+  }
+
   async addOrganizerRole(userId: string): Promise<User> {
     const user = await this.findByIdOrFail(userId);
     const currentRoles = Array.isArray(user.roles) ? user.roles : [];

@@ -55,6 +55,18 @@ EMAIL_PROVIDER=none
 
 (Any value other than `resend` disables sending; registration still works if the product flow does not require email verification in your setup.)
 
+## 4b. Paystack + staging checkout
+
+| Variable | Required for paid checkout | Notes |
+| -------- | -------------------------- | ----- |
+| `PAYSTACK_SECRET_KEY` | Yes | Test key on staging (`sk_test_…`) |
+| `PAYSTACK_WEBHOOK_SECRET` | No | Webhook HMAC; defaults to `PAYSTACK_SECRET_KEY` |
+| `PAYSTACK_CALLBACK_URL` | No | Defaults to `{FRONTEND_URL}/orders/payment/callback` |
+
+**Paystack dashboard:** webhook URL = `https://<your-api-project>.vercel.app/api/webhooks/paystack`.
+
+Full staging blocks (Web + API), env map, and smoke test: **Web repo** `docs/STAGING_CHECKLIST.md`. Local reference: [`.env.example`](../.env.example).
+
 ## 5. Redis (optional)
 
 Rate limiting uses Redis when `REDIS_URL` is set. If omitted, the app falls back to in-memory throttling (fine for early demos).
@@ -72,8 +84,11 @@ In the **Web** Vercel project, set:
 
 - `NEXT_PUBLIC_API_BASE_URL` = `https://<your-api-project>.vercel.app`
 - `API_URL` = same URL
+- `NEXT_PUBLIC_SITE_URL` = your Web deployment URL (must match `FRONTEND_URL` on this API project)
+- `NEXT_PUBLIC_USE_API_CHECKOUT` = `true` for Paystack checkout
+- `NEXT_PUBLIC_USE_DEMO_EVENTS` = `false` if listings should come from the API
 
-Then set `NEXT_PUBLIC_USE_DEMO_EVENTS=false` if you want listings to come from the API.
+See **Web** `docs/STAGING_CHECKLIST.md` for copy-paste Preview/Production blocks.
 
 ## 8. Limitations
 

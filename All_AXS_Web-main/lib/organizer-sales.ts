@@ -12,11 +12,13 @@ export type OrganizerSalesEventRow = {
   ordersCount: number;
   grossCents: number;
   feesCents: number;
+  netCents: number;
 };
 
 export type OrganizerSalesRollup = {
   grossCents: number;
   feesCents: number;
+  netCents: number;
   ticketsSold: number;
   ordersCount: number;
   currency: string;
@@ -37,6 +39,7 @@ export type OrganizerSalesOrderRow = {
   buyerName: string;
   amountCents: number;
   feesCents: number;
+  netCents: number;
   currency: string;
   ticketsInOrder: number;
   lineSummary: string;
@@ -80,6 +83,8 @@ export function normalizeOrganizerSalesSummary(
     if (!isRecord(row)) continue;
     const eventId = str(row.eventId);
     if (!eventId) continue;
+    const grossCents = num(row.grossCents);
+    const feesCents = num(row.feesCents);
     events.push({
       eventId,
       title: str(row.title, "Event"),
@@ -90,8 +95,9 @@ export function normalizeOrganizerSalesSummary(
       capacityTotal: num(row.capacityTotal),
       ticketsSold: num(row.ticketsSold),
       ordersCount: num(row.ordersCount),
-      grossCents: num(row.grossCents),
-      feesCents: num(row.feesCents),
+      grossCents,
+      feesCents,
+      netCents: num(row.netCents, Math.max(0, grossCents - feesCents)),
     });
   }
 
@@ -100,6 +106,10 @@ export function normalizeOrganizerSalesSummary(
     rollup: {
       grossCents: num(rollupRaw.grossCents),
       feesCents: num(rollupRaw.feesCents),
+      netCents: num(
+        rollupRaw.netCents,
+        Math.max(0, num(rollupRaw.grossCents) - num(rollupRaw.feesCents)),
+      ),
       ticketsSold: num(rollupRaw.ticketsSold),
       ordersCount: num(rollupRaw.ordersCount),
       currency: str(rollupRaw.currency, "KES"),
@@ -118,6 +128,8 @@ export function normalizeOrganizerSalesOrders(
     if (!isRecord(row)) continue;
     const id = str(row.id);
     if (!id) continue;
+    const amountCents = num(row.amountCents);
+    const feesCents = num(row.feesCents);
     orders.push({
       id,
       createdAt: str(row.createdAt),
@@ -126,8 +138,9 @@ export function normalizeOrganizerSalesOrders(
       eventTitle: str(row.eventTitle, "Event"),
       buyerEmail: str(row.buyerEmail),
       buyerName: str(row.buyerName),
-      amountCents: num(row.amountCents),
-      feesCents: num(row.feesCents),
+      amountCents,
+      feesCents,
+      netCents: num(row.netCents, Math.max(0, amountCents - feesCents)),
       currency: str(row.currency, "KES"),
       ticketsInOrder: num(row.ticketsInOrder),
       lineSummary: str(row.lineSummary, "—"),

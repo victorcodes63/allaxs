@@ -19,11 +19,17 @@ function adminPageTitle(pathname: string): string {
   if (pathname === "/admin/orders" || pathname.startsWith("/admin/orders/")) {
     return "Orders";
   }
+  if (pathname === "/admin/payouts" || pathname.startsWith("/admin/payouts/")) {
+    return "Payout batches";
+  }
   if (pathname === "/admin/users" || pathname.startsWith("/admin/users/")) {
     return "Users";
   }
   if (pathname === "/admin/moderation" || pathname.startsWith("/admin/moderation")) {
     return "Moderation queue";
+  }
+  if (pathname === "/admin/scan" || pathname.startsWith("/admin/scan/")) {
+    return "Scan tickets";
   }
   if (pathname === "/notifications" || pathname.startsWith("/notifications/")) {
     return "Notifications";
@@ -59,6 +65,17 @@ export function AdminShell({
             label: "Orders",
             match: (p) =>
               p === "/admin/orders" || p.startsWith("/admin/orders/"),
+          },
+          {
+            href: "/admin/payouts",
+            label: "Payouts",
+            match: (p) =>
+              p === "/admin/payouts" || p.startsWith("/admin/payouts/"),
+          },
+          {
+            href: "/admin/scan",
+            label: "Scan tickets",
+            match: (p) => p === "/admin/scan" || p.startsWith("/admin/scan/"),
           },
           {
             href: "/admin/users",

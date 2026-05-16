@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { normalizeWebUserRoles } from "@/lib/auth/hub-routing";
 
 // Helper to decode JWT payload without verification (just to get user info)
 function decodeJWT(token: string): { sub?: string; id?: string; email?: string; name?: string; roles?: string[]; exp?: number } | null {
@@ -48,14 +49,13 @@ export async function GET() {
       }
     }
 
-    // Return user info from token
-    // Note: JWT payload uses 'sub' for user ID, but we also check 'id' for compatibility
+    // Return user info from token (roles normalized for web hub + guards)
     return NextResponse.json({
       user: {
         id: decoded.sub || decoded.id || "",
         email: decoded.email || "",
         name: decoded.name,
-        roles: decoded.roles || [],
+        roles: normalizeWebUserRoles((decoded as Record<string, unknown>).roles),
       },
     });
   } catch (error) {

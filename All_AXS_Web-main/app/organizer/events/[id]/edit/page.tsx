@@ -15,6 +15,7 @@ import { EventDetailsTab } from "@/components/organizer/event-editor/EventDetail
 import { EventMediaTab } from "@/components/organizer/event-editor/EventMediaTab";
 import { EventTicketTiersTab } from "@/components/organizer/event-editor/EventTicketTiersTab";
 import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab";
+import { EventCouponsTab } from "@/components/organizer/event-editor/EventCouponsTab";
 import { EventStatus } from "@/lib/validation/event";
 
 interface TicketType {
@@ -51,6 +52,7 @@ const EDITOR_TAB_IDS = [
   "details",
   "media",
   "ticket-tiers",
+  "coupons",
   "sales",
 ] as const;
 type EditorTabId = (typeof EDITOR_TAB_IDS)[number];
@@ -169,6 +171,9 @@ export default function EventEditorPage() {
     );
   }
 
+  const defaultCouponCurrency =
+    event.ticketTypes?.find((t) => t.currency)?.currency ?? "KES";
+
   const tabs = [
     {
       id: "details",
@@ -191,6 +196,16 @@ export default function EventEditorPage() {
         <EventTicketTiersTab
           event={event}
           onEventUpdate={handleEventUpdate}
+        />
+      ),
+    },
+    {
+      id: "coupons",
+      label: "Coupons",
+      content: (
+        <EventCouponsTab
+          eventId={event.id}
+          defaultCurrency={defaultCouponCurrency}
         />
       ),
     },

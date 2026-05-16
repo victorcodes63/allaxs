@@ -13,10 +13,10 @@ export class Coupon extends BaseEntity {
   kind!: CouponType;
 
   @Column({ type: 'integer', nullable: true })
-  valueCents?: number; // for FIXED
+  valueCents?: number;
 
   @Column({ type: 'integer', nullable: true })
-  percentOff?: number; // 0..100 for PERCENT
+  percentOff?: number;
 
   @Column({ type: 'timestamptz', nullable: true })
   startAt?: Date;
@@ -33,13 +33,28 @@ export class Coupon extends BaseEntity {
   @Column({ type: 'integer', nullable: true })
   perUserLimit?: number;
 
+  /**
+   * Optional subtotal floor (in minor units). Orders below this amount
+   * cannot redeem the coupon. See COUPONS_SPEC §3 rule 7.
+   */
+  @Column({ type: 'integer', nullable: true, name: 'min_order_cents' })
+  minOrderCents?: number;
+
+  /**
+   * Optional ISO 4217 currency restriction. When `NULL`, the coupon
+   * applies to any order currency. When set, only orders in this
+   * currency may redeem (see COUPONS_SPEC §3 rule 4).
+   */
+  @Column({ type: 'char', length: 3, nullable: true })
+  currency?: string;
+
   @Index()
-  @Column({ type: 'uuid', nullable: true, name: 'event_id' })
-  eventId?: string | null;
+  @Column({ type: 'uuid', name: 'event_id' })
+  eventId!: string;
 
   @ManyToOne(() => Event, (e) => e.coupons, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'event_id' })
-  event?: Event | null;
+  event!: Event;
 
   @Column({ type: 'boolean', default: true })
   active!: boolean;

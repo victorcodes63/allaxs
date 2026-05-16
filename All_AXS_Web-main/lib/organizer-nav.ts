@@ -2,7 +2,9 @@
 export function organizerPageTitle(pathname: string): string {
   if (pathname === "/organizer/dashboard") return "Overview";
   if (pathname === "/organizer/sales") return "Sales & orders";
+  if (pathname === "/organizer/earnings") return "Earnings & payouts";
   if (pathname === "/organizer/tickets") return "Tickets";
+  if (pathname === "/organizer/tickets/scan") return "Door scan";
   if (pathname === "/organizer/account") return "Account";
   if (pathname === "/organizer/events" || pathname === "/organizer/events/")
     return "Events";
@@ -24,8 +26,14 @@ export function organizerNavActive(href: string, pathname: string): boolean {
   if (href === "/organizer/sales") {
     return pathname === "/organizer/sales";
   }
+  if (href === "/organizer/earnings") {
+    return pathname === "/organizer/earnings";
+  }
   if (href === "/organizer/tickets") {
     return pathname === "/organizer/tickets";
+  }
+  if (href === "/organizer/tickets/scan") {
+    return pathname === "/organizer/tickets/scan";
   }
   if (href === "/organizer/events/new") {
     return pathname === "/organizer/events/new";

@@ -8,11 +8,14 @@ export function PaymentCallbackClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference");
-  const [message, setMessage] = useState("Confirming your payment...");
+  const missingReference = !reference;
+  const [pollMessage, setPollMessage] = useState<string | null>(null);
+  const message = missingReference
+    ? "Missing payment reference."
+    : (pollMessage ?? "Confirming your payment...");
 
   useEffect(() => {
     if (!reference) {
-      setMessage("Missing payment reference.");
       return;
     }
 
@@ -33,21 +36,35 @@ export function PaymentCallbackClient() {
           throw new Error(data.message || "Payment confirmation failed");
         }
         if (data.status === "PAID" && data.orderId) {
+          const sentKey = `ticket-email-sent:${data.orderId}`;
+          if (typeof window !== "undefined" && window.localStorage.getItem(sentKey) !== "true") {
+            try {
+              const resendRes = await fetch(`/api/checkout/orders/${data.orderId}/resend-tickets`, {
+                method: "POST",
+                credentials: "same-origin",
+              });
+              if (resendRes.ok) {
+                window.localStorage.setItem(sentKey, "true");
+              }
+            } catch {
+              // Email retries remain available from the confirmation page.
+            }
+          }
           router.replace(`/orders/${data.orderId}/confirmation`);
           return;
         }
 
-        setMessage("Payment is processing. Waiting for confirmation...");
+        setPollMessage("Payment is processing. Waiting for confirmation...");
         await new Promise((resolve) => window.setTimeout(resolve, 2000));
       }
       if (!cancelled) {
-        setMessage("Payment is still processing. Refresh this page in a few seconds.");
+        setPollMessage("Payment is still processing. Refresh this page in a few seconds.");
       }
     };
 
     void poll().catch((error: unknown) => {
       if (!cancelled) {
-        setMessage(error instanceof Error ? error.message : "Payment confirmation failed");
+        setPollMessage(error instanceof Error ? error.message : "Payment confirmation failed");
       }
     });
 

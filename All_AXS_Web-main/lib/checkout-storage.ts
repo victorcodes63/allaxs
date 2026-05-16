@@ -26,6 +26,14 @@ export type StoredOrder = {
   lineItems: CheckoutLineItem[];
   totalCents: number;
   currency: string;
+  /** Populated from API order summary when platform fees apply. */
+  feesCents?: number;
+  /** Subtotal before any coupon discount (gross). */
+  subtotalCents?: number;
+  /** Coupon discount applied at checkout, in minor units. */
+  discountCents?: number;
+  /** Coupon redeemed on the order (when the buyer used one). */
+  coupon?: { code: string; discountCents: number };
   /** True when checkout completed without a signed-in session (browser session passes in demo). */
   guestCheckout?: boolean;
   ticketDelivery?: TicketDeliveryChannel;
@@ -35,7 +43,6 @@ export type CheckoutDraft = {
   eventId: string;
   qty: Record<string, number>;
   step: "tickets" | "buyer";
-  guestMode: boolean | null;
 };
 
 const CHECKOUT_DRAFT_KEY = "allaxs_checkout_draft";
@@ -54,9 +61,13 @@ export function loadCheckoutDraft(eventId: string): CheckoutDraft | null {
   try {
     const raw = window.sessionStorage.getItem(CHECKOUT_DRAFT_KEY);
     if (!raw) return null;
-    const d = JSON.parse(raw) as CheckoutDraft;
+    const d = JSON.parse(raw) as CheckoutDraft & { guestMode?: unknown };
     if (d.eventId !== eventId) return null;
-    return d;
+    return {
+      eventId: d.eventId,
+      qty: typeof d.qty === "object" && d.qty !== null ? d.qty : {},
+      step: d.step === "buyer" ? "buyer" : "tickets",
+    };
   } catch {
     return null;
   }

@@ -53,6 +53,7 @@ function isPublicAuthPath(pathname: string | null): boolean {
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/resend-verification",
   ] as const;
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }

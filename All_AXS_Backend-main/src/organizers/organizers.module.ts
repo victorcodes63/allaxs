@@ -13,6 +13,10 @@ import { Order } from '../domain/order.entity';
 import { OrderItem } from '../domain/order-item.entity';
 import { Ticket } from '../domain/ticket.entity';
 import { AuthModule } from '../auth/auth.module';
+import { ScanModule } from '../scan/scan.module';
+import { DomainModule } from '../domain/domain.module';
+import { OrganizerEarningsController } from './organizer-earnings.controller';
+import { OrganizerEarningsService } from './organizer-earnings.service';
 
 @Module({
   imports: [
@@ -25,16 +29,20 @@ import { AuthModule } from '../auth/auth.module';
       Ticket,
     ]),
     AuthModule,
+    ScanModule,
+    DomainModule,
   ],
   controllers: [
     OrganizerProfilesController,
     OrganizerSalesController,
     OrganizerTicketsController,
+    OrganizerEarningsController,
   ],
   providers: [
     OrganizerProfilesService,
     OrganizerSalesService,
     OrganizerTicketsService,
+    OrganizerEarningsService,
   ],
   exports: [
     OrganizerProfilesService,

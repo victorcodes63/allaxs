@@ -429,7 +429,7 @@ export function HubAppShell({
           onDrawerToggle={() => setDrawerOpen((o) => !o)}
           onLogout={onLogout}
           loggingOut={loggingOut}
-          innerClassName={`${HUB_MAIN_MAX} flex min-h-[3.5rem] w-full items-center gap-2 sm:min-h-0 sm:h-16 sm:gap-3 ${HUB_MAIN_PAD}`}
+          innerClassName={`${HUB_MAIN_MAX} flex min-h-[3.5rem] w-full flex-wrap items-center gap-2 sm:min-h-0 sm:h-16 sm:gap-3 ${HUB_MAIN_PAD}`}
         />
 
         <div

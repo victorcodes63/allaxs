@@ -2,10 +2,13 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseEnumPipe,
   ParseUUIDPipe,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +26,8 @@ import type { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role, TicketStatus } from '../domain/enums';
 import { OrganizerTicketsService } from './organizer-tickets.service';
 import { UpdateOrganizerTicketDto } from './dto/update-organizer-ticket.dto';
+import { TicketScanService } from '../scan/ticket-scan.service';
+import { ScanTicketDto } from '../scan/dto/scan-ticket.dto';
 
 @ApiTags('organizers')
 @Controller('organizers')
@@ -32,6 +37,7 @@ import { UpdateOrganizerTicketDto } from './dto/update-organizer-ticket.dto';
 export class OrganizerTicketsController {
   constructor(
     private readonly organizerTicketsService: OrganizerTicketsService,
+    private readonly ticketScanService: TicketScanService,
   ) {}
 
   @Get('tickets')
@@ -76,6 +82,21 @@ export class OrganizerTicketsController {
       limit,
       offset,
     });
+  }
+
+  @Post('tickets/scan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify or check in a ticket from QR payload (organizer events only)',
+  })
+  async scanTicket(@GetUser() user: CurrentUser, @Body() body: ScanTicketDto) {
+    return this.ticketScanService.scanForOrganizer(
+      user.id,
+      body.payload,
+      body.action,
+      body.gateId,
+      body.deviceId,
+    );
   }
 
   @Patch('tickets/:id')

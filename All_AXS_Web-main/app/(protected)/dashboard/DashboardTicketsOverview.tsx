@@ -6,12 +6,17 @@ import { loadAllTickets, type StoredTicket } from "@/lib/checkout-storage";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
 import { mergeTicketsById, normalizeApiTicketsPayload } from "@/lib/tickets-api";
 import QRCode from "react-qr-code";
-import { buildTicketQrPayload } from "@/lib/ticket-qr";
+import { buildTicketQrUrl } from "@/lib/ticket-qr";
 
 export function DashboardTicketsOverview() {
+  const [origin, setOrigin] = useState("");
   const [tickets, setTickets] = useState<StoredTicket[] | null>(() =>
     isApiCheckoutEnabled() ? null : loadAllTickets()
   );
+
+  useEffect(() => {
+    if (typeof window !== "undefined") setOrigin(window.location.origin);
+  }, []);
 
   useEffect(() => {
     if (!isApiCheckoutEnabled()) return;
@@ -82,7 +87,7 @@ export function DashboardTicketsOverview() {
 
   const featuredPass = tickets[0];
   const extraPasses = tickets.slice(1, 4);
-  const featuredQrValue = buildTicketQrPayload(featuredPass);
+  const featuredQrValue = origin ? buildTicketQrUrl(origin, featuredPass) : "";
 
   return (
     <section

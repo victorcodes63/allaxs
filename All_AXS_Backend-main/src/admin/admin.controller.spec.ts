@@ -6,10 +6,16 @@ import { AdminController } from './admin.controller';
 import { AdminAuditService } from './admin-audit.service';
 import { EventsService } from '../events/events.service';
 import { Event } from '../events/entities/event.entity';
+import { TicketType } from '../events/entities/ticket-type.entity';
 import { Order } from '../domain/order.entity';
 import { User } from '../users/entities/user.entity';
+import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
+import { AdminAuditLog } from './entities/admin-audit-log.entity';
 import { Role, EventStatus, OrderStatus } from '../domain/enums';
 import type { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { OrderRefundService } from './order-refund.service';
+import { AuthService } from '../auth/auth.service';
+import { OrganizerProfilesService } from '../organizers/organizer-profiles.service';
 
 describe('AdminController', () => {
   let controller: AdminController;
@@ -18,6 +24,7 @@ describe('AdminController', () => {
   let userRepository: jest.Mocked<Repository<User>>;
   let adminAuditService: jest.Mocked<AdminAuditService>;
   let eventsService: jest.Mocked<EventsService>;
+  let orderRefundService: jest.Mocked<OrderRefundService>;
 
   const mockAdminUser: CurrentUser = {
     id: 'admin-id',
@@ -50,6 +57,21 @@ describe('AdminController', () => {
       reject: jest.fn(),
     };
 
+    const mockOrderRefundService = {
+      refundPaidOrder: jest.fn(),
+    };
+
+    const mockAuthService = {
+      forceSignOutUser: jest.fn(),
+    };
+
+    const mockOrganizerProfilesService = {
+      serializeOrganizerProfile: jest.fn((p: OrganizerProfile) => ({
+        id: p.id,
+        verified: p.verified,
+      })),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AdminController],
       providers: [
@@ -73,6 +95,30 @@ describe('AdminController', () => {
           provide: EventsService,
           useValue: mockEventsService,
         },
+        {
+          provide: OrderRefundService,
+          useValue: mockOrderRefundService,
+        },
+        {
+          provide: AuthService,
+          useValue: mockAuthService,
+        },
+        {
+          provide: OrganizerProfilesService,
+          useValue: mockOrganizerProfilesService,
+        },
+        {
+          provide: getRepositoryToken(TicketType),
+          useValue: { find: jest.fn(), findOne: jest.fn(), save: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(OrganizerProfile),
+          useValue: { findOne: jest.fn(), save: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(AdminAuditLog),
+          useValue: { find: jest.fn(), findOne: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -82,6 +128,7 @@ describe('AdminController', () => {
     userRepository = module.get(getRepositoryToken(User));
     adminAuditService = module.get(AdminAuditService);
     eventsService = module.get(EventsService);
+    orderRefundService = module.get(OrderRefundService);
   });
 
   it('should be defined', () => {
@@ -211,23 +258,21 @@ describe('AdminController', () => {
 
   describe('refundOrder', () => {
     it('should refund an order and log audit', async () => {
-      const mockOrder = {
-        id: 'order-id',
-        status: OrderStatus.PAID,
-        amountCents: 10000,
-        currency: 'KES',
-      } as Order;
-
       const mockRequest = {
         ip: '127.0.0.1',
         headers: { 'user-agent': 'Test Agent' },
       } as any;
 
-      orderRepository.findOne.mockResolvedValue(mockOrder);
-      orderRepository.save.mockResolvedValue({
-        ...mockOrder,
-        status: OrderStatus.REFUNDED,
-      } as Order);
+      orderRefundService.refundPaidOrder.mockResolvedValue({
+        order: {
+          id: 'order-id',
+          status: OrderStatus.REFUNDED,
+          previousStatus: OrderStatus.PAID,
+          refundAmountCents: 10000,
+          originalAmountCents: 10000,
+          currency: 'KES',
+        },
+      });
 
       const result = await controller.refundOrder(
         'order-id',
@@ -236,17 +281,17 @@ describe('AdminController', () => {
         mockRequest,
       );
 
-      expect(orderRepository.findOne).toHaveBeenCalledWith({
-        where: { id: 'order-id' },
+      expect(orderRefundService.refundPaidOrder).toHaveBeenCalledWith('order-id', {
+        reason: 'Customer request',
       });
-      expect(orderRepository.save).toHaveBeenCalled();
       expect(adminAuditService.logAction).toHaveBeenCalled();
       expect(result.message).toBe('Order refunded successfully');
     });
 
     it('should throw NotFoundException when order does not exist', async () => {
-      orderRepository.findOne.mockResolvedValue(null);
       const mockRequest = {} as any;
+
+      orderRefundService.refundPaidOrder.mockRejectedValue(new NotFoundException('Order not found'));
 
       await expect(
         controller.refundOrder(
@@ -259,13 +304,11 @@ describe('AdminController', () => {
     });
 
     it('should throw BadRequestException when order is already refunded', async () => {
-      const mockOrder = {
-        id: 'order-id',
-        status: OrderStatus.REFUNDED,
-      } as Order;
-
-      orderRepository.findOne.mockResolvedValue(mockOrder);
       const mockRequest = {} as any;
+
+      orderRefundService.refundPaidOrder.mockRejectedValue(
+        new BadRequestException('Order is already refunded'),
+      );
 
       await expect(
         controller.refundOrder('order-id', {}, mockAdminUser, mockRequest),

@@ -22,15 +22,45 @@ function ResetPasswordForm() {
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [tokenChecked, setTokenChecked] = useState(false);
 
   useEffect(() => {
     const tokenParam = searchParams.get("token");
     if (!tokenParam) {
       setError("Invalid or missing reset token");
+      setTokenChecked(true);
     } else {
       setToken(tokenParam);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    setTokenChecked(false);
+    setError(null);
+
+    (async () => {
+      try {
+        await axios.get("/api/auth/reset-password/validate", {
+          params: { token },
+        });
+      } catch (err) {
+        if (cancelled) return;
+        const message =
+          (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
+          "Invalid or expired reset token";
+        setError(message);
+        setToken(null);
+      } finally {
+        if (!cancelled) setTokenChecked(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const {
     register,
@@ -72,6 +102,16 @@ function ResetPasswordForm() {
       setIsSubmitting(false);
     }
   };
+
+  if (!tokenChecked) {
+    return (
+      <AuthPageShell>
+        <AuthCard title="Reset Password" subtitle="Checking your reset link">
+          <p className="text-sm text-muted text-center">Validating token…</p>
+        </AuthCard>
+      </AuthPageShell>
+    );
+  }
 
   if (success) {
     return (
@@ -132,7 +172,7 @@ function ResetPasswordForm() {
             disabled={!token}
           />
 
-          <Button type="submit" disabled={isSubmitting || !token}>
+          <Button type="submit" disabled={isSubmitting || !token || !tokenChecked}>
             {isSubmitting ? "Resetting password..." : "Reset Password"}
           </Button>
         </form>

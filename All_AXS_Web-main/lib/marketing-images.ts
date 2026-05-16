@@ -12,10 +12,6 @@ function u(id: string, w: number, q = 82): string {
 export const marketingImages = {
   /** Home hero — daylight team session in a modern room */
   homeHero: u("photo-1573164574511-73c773193279", 2400),
-  /** Wide parallax — panel / speakers in a modern room */
-  parallaxSummit: u("photo-1776039325163-f45315a484f3", 2000),
-  /** Second parallax — collaborative lounge working session */
-  parallaxSession: u("photo-1655720357872-ce227e4164ba", 2000),
   /** Journey card — Discover */
   journeyDiscover: u("photo-1573164574308-edcb95e8b261", 1200),
   /** Journey card — Checkout — focused work at a laptop */

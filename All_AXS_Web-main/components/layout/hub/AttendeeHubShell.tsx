@@ -2,6 +2,11 @@
 
 import { useMemo } from "react";
 import { HubAppShell, type HubNavSection } from "@/components/layout/hub/HubAppShell";
+import {
+  normalizeWebUserRoles,
+  shouldOfferOrganizerHub,
+  userHasRole,
+} from "@/lib/auth/hub-routing";
 
 function attendeePageTitle(pathname: string): string {
   if (pathname === "/organizer/onboarding" || pathname.startsWith("/organizer/onboarding/")) {
@@ -64,7 +69,7 @@ export function AttendeeHubShell({
         ],
       },
     ];
-    if (user.roles?.includes("ORGANIZER")) {
+    if (shouldOfferOrganizerHub(normalizeWebUserRoles(user.roles))) {
       base.push({
         title: "Host",
         items: [
@@ -76,7 +81,7 @@ export function AttendeeHubShell({
         ],
       });
     }
-    if (user.roles?.includes("ADMIN")) {
+    if (userHasRole(user, "ADMIN")) {
       base.push({
         title: "Moderation",
         items: [

@@ -22,7 +22,9 @@ function VerifyEmailContent() {
 
       if (!token) {
         setStatus("error");
-        setMessage("Invalid or missing verification token");
+        setMessage(
+          "Invalid or missing verification token. You can request a new verification email."
+        );
         return;
       }
 
@@ -89,10 +91,13 @@ function VerifyEmailContent() {
               <div className="bg-primary/10 border border-primary/30 text-primary rounded-lg p-4 text-sm">
                 {message}
               </div>
-              <Link href="/login">
+              <Link href="/resend-verification">
                 <Button variant="primary" className="w-full">
-                  Back to Sign In
+                  Resend Verification Email
                 </Button>
+              </Link>
+              <Link href="/login" className="block text-center text-sm text-primary hover:underline">
+                Back to Sign In
               </Link>
             </>
           )}

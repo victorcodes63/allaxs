@@ -34,6 +34,7 @@ import { EventDetailsTab } from "@/components/organizer/event-editor/EventDetail
 import { EventMediaTab } from "@/components/organizer/event-editor/EventMediaTab";
 import { EventTicketTiersTab } from "@/components/organizer/event-editor/EventTicketTiersTab";
 import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab";
+import { EventCouponsTab } from "@/components/organizer/event-editor/EventCouponsTab";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
 
 interface TicketType {
@@ -75,6 +76,7 @@ const EDITOR_TAB_IDS = [
   "details",
   "media",
   "ticket-tiers",
+  "coupons",
   "sales",
 ] as const;
 type EditorTabId = (typeof EDITOR_TAB_IDS)[number];
@@ -227,6 +229,19 @@ export default function AdminEventEditorPage() {
         <EventTicketTiersTab
           event={event}
           onEventUpdate={handleEventUpdate}
+          canEditOverride
+        />
+      ),
+    },
+    {
+      id: "coupons",
+      label: "Coupons",
+      content: (
+        <EventCouponsTab
+          eventId={event.id}
+          defaultCurrency={
+            event.ticketTypes?.find((t) => t.currency)?.currency ?? "KES"
+          }
           canEditOverride
         />
       ),

@@ -12,6 +12,8 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { userInitials } from "@/lib/hub-user";
+import { userCanSwitchAttendeeOrganizerHub } from "@/lib/auth/hub-routing";
+import { useAuth } from "@/lib/auth";
 import { NOTIFICATIONS_LAST_VISITED_AT_KEY, type NotificationCategory } from "@/lib/notifications-inbox";
 import {
   applyHubNotificationReadToSnapshot,
@@ -156,6 +158,8 @@ export function HubTopBar({
   innerClassName,
 }: HubTopBarProps) {
   const router = useRouter();
+  const { user: sessionUser } = useAuth();
+  const hubUser = sessionUser ?? user;
   const [search, setSearch] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -171,12 +175,16 @@ export function HubTopBar({
   const notificationsRef = useRef<HTMLDivElement>(null);
   const notificationsButtonRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
-  const initials = userInitials(user);
-  const canSwitchContext = Boolean(
-    user.roles?.includes("ATTENDEE") && user.roles?.includes("ORGANIZER"),
-  );
+  const initials = userInitials(hubUser);
+  const canSwitchContext = userCanSwitchAttendeeOrganizerHub(hubUser);
   const switchHref = hubKind === "attendee" ? "/organizer/dashboard" : "/dashboard";
   const switchLabel = hubKind === "attendee" ? "Host view" : "Attendee view";
+
+  const navigateHubContext = useCallback(() => {
+    setUserMenuOpen(false);
+    setNotificationsOpen(false);
+    router.push(switchHref, { scroll: false });
+  }, [router, switchHref]);
 
   const baseQuickLinks =
     hubKind === "attendee"
@@ -190,6 +198,7 @@ export function HubTopBar({
             { href: "/admin", label: "Overview" },
             { href: "/admin/events", label: "All events" },
             { href: "/admin/orders", label: "Orders" },
+            { href: "/admin/payouts", label: "Payouts" },
             { href: "/admin/users", label: "Users" },
             { href: "/admin/moderation", label: "Moderation queue" },
             { href: "/notifications", label: "Notifications" },
@@ -198,18 +207,11 @@ export function HubTopBar({
             { href: "/organizer/dashboard", label: "Overview" },
             { href: "/organizer/events", label: "Events" },
             { href: "/organizer/sales", label: "Sales & orders" },
+            { href: "/organizer/earnings", label: "Earnings" },
             { href: "/organizer/tickets", label: "Tickets" },
             { href: "/organizer/account", label: "Account" },
           ];
-  const quickLinks = canSwitchContext
-    ? [
-        {
-          href: switchHref,
-          label: `Switch to ${hubKind === "attendee" ? "Host" : "Attendee"}`,
-        },
-        ...baseQuickLinks,
-      ]
-    : baseQuickLinks;
+  const switchMenuLabel = `Switch to ${hubKind === "attendee" ? "Host" : "Attendee"}`;
 
   const loadNotifications = useCallback(async (opts?: { force?: boolean }) => {
     const force = opts?.force ?? false;
@@ -337,7 +339,7 @@ export function HubTopBar({
   }, [notifications, dropdownCategoryFilter]);
 
   return (
-    <header className="sticky top-0 z-30 shrink-0 border-b border-border/70 bg-background/75 pt-[env(safe-area-inset-top,0px)] shadow-[0_1px_0_rgba(255,255,255,0.05),0_8px_32px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+    <header className="sticky top-0 z-[38] shrink-0 border-b border-border/70 bg-background/75 pt-[env(safe-area-inset-top,0px)] shadow-[0_1px_0_rgba(255,255,255,0.05),0_8px_32px_-12px_rgba(0,0,0,0.35)] backdrop-blur-xl">
       <div className={`${innerClassName} relative`}>
         <button
           type="button"
@@ -400,12 +402,18 @@ export function HubTopBar({
         </form>
 
         {canSwitchContext ? (
-          <Link
-            href={switchHref}
-            className="hidden shrink-0 items-center rounded-[var(--radius-button)] border border-border/80 bg-surface/70 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-foreground/90 shadow-[var(--btn-shadow-outline)] transition-[border-color,background-color] hover:border-primary/35 hover:bg-wash xl:inline-flex"
+          <button
+            type="button"
+            title={
+              hubKind === "attendee"
+                ? "Open the organiser dashboard in the same session"
+                : "Return to fan home (tickets and browse) in the same session"
+            }
+            onClick={navigateHubContext}
+            className="relative z-10 inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-[var(--radius-button)] border border-border/80 bg-surface/70 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/90 shadow-[var(--btn-shadow-outline)] transition-[border-color,background-color] hover:border-primary/35 hover:bg-wash sm:max-w-none sm:px-3 sm:text-xs sm:tracking-[0.12em]"
           >
             {switchLabel}
-          </Link>
+          </button>
         ) : null}
 
         <div className="shrink-0">
@@ -575,10 +583,10 @@ export function HubTopBar({
             </span>
             <span className="hidden min-w-0 max-w-[8rem] text-left sm:block">
               <span className="block truncate text-xs font-semibold leading-tight text-foreground">
-                {user.name || "Member"}
+                {hubUser.name || "Member"}
               </span>
               <span className="block truncate text-[10px] leading-tight text-muted">
-                {user.email}
+                {hubUser.email}
               </span>
             </span>
             <ChevronDown
@@ -598,12 +606,22 @@ export function HubTopBar({
             >
               <div className="border-b border-border/60 px-3 py-2.5 sm:hidden">
                 <p className="truncate text-sm font-semibold text-foreground">
-                  {user.name || "Member"}
+                  {hubUser.name || "Member"}
                 </p>
-                <p className="truncate text-xs text-muted">{user.email}</p>
+                <p className="truncate text-xs text-muted">{hubUser.email}</p>
               </div>
               <div className="py-1" role="none">
-                {quickLinks.map((item) => (
+                {canSwitchContext ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="block w-full px-3 py-2 text-left text-sm text-foreground/90 transition-colors hover:bg-wash"
+                    onClick={navigateHubContext}
+                  >
+                    {switchMenuLabel}
+                  </button>
+                ) : null}
+                {baseQuickLinks.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}

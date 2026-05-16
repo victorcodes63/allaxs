@@ -40,6 +40,16 @@ describe('OrganizerProfilesController', () => {
     const mockService = {
       findByUserId: jest.fn(),
       upsertForUser: jest.fn(),
+      serializeOrganizerProfile: jest.fn((p: OrganizerProfile) => ({
+        id: p.id,
+        orgName: p.orgName,
+        payoutProfile: {
+          isComplete: true,
+          missingItems: [],
+          adminVerified: p.verified,
+          readyForSettlement: false,
+        },
+      })),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -69,7 +79,14 @@ describe('OrganizerProfilesController', () => {
       const result = await controller.getMyProfile(mockUser);
 
       expect(service.findByUserId).toHaveBeenCalledWith('user-id');
-      expect(result).toEqual(mockProfile);
+      expect(service.serializeOrganizerProfile).toHaveBeenCalledWith(mockProfile);
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: mockProfile.id,
+          orgName: mockProfile.orgName,
+          payoutProfile: expect.any(Object),
+        }),
+      );
     });
 
     it('should throw NotFoundException when profile not found', async () => {
@@ -97,11 +114,27 @@ describe('OrganizerProfilesController', () => {
       } as OrganizerProfile;
 
       service.upsertForUser.mockResolvedValue(newProfile);
+      service.serializeOrganizerProfile.mockReturnValue({
+        id: newProfile.id,
+        orgName: newProfile.orgName,
+        payoutProfile: {
+          isComplete: true,
+          missingItems: [],
+          adminVerified: false,
+          readyForSettlement: false,
+        },
+      });
 
       const result = await controller.upsertMyProfile(mockUser, createDto);
 
       expect(service.upsertForUser).toHaveBeenCalledWith('user-id', createDto);
-      expect(result).toEqual(newProfile);
+      expect(service.serializeOrganizerProfile).toHaveBeenCalledWith(newProfile);
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: newProfile.id,
+          payoutProfile: expect.any(Object),
+        }),
+      );
     });
 
     it('should update existing profile and return it', async () => {
@@ -111,6 +144,16 @@ describe('OrganizerProfilesController', () => {
       } as OrganizerProfile;
 
       service.upsertForUser.mockResolvedValue(updatedProfile);
+      service.serializeOrganizerProfile.mockReturnValue({
+        id: updatedProfile.id,
+        orgName: 'Updated Org',
+        payoutProfile: {
+          isComplete: true,
+          missingItems: [],
+          adminVerified: false,
+          readyForSettlement: false,
+        },
+      });
 
       const result = await controller.upsertMyProfile(mockUser, {
         orgName: 'Updated Org',
@@ -118,7 +161,12 @@ describe('OrganizerProfilesController', () => {
       });
 
       expect(service.upsertForUser).toHaveBeenCalled();
-      expect(result).toEqual(updatedProfile);
+      expect(result).toEqual(
+        expect.objectContaining({
+          orgName: 'Updated Org',
+          payoutProfile: expect.any(Object),
+        }),
+      );
     });
   });
 });
