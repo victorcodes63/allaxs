@@ -18,6 +18,7 @@ Set variables in **Vercel → Project → Settings → Environment Variables** (
 | API base for proxies + client | — | `API_URL` + `NEXT_PUBLIC_API_BASE_URL` | **Yes** — same staging API URL |
 | Real checkout (not session-only) | Paystack keys on API | `NEXT_PUBLIC_USE_API_CHECKOUT=true` | Web flag required for Paystack init proxy |
 | Order / ticket emails | `RESEND_API_KEY`, `RESEND_FROM` | — | Verified domain in Resend |
+| HTML email wordmark | `FRONTEND_URL` → `/brand/logo-header.png` | `public/brand/logo-header.png` | Optional override: API `EMAIL_LOGO_URL` |
 | Paystack charges + refunds | `PAYSTACK_SECRET_KEY` | — | Test key on staging |
 | Paystack webhooks | `PAYSTACK_WEBHOOK_SECRET` (optional) | — | Falls back to `PAYSTACK_SECRET_KEY` if unset |
 | Paystack dashboard webhook URL | — | — | `https://<staging-api-host>/api/webhooks/paystack` |

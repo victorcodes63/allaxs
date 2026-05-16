@@ -41,9 +41,7 @@ export class EmailService {
     this.resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     this.resendFrom = this.configService.get<string>('RESEND_FROM');
     this.frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    // Only use a logo URL when explicitly configured.
-    // Email clients will show a broken-image icon if the URL is invalid/unreachable.
-    this.emailLogoUrl = this.configService.get<string>('EMAIL_LOGO_URL');
+    this.emailLogoUrl = this.resolveEmailLogoUrl();
     this.isDevelopment =
       this.configService.get<string>('NODE_ENV', 'development') ===
       'development';
@@ -78,6 +76,33 @@ export class EmailService {
         'FRONTEND_URL is not configured. Email links may be incorrect.',
       );
     }
+
+    if (this.emailLogoUrl) {
+      const explicit = this.configService.get<string>('EMAIL_LOGO_URL')?.trim();
+      if (explicit) {
+        this.logger.log(`Email header logo: EMAIL_LOGO_URL`);
+      } else {
+        this.logger.log(
+          `Email header logo: ${this.emailLogoUrl} (derived from FRONTEND_URL)`,
+        );
+      }
+    } else {
+      this.logger.warn(
+        'No email header logo URL (set EMAIL_LOGO_URL or FRONTEND_URL). Emails use text fallback branding.',
+      );
+    }
+  }
+
+  /**
+   * Wordmark for HTML emails (white card). Matches Web `public/brand/logo-header.png`.
+   * Override with EMAIL_LOGO_URL when hosting elsewhere.
+   */
+  private resolveEmailLogoUrl(): string | undefined {
+    const explicit = this.configService.get<string>('EMAIL_LOGO_URL')?.trim();
+    if (explicit) return explicit;
+    const base = this.configService.get<string>('FRONTEND_URL')?.trim();
+    if (!base) return undefined;
+    return `${base.replace(/\/$/, '')}/brand/logo-header.png`;
   }
 
   /** Resend's Node SDK returns `{ error }` instead of throwing for many API failures. */
@@ -162,7 +187,7 @@ export class EmailService {
     const linkText = input.linkLabel ?? 'Or copy and paste this link into your browser:';
     const appName = this.configService.get<string>('APP_NAME', 'All AXS');
     const brandBlock = this.emailLogoUrl
-      ? `<img src="${this.emailLogoUrl}" alt="${appName} logo" height="36" style="display:block;height:36px;width:auto;border:0;outline:none;text-decoration:none;" />`
+      ? `<img src="${this.emailLogoUrl}" alt="${appName}" width="180" style="display:block;width:180px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;margin:0 auto;" />`
       : `
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
           <tr>
@@ -317,7 +342,7 @@ export class EmailService {
 
     const html = this.renderEmailShell({
       preheader: `Verify your ${appName} account.`,
-      title: `Welcome to ${appName}${user.name ? `, ${user.name}` : ''}`,
+      title: `Verify your email${user.name ? `, ${user.name}` : ''}`,
       intro: 'Thanks for registering. Confirm your email address to activate your account.',
       actionLabel: 'Verify Email Address',
       actionUrl: verificationUrl,

@@ -83,7 +83,9 @@ describe('EmailService', () => {
         from: 'noreply@test.com',
         to: 'test@example.com',
         subject: 'Verify your Test App account',
-        html: expect.stringContaining('Verify Email Address'),
+        html: expect.stringMatching(
+          /Verify Email Address[\s\S]*\/brand\/logo-header\.png/,
+        ),
       });
     });
 
@@ -94,7 +96,7 @@ describe('EmailService', () => {
       expect(mockResendSend).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'test@example.com',
-          html: expect.stringContaining('Welcome to Test App'),
+          html: expect.stringContaining('Verify your email'),
         }),
       );
     });
@@ -109,7 +111,9 @@ describe('EmailService', () => {
         from: 'noreply@test.com',
         to: 'test@example.com',
         subject: 'Reset your Test App password',
-        html: expect.stringContaining('Reset Password'),
+        html: expect.stringMatching(
+          /Reset Password[\s\S]*\/brand\/logo-header\.png/,
+        ),
       });
     });
 
@@ -149,8 +153,50 @@ describe('EmailService', () => {
         from: 'noreply@test.com',
         to: 'test@example.com',
         subject: 'Welcome to Test App',
-        html: expect.stringContaining('Welcome to Test App'),
+        html: expect.stringMatching(
+          /Welcome to Test App[\s\S]*\/brand\/logo-header\.png/,
+        ),
       });
+    });
+  });
+
+  describe('email header logo', () => {
+    it('prefers EMAIL_LOGO_URL over FRONTEND_URL default', async () => {
+      configService.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        const config: Record<string, unknown> = {
+          RESEND_API_KEY: 're_test_key',
+          RESEND_FROM: 'noreply@test.com',
+          FRONTEND_URL: 'http://localhost:3000',
+          EMAIL_LOGO_URL: 'https://cdn.example/custom-logo.png',
+          APP_NAME: 'Test App',
+        };
+        return config[key] ?? defaultValue;
+      });
+
+      const module = await Test.createTestingModule({
+        providers: [
+          EmailService,
+          { provide: ConfigService, useValue: configService },
+          {
+            provide: TicketPdfService,
+            useValue: {
+              buildTicketPdfBuffer: jest
+                .fn()
+                .mockResolvedValue(Buffer.from('%PDF-smoke')),
+            },
+          },
+        ],
+      }).compile();
+
+      const logoService = module.get(EmailService);
+      const user = createMockUser();
+      await logoService.sendWelcomeEmail(user);
+
+      expect(mockResendSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          html: expect.stringContaining('https://cdn.example/custom-logo.png'),
+        }),
+      );
     });
   });
 });

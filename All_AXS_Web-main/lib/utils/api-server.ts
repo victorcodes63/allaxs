@@ -2,13 +2,11 @@
  * Server-side API client for SSR pages
  * Uses fetch directly to the NestJS backend.
  *
- * Demo listings (no API):
- * - NEXT_PUBLIC_USE_DEMO_EVENTS=true  → always use demo data
- * - NEXT_PUBLIC_USE_DEMO_EVENTS=false → always use the API
- * - unset                             → in development, use demo; in production, use API
+ * Demo listings: see `lib/public-events-mode.ts` (disabled when API checkout is on).
  */
 
 import { DEMO_PUBLIC_EVENTS } from "@/lib/data/demo-public-events";
+import { isDemoPublicEventsMode } from "@/lib/public-events-mode";
 import type { PublicEvent, PublicEventsResponse } from "@/lib/types/public-event";
 
 export type { PublicEvent, PublicEventsResponse };
@@ -17,13 +15,6 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:8080";
-
-function isDemoEventsMode(): boolean {
-  const flag = process.env.NEXT_PUBLIC_USE_DEMO_EVENTS;
-  if (flag === "false") return false;
-  if (flag === "true") return true;
-  return process.env.NODE_ENV === "development";
-}
 
 function filterDemoPublicEvents(options: {
   page?: number;
@@ -80,7 +71,7 @@ export async function fetchPublicEvents(options: {
   dateTo?: string;
   city?: string;
 }): Promise<PublicEventsResponse> {
-  if (isDemoEventsMode()) {
+  if (isDemoPublicEventsMode()) {
     return filterDemoPublicEvents(options);
   }
 
@@ -113,7 +104,7 @@ export async function fetchPublicEvents(options: {
  * Fetch event by slug
  */
 export async function fetchEventBySlug(slug: string): Promise<PublicEvent> {
-  if (isDemoEventsMode()) {
+  if (isDemoPublicEventsMode()) {
     const found = DEMO_PUBLIC_EVENTS.find((e) => e.slug === slug);
     if (!found) {
       throw new Error("Event not found");
@@ -144,7 +135,7 @@ export async function fetchEventBySlug(slug: string): Promise<PublicEvent> {
  * Get event slug by ID (for redirects)
  */
 export async function getEventSlugById(id: string): Promise<string> {
-  if (isDemoEventsMode()) {
+  if (isDemoPublicEventsMode()) {
     const found = DEMO_PUBLIC_EVENTS.find((e) => e.id === id);
     if (!found) {
       throw new Error("Event not found");

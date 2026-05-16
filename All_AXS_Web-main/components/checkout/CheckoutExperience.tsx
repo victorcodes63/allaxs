@@ -17,6 +17,7 @@ import {
   type StoredOrder,
 } from "@/lib/checkout-storage";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
+import { isUuid } from "@/lib/public-events-mode";
 import {
   previewCheckoutCoupon,
   type CouponPreviewResponse,
@@ -303,6 +304,12 @@ export function CheckoutExperience({
     setSubmitting(true);
     try {
       if (isApiCheckoutEnabled() && signedIn) {
+        if (!isUuid(event.id) || lineItems.some((li) => !isUuid(li.ticketTypeId))) {
+          setError(
+            "This event can't be purchased with live checkout right now. Go back to Browse events, open the event again, and retry. If it still fails, contact support.",
+          );
+          return;
+        }
         const res = await fetch("/api/checkout/paystack/init", {
           method: "POST",
           credentials: "same-origin",

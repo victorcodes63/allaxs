@@ -27,6 +27,8 @@ Point `API_URL` and `NEXT_PUBLIC_API_BASE_URL` at the **production URL** of the 
 | `NEXT_PUBLIC_USE_DEMO_EVENTS`    | `true` |
 | `NEXT_PUBLIC_SITE_URL`           | Your production URL, e.g. `https://your-app.vercel.app` |
 
+Do **not** set `NEXT_PUBLIC_USE_API_CHECKOUT=true` with demo events — checkout needs real event UUIDs from the API.
+
 ### Full stack (API on Vercel too)
 
 | Variable                         | Value |
