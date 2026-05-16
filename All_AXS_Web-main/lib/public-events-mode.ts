@@ -5,6 +5,10 @@
  * which requires UUID event and ticket type ids from the database.
  */
 export function isDemoPublicEventsMode(): boolean {
+  // Never serve fixture catalog on Vercel Production, even if env is mis-set.
+  if (process.env.VERCEL_ENV === "production") {
+    return false;
+  }
   if (process.env.NEXT_PUBLIC_USE_API_CHECKOUT === "true") {
     return false;
   }

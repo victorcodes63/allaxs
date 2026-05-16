@@ -22,9 +22,7 @@ import {
 } from "@/lib/auth/post-auth-redirect";
 import { useAuth } from "@/lib/auth";
 
-function registerCardSubtitle(): string {
-  return "One account for fans and hosts. Switch views anytime from the hub bar—no need to sign out again.";
-}
+const AUTH_SUBTITLE = "One account for fans and hosts.";
 
 function RegisterForm() {
   const router = useRouter();
@@ -55,8 +53,6 @@ function RegisterForm() {
 
       if (response.status === 200 || response.status === 201) {
         const snapshot = await fetchPostAuthSnapshot();
-        // Push the new user into the shared <AuthProvider> so the
-        // chrome and role-aware redirects react immediately.
         await refreshAuth();
         const path = resolvePostAuthRedirect({
           nextParam: searchParams.get("next"),
@@ -78,67 +74,56 @@ function RegisterForm() {
 
   return (
     <AuthPageShell>
-      <AuthCard wide title="Create an Account" subtitle={registerCardSubtitle()}>
-        <AuthSplitLayout
-          rail={<AuthIntentHint searchParams={searchParams} basePath="/register" />}
-        >
-          <div className="space-y-6">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Account</p>
-              <h2 className="mt-1 font-display text-base font-semibold tracking-tight text-foreground">
-                Your details
-              </h2>
-            </div>
-            <div className="rounded-[var(--radius-card)] border border-border/50 bg-background/30 p-5 sm:p-6">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                {error && (
-                  <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm text-primary">
-                    {error}
-                  </div>
-                )}
+      <AuthCard wide title="Create account" subtitle={AUTH_SUBTITLE}>
+        <AuthSplitLayout rail={<AuthIntentHint searchParams={searchParams} basePath="/register" />}>
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-2.5 [&_label]:mb-0.5 [&_label]:text-xs"
+          >
+            {error ? (
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
+                {error}
+              </div>
+            ) : null}
 
-                <Input
-                  label="Name"
-                  type="text"
-                  autoComplete="name"
-                  placeholder="John Doe"
-                  {...register("name")}
-                  error={errors.name?.message}
-                />
+            <Input
+              label="Name"
+              type="text"
+              autoComplete="name"
+              placeholder="Your name"
+              {...register("name")}
+              error={errors.name?.message}
+            />
 
-                <Input
-                  label="Email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  {...register("email")}
-                  error={errors.email?.message}
-                />
+            <Input
+              label="Email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              {...register("email")}
+              error={errors.email?.message}
+            />
 
-                <Input
-                  label="Password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="••••••••"
-                  {...register("password")}
-                  error={errors.password?.message}
-                />
+            <Input
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="••••••••"
+              {...register("password")}
+              error={errors.password?.message}
+            />
 
-                <Button type="submit" disabled={isSubmitting} className="mt-1">
-                  {isSubmitting ? "Creating account..." : "Sign Up"}
-                </Button>
-              </form>
-            </div>
+            <Button type="submit" disabled={isSubmitting} className="mt-0.5 w-full">
+              {isSubmitting ? "Creating…" : "Sign Up"}
+            </Button>
+          </form>
 
-            <div className="text-center">
-              <p className="text-sm text-muted">
-                Already have an account?{" "}
-                <Link href={loginHref} className="font-medium text-primary hover:underline">
-                  Sign in
-                </Link>
-              </p>
-            </div>
-          </div>
+          <p className="pt-2 text-center text-[11px] text-muted sm:text-xs">
+            Already have an account?{" "}
+            <Link href={loginHref} className="font-medium text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
         </AuthSplitLayout>
       </AuthCard>
     </AuthPageShell>
@@ -150,11 +135,11 @@ export default function RegisterPage() {
     <Suspense
       fallback={
         <AuthPageShell>
-          <p className="text-lg text-muted">Loading…</p>
+          <p className="text-center text-sm text-muted">Loading…</p>
         </AuthPageShell>
       }
     >
-      <AuthSessionEntryGate title="Create an Account" subtitle={registerCardSubtitle()}>
+      <AuthSessionEntryGate title="Create account" subtitle={AUTH_SUBTITLE}>
         <RegisterForm />
       </AuthSessionEntryGate>
     </Suspense>

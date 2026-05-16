@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "validate:production-env": "node scripts/validate-production-env.mjs",
+    "prebuild": "node scripts/validate-production-env.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
@@ -14,6 +16,7 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@react-oauth/google": "^0.12.2",
+    "@sentry/nextjs": "^10.53.1",
     "@vercel/blob": "^2.3.3",
     "axios": "^1.13.2",
     "framer-motion": "^12.38.0",

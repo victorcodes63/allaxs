@@ -39,7 +39,7 @@ Do **not** set `NEXT_PUBLIC_USE_API_CHECKOUT=true` with demo events — checkout
 | `NEXT_PUBLIC_USE_DEMO_EVENTS`    | `false` (or omit; production then uses the API for public events) |
 | `NEXT_PUBLIC_USE_API_CHECKOUT`   | `true` for Paystack + persisted orders/tickets |
 
-**Staging / go-live:** copy-paste env blocks and smoke-test steps in **[STAGING_CHECKLIST.md](./STAGING_CHECKLIST.md)**. API Paystack, Resend, and `FRONTEND_URL` live on the **backend** Vercel project.
+**Staging / go-live:** start with **[PHASE0_GO_LIVE.md](./PHASE0_GO_LIVE.md)**, then **[STAGING_CHECKLIST.md](./STAGING_CHECKLIST.md)**. Production builds **fail** if `NEXT_PUBLIC_USE_DEMO_EVENTS=true` on Vercel Production. API Paystack, Resend, and `FRONTEND_URL` live on the **backend** Vercel project.
 
 Push to `main` (or your production branch) and Vercel redeploys automatically.
 

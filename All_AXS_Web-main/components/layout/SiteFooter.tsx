@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CtaArrow } from "@/components/ui/CtaArrow";
 import { FooterBackToTop } from "@/components/layout/FooterBackToTop";
 import { FooterStayInTheLoop } from "@/components/layout/FooterStayInTheLoop";
+import { AuthFooterDemoLogins } from "@/components/auth/AuthFooterDemoLogins";
 
 const FOOTER_NAV = [
   ["/", "Home"],
@@ -71,6 +72,7 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
                 {label}
               </Link>
             ))}
+            <AuthFooterDemoLogins />
           </nav>
         </div>
         <div className="border-t border-[color:var(--footer-legal-border)] bg-[color:var(--footer-legal-bg)] text-white">

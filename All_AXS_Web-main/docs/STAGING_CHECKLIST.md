@@ -1,5 +1,7 @@
 # Staging environment checklist
 
+**Start here:** [PHASE0_GO_LIVE.md](./PHASE0_GO_LIVE.md) (production guards, Sentry, redeploy checklist).
+
 Use this before calling staging “ready” for paid checkout and email flows.
 
 Set variables in **Vercel → Project → Settings → Environment Variables** (Preview and/or Production). Do not commit secrets. Copy the blocks below into the dashboard and replace placeholders.
