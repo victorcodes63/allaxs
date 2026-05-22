@@ -27,6 +27,10 @@ export class User extends BaseEntity {
   @Column({ type: 'enum', enum: UserStatus, default: UserStatus.ACTIVE })
   status!: UserStatus;
 
+  /** Set when the account is provisioned during public guest checkout. */
+  @Column({ type: 'timestamptz', nullable: true })
+  autoCreatedAt?: Date | null;
+
   @OneToOne(() => OrganizerProfile, (o) => o.user)
   organizer?: OrganizerProfile;
 

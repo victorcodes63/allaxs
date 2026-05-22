@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Helper to decode JWT without verification (just to check exp)
-// Uses Buffer which is available in Next.js Edge runtime
 function decodeJWT(token: string): { exp?: number } | null {
   try {
     const base64Url = token.split(".")[1];
@@ -46,6 +45,7 @@ function isAuthEntryPath(pathname: string): boolean {
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/check-email",
     "/resend-verification",
   ] as const;
   return authPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -79,7 +79,7 @@ async function tryRefreshAndContinue(request: NextRequest): Promise<NextResponse
   return res;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const accessToken = request.cookies.get("accessToken")?.value;
 
@@ -125,17 +125,19 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  runtime: "nodejs",
   matcher: [
     "/login",
     "/register",
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/check-email",
     "/resend-verification",
     "/dashboard/:path*",
     "/organizer/:path*",
     "/admin/:path*",
     "/account/:path*",
-    /* Public checkout URL: buyers sign in or register before Paystack; /tickets stays public for session passes. */
+    /* Public checkout: guest flow (no sign-in); /tickets stays public for session passes. */
   ],
 };

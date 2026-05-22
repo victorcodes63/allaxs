@@ -8,6 +8,7 @@ import {
   shouldUnoptimizeEventImage,
 } from "@/lib/utils/image";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
+import { resolveCurrencyFromTiers } from "@/lib/currency";
 
 export const revalidate = 300;
 
@@ -77,8 +78,7 @@ export default async function DashboardEventDetailPage({ params }: Props) {
     event.ticketTypes && event.ticketTypes.length > 0
       ? Math.min(...event.ticketTypes.map((t) => t.priceCents))
       : null;
-  const currency =
-    event.ticketTypes && event.ticketTypes.length > 0 ? event.ticketTypes[0].currency : "KES";
+  const currency = resolveCurrencyFromTiers(event.ticketTypes);
   const availableTiers = event.ticketTypes?.filter(isTierAvailable) ?? [];
   const location = [event.venue, event.city, event.country].filter(Boolean).join(" · ");
 

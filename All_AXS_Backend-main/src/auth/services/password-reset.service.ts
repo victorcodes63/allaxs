@@ -100,6 +100,30 @@ export class PasswordResetService {
   }
 
   /**
+   * Persist a reset token without sending email (e.g. embed in ticket email).
+   */
+  async createResetToken(user: User, ipAddress?: string): Promise<string> {
+    const token = this.generateToken();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await this.passwordResetRepository.update(
+      { userId: user.id, isUsed: false },
+      { isUsed: true, usedAt: new Date() },
+    );
+
+    const passwordReset = this.passwordResetRepository.create({
+      userId: user.id,
+      email: user.email,
+      token,
+      expiresAt,
+      isUsed: false,
+      ipAddress,
+    });
+    await this.passwordResetRepository.save(passwordReset);
+    return token;
+  }
+
+  /**
    * Mark a password reset token as used
    */
   async markTokenAsUsed(token: string): Promise<void> {

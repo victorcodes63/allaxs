@@ -80,6 +80,14 @@ export enum TicketTypeStatus {
   SOLD_OUT = 'SOLD_OUT',
 }
 
+export enum WaitlistStatus {
+  WAITING = 'WAITING',
+  NOTIFIED = 'NOTIFIED',
+  PURCHASED = 'PURCHASED',
+  EXPIRED = 'EXPIRED',
+  CANCELLED = 'CANCELLED',
+}
+
 /** Organizer ledger / settlement (signed amount_cents: positive = owed to organizer). */
 export enum LedgerEntryType {
   ORDER_EARNINGS = 'ORDER_EARNINGS',
@@ -93,4 +101,10 @@ export enum PayoutBatchStatus {
   EXPORTED = 'EXPORTED',
   MARKED_PAID = 'MARKED_PAID',
   CANCELLED = 'CANCELLED',
+}
+
+export enum RefundRequestStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  DENIED = 'DENIED',
 }

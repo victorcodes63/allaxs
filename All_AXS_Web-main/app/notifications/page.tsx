@@ -1,8 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth";
+import { preferredHubShell } from "@/lib/auth/hub-routing";
+import { applyHubNotificationMarkAllReadToSnapshot } from "@/lib/notifications-hub-list";
 import { NOTIFICATIONS_LAST_VISITED_AT_KEY } from "@/lib/notifications-inbox";
+import { resolveNotificationLink } from "@/lib/notifications-navigation";
+import { loadOrganizerEventSlugIndex } from "@/lib/organizer-event-slug-index";
 
 type NotificationItem = {
   id: string;
@@ -34,6 +39,8 @@ const PAGE_SIZE = 20;
 
 export default function NotificationsPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const hub = preferredHubShell(user);
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -43,6 +50,8 @@ export default function NotificationsPage() {
   const [offset, setOffset] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [lastVisitedAt, setLastVisitedAt] = useState<number | null>(null);
+  const [organizerSlugToId, setOrganizerSlugToId] = useState<Record<string, string>>({});
+  const autoMarkedAllReadRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -95,6 +104,11 @@ export default function NotificationsPage() {
     void loadPage(0, false);
   }, [loadPage]);
 
+  useEffect(() => {
+    if (hub !== "organizer") return;
+    void loadOrganizerEventSlugIndex().then(setOrganizerSlugToId);
+  }, [hub]);
+
   const markRead = useCallback(async (id: string) => {
     const target = items.find((item) => item.id === id);
     if (!target || target.isRead) return;
@@ -113,6 +127,7 @@ export default function NotificationsPage() {
   const markAllRead = useCallback(async () => {
     setItems((prev) => prev.map((item) => ({ ...item, isRead: true })));
     setUnreadCount(0);
+    applyHubNotificationMarkAllReadToSnapshot();
     try {
       await fetch("/api/notifications/read-all", {
         method: "POST",
@@ -122,6 +137,14 @@ export default function NotificationsPage() {
       /* optimistic */
     }
   }, []);
+
+  useEffect(() => {
+    if (loading || error || autoMarkedAllReadRef.current) return;
+    autoMarkedAllReadRef.current = true;
+    if (unreadCount > 0) {
+      void markAllRead();
+    }
+  }, [loading, error, unreadCount, markAllRead]);
 
   const hasMore = useMemo(() => items.length < total, [items.length, total]);
   const filteredItems = useMemo(() => {
@@ -212,7 +235,12 @@ export default function NotificationsPage() {
                   type="button"
                   onClick={() => {
                     void markRead(item.id);
-                    if (item.link) router.push(item.link);
+                    const href = resolveNotificationLink(item.link, {
+                      hub,
+                      category: item.category,
+                      organizerSlugToId: hub === "organizer" ? organizerSlugToId : undefined,
+                    });
+                    if (href) router.push(href);
                   }}
                   className="w-full rounded-[var(--radius-card)] border border-border/70 bg-background/40 px-4 py-3 text-left transition-colors hover:bg-wash"
                 >

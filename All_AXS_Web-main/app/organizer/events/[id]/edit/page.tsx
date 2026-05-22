@@ -16,6 +16,9 @@ import { EventMediaTab } from "@/components/organizer/event-editor/EventMediaTab
 import { EventTicketTiersTab } from "@/components/organizer/event-editor/EventTicketTiersTab";
 import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab";
 import { EventCouponsTab } from "@/components/organizer/event-editor/EventCouponsTab";
+import { EventScannerTab } from "@/components/organizer/event-editor/EventScannerTab";
+import { OrganizerAdminEditBanner } from "@/components/organizer/event-editor/OrganizerAdminEditBanner";
+import { resolveCurrencyFromTiers } from "@/lib/currency";
 import { EventStatus } from "@/lib/validation/event";
 
 interface TicketType {
@@ -54,6 +57,7 @@ const EDITOR_TAB_IDS = [
   "ticket-tiers",
   "coupons",
   "sales",
+  "scanner",
 ] as const;
 type EditorTabId = (typeof EDITOR_TAB_IDS)[number];
 
@@ -171,8 +175,7 @@ export default function EventEditorPage() {
     );
   }
 
-  const defaultCouponCurrency =
-    event.ticketTypes?.find((t) => t.currency)?.currency ?? "KES";
+  const defaultCouponCurrency = resolveCurrencyFromTiers(event.ticketTypes);
 
   const tabs = [
     {
@@ -214,6 +217,13 @@ export default function EventEditorPage() {
       label: "Sales",
       content: <EventSalesTab eventId={event.id} eventTitle={event.title} />,
     },
+    {
+      id: "scanner",
+      label: "Scanner Links",
+      content: (
+        <EventScannerTab eventId={event.id} eventEndAt={event.endAt} />
+      ),
+    },
   ];
 
   return (
@@ -232,6 +242,8 @@ export default function EventEditorPage() {
           ← Back to events
         </Link>
       </div>
+
+      <OrganizerAdminEditBanner eventId={event.id} />
 
       <Suspense
         fallback={

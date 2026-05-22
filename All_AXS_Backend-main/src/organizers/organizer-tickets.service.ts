@@ -9,7 +9,7 @@ import { Brackets, Repository } from 'typeorm';
 import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
 import { Event } from '../events/entities/event.entity';
 import { Ticket } from '../domain/ticket.entity';
-import { OrderStatus, TicketStatus } from '../domain/enums';
+import { OrderStatus, Role, TicketStatus } from '../domain/enums';
 
 export type OrganizerTicketRow = {
   id: string;
@@ -31,6 +31,18 @@ export type OrganizerTicketRow = {
 
 function escapeLike(raw: string): string {
   return raw.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
+function escapeCsvCell(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function sanitizeFilenameSlug(raw: string): string {
+  const trimmed = raw.trim().replace(/[^a-zA-Z0-9_-]+/g, '-');
+  return trimmed.replace(/^-+|-+$/g, '') || 'event';
 }
 
 @Injectable()
@@ -232,5 +244,71 @@ export class OrganizerTicketsService {
     };
 
     return { ticket: row };
+  }
+
+  async exportAttendeesCsv(
+    userId: string,
+    userRoles: Role[],
+    eventId: string,
+  ): Promise<{ csv: string; filename: string }> {
+    const isAdmin = userRoles.includes(Role.ADMIN);
+
+    let event: Event | null = null;
+    if (isAdmin) {
+      event = await this.eventRepository.findOne({ where: { id: eventId } });
+      if (!event) {
+        throw new NotFoundException('Event not found');
+      }
+    } else {
+      const profile = await this.getOrganizerProfileOrThrow(userId);
+      event = await this.eventRepository.findOne({
+        where: { id: eventId, organizer: { id: profile.id } },
+      });
+      if (!event) {
+        throw new ForbiddenException(
+          'Event not found or you do not have access to it.',
+        );
+      }
+    }
+
+    const rows = await this.ticketRepository
+      .createQueryBuilder('t')
+      .innerJoinAndSelect('t.order', 'o')
+      .innerJoin('o.event', 'e')
+      .leftJoinAndSelect('t.ticketType', 'tt')
+      .where('e.id = :eventId', { eventId })
+      .andWhere('o.status = :paid', { paid: OrderStatus.PAID })
+      .orderBy('t.createdAt', 'ASC')
+      .addOrderBy('t.id', 'ASC')
+      .getMany();
+
+    const header = [
+      'Attendee Name',
+      'Email',
+      'Tier Name',
+      'Order Reference',
+      'Ticket Status',
+      'Checked In',
+    ];
+    const lines = [header.map(escapeCsvCell).join(',')];
+
+    for (const t of rows) {
+      const email = (t.attendeeEmail || t.order?.email || '').trim();
+      const name = (t.attendeeName || '').trim();
+      const tierName = t.ticketType?.name ?? 'Ticket';
+      const orderRef = (t.order?.reference || t.orderId).trim();
+      const status = t.status;
+      const checkedIn = t.status === TicketStatus.CHECKED_IN ? 'yes' : 'no';
+
+      lines.push(
+        [name, email, tierName, orderRef, status, checkedIn]
+          .map(escapeCsvCell)
+          .join(','),
+      );
+    }
+
+    const filename = `${sanitizeFilenameSlug(event.slug || event.title)}-attendees.csv`;
+
+    return { csv: `${lines.join('\n')}\n`, filename };
   }
 }

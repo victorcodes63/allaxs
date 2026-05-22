@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { loadAllTickets, type StoredTicket } from "@/lib/checkout-storage";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
@@ -43,10 +43,40 @@ function compactTicketRef(id: string): string {
   return id.startsWith("tk_") ? id.slice(3, 11).toUpperCase() : id.slice(0, 8).toUpperCase();
 }
 
+type ResendState = "idle" | "sending" | "sent" | "failed";
+
+type OrderGroup = {
+  orderId: string;
+  eventTitle: string;
+  ticketCount: number;
+};
+
+function groupTicketsByOrder(tickets: StoredTicket[]): OrderGroup[] {
+  const groups = new Map<string, OrderGroup>();
+  for (const ticket of tickets) {
+    const orderId = ticket.orderId?.trim();
+    if (!orderId) continue;
+    const existing = groups.get(orderId);
+    if (existing) {
+      existing.ticketCount += 1;
+      continue;
+    }
+    groups.set(orderId, {
+      orderId,
+      eventTitle: ticket.eventTitle?.trim() || "Your event",
+      ticketCount: 1,
+    });
+  }
+  return [...groups.values()];
+}
+
 export function TicketsList() {
   const [mounted, setMounted] = useState(false);
   const [apiTickets, setApiTickets] = useState<StoredTicket[] | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [resendByOrder, setResendByOrder] = useState<Record<string, ResendState>>({});
+
+  const apiCheckout = isApiCheckoutEnabled();
 
   useEffect(() => {
     const t = window.setTimeout(() => setMounted(true), 0);
@@ -54,7 +84,7 @@ export function TicketsList() {
   }, []);
 
   useEffect(() => {
-    if (!mounted || !isApiCheckoutEnabled()) return;
+    if (!mounted || !apiCheckout) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -78,21 +108,39 @@ export function TicketsList() {
     return () => {
       cancelled = true;
     };
-  }, [mounted]);
+  }, [mounted, apiCheckout]);
 
-  if (!mounted) {
-    return <p className="text-muted py-12 text-center">Loading tickets…</p>;
-  }
-
-  const sessionTickets = loadAllTickets();
-  const tickets: StoredTicket[] = !isApiCheckoutEnabled()
+  const sessionTickets = mounted ? loadAllTickets() : [];
+  const tickets: StoredTicket[] = !apiCheckout
     ? sessionTickets
     : apiError
       ? sessionTickets
       : mergeTicketsById(apiTickets ?? [], sessionTickets);
 
+  const orderGroups = useMemo(() => groupTicketsByOrder(tickets), [tickets]);
+
+  const resendTicketEmail = async (orderId: string) => {
+    setResendByOrder((prev) => ({ ...prev, [orderId]: "sending" }));
+    try {
+      const res = await fetch(`/api/checkout/orders/${orderId}/resend-tickets`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      setResendByOrder((prev) => ({
+        ...prev,
+        [orderId]: res.ok ? "sent" : "failed",
+      }));
+    } catch {
+      setResendByOrder((prev) => ({ ...prev, [orderId]: "failed" }));
+    }
+  };
+
   const awaitingServerList =
-    isApiCheckoutEnabled() && apiTickets === null && !apiError && tickets.length === 0;
+    apiCheckout && apiTickets === null && !apiError && tickets.length === 0;
+
+  if (!mounted) {
+    return <p className="text-muted py-12 text-center">Loading tickets…</p>;
+  }
 
   if (awaitingServerList) {
     return <p className="text-muted py-12 text-center">Loading tickets…</p>;
@@ -121,19 +169,68 @@ export function TicketsList() {
   }
 
   const sessionFallbackBanner =
-    isApiCheckoutEnabled() && apiError && tickets.length > 0 ? (
+    apiCheckout && apiError && tickets.length > 0 ? (
       <div className="rounded-[var(--radius-panel)] border border-border bg-primary/5 px-5 py-4 text-sm text-muted max-w-2xl">
         <p className="font-medium text-foreground">Account passes unavailable</p>
         <p className="mt-1 leading-relaxed">{apiError}</p>
         <p className="mt-2 leading-relaxed">
-          You still have demo passes stored in this browser—open each card below for a scannable QR code.
+          Sign in to sync tickets from your account, or check your email for the PDF attachment with entry QR codes.
         </p>
+      </div>
+    ) : null;
+
+  const resendEmailBanner =
+    apiCheckout && !apiError && orderGroups.length > 0 ? (
+      <div className="rounded-[var(--radius-panel)] border border-border bg-surface px-5 py-4 text-sm text-muted max-w-2xl space-y-3">
+        <div>
+          <p className="font-medium text-foreground">Email tickets</p>
+          <p className="mt-1 leading-relaxed">
+            Ticket QR codes are in the PDF attachment we email after purchase—not inline in the message body. Open any
+            pass below to view a QR code or download a PDF.
+          </p>
+        </div>
+        <ul className="space-y-2">
+          {orderGroups.map((group) => {
+            const state = resendByOrder[group.orderId] ?? "idle";
+            const label =
+              state === "sending"
+                ? "Sending…"
+                : state === "sent"
+                  ? "Email sent"
+                  : state === "failed"
+                    ? "Retry email"
+                    : "Resend ticket email";
+            return (
+              <li
+                key={group.orderId}
+                className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-[var(--radius-card)] border border-border/80 bg-background/50 px-4 py-3"
+              >
+                <div>
+                  <p className="font-medium text-foreground line-clamp-1">{group.eventTitle}</p>
+                  <p className="text-xs text-muted mt-0.5">
+                    {group.ticketCount} pass{group.ticketCount === 1 ? "" : "es"} · Order{" "}
+                    <span className="font-mono">{group.orderId.slice(0, 8)}…</span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void resendTicketEmail(group.orderId)}
+                  disabled={state === "sending"}
+                  className="inline-flex min-h-[var(--btn-min-h)] shrink-0 items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/45 disabled:opacity-70"
+                >
+                  {label}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     ) : null;
 
   return (
     <div className="space-y-6">
       {sessionFallbackBanner}
+      {resendEmailBanner}
       <ul className="grid gap-4 sm:grid-cols-2">
       {tickets.map((t: StoredTicket) => {
         const whenLabel = formatTicketWhen(t.eventStartAt, t.eventEndAt);
@@ -156,7 +253,7 @@ export function TicketsList() {
               </p>
               <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.16em] text-primary/85">
-                  View QR
+                  {apiCheckout ? "View pass" : "View QR"}
                 </span>
                 <span
                   aria-hidden

@@ -17,6 +17,10 @@ export interface AuthUser {
   email: string;
   name?: string;
   roles?: string[];
+  /** ISO timestamp when account was auto-provisioned at guest checkout. */
+  autoCreatedAt?: string;
+  /** Present when the access JWT includes `emailVerified` (password sign-up flow). */
+  emailVerified?: boolean;
 }
 
 export interface AuthState {
@@ -29,6 +33,21 @@ export interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | null>(null);
+
+const AUTH_BROADCAST_KEY = "allaxs:auth:broadcast";
+
+type AuthBroadcastMessage =
+  | { type: "signed-out"; at: number }
+  | { type: "signed-in"; at: number };
+
+function writeAuthBroadcast(message: AuthBroadcastMessage) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(AUTH_BROADCAST_KEY, JSON.stringify(message));
+  } catch {
+    // Private mode / quota — ignore; local tab state still updates.
+  }
+}
 
 async function fetchAuthUser(): Promise<AuthUser | null> {
   const coerce = (raw: unknown): AuthUser | null => {
@@ -45,6 +64,10 @@ async function fetchAuthUser(): Promise<AuthUser | null> {
       email,
       name: typeof o.name === "string" ? o.name : undefined,
       roles: normalizeWebUserRoles(o.roles),
+      autoCreatedAt:
+        typeof o.autoCreatedAt === "string" ? o.autoCreatedAt : undefined,
+      emailVerified:
+        typeof o.emailVerified === "boolean" ? o.emailVerified : undefined,
     };
   };
 
@@ -76,9 +99,24 @@ async function fetchAuthUser(): Promise<AuthUser | null> {
  * admin layout's.
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUserState] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const inFlight = useRef<Promise<void> | null>(null);
+  const userRef = useRef<AuthUser | null>(null);
+  const skipBroadcastRef = useRef(false);
+
+  userRef.current = user;
+
+  const setUser = useCallback((next: AuthUser | null) => {
+    const wasSignedIn = userRef.current !== null;
+    setUserState(next);
+    if (skipBroadcastRef.current) return;
+    if (next === null) {
+      writeAuthBroadcast({ type: "signed-out", at: Date.now() });
+    } else if (!wasSignedIn) {
+      writeAuthBroadcast({ type: "signed-in", at: Date.now() });
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     if (inFlight.current) {
@@ -99,15 +137,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       inFlight.current = null;
     }
-  }, []);
+  }, [setUser]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== AUTH_BROADCAST_KEY || !event.newValue) return;
+      skipBroadcastRef.current = true;
+      try {
+        const message = JSON.parse(event.newValue) as AuthBroadcastMessage;
+        if (message.type === "signed-out") {
+          setUserState(null);
+          setLoading(false);
+        } else if (message.type === "signed-in") {
+          void refresh();
+        }
+      } catch {
+        // Ignore malformed payloads from other tabs.
+      } finally {
+        skipBroadcastRef.current = false;
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [refresh]);
+
   const value = useMemo<AuthState>(
     () => ({ user, loading, refresh, setUser }),
-    [user, loading, refresh],
+    [user, loading, refresh, setUser],
   );
 
   return (

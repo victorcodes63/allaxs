@@ -12,6 +12,8 @@ Set variables in **Vercel → Project → Settings → Environment Variables** (
 
 ## Environment variable map
 
+**POLISH-001:** Complete — cross-checked against Web `.env.example` and API `.env.example` (2026-05-22). Operator still must paste values into Vercel (Preview/Production); nothing in git.
+
 | Concern | API (Nest) | Web (Next.js) | Must match |
 | -------- | ----------- | ------------- | ---------- |
 | Public site origin (emails, verify/reset links) | `FRONTEND_URL` | `NEXT_PUBLIC_SITE_URL` (or `NEXT_PUBLIC_BASE_URL`) | **Yes** — same HTTPS origin, no trailing slash |
@@ -134,6 +136,12 @@ NEXT_PUBLIC_USE_DEMO_EVENTS=false
 
 ---
 
+## Email verification & checkout
+
+**Policy (POLISH-005):** Password sign-up sends a verification link; buyers may browse while signed in but **cannot start signed-in checkout** (`POST /checkout/paystack/init` or demo checkout) until `emailVerified` is true. The API returns **403** with code `emailNotVerified`; the Web checkout page shows a resend CTA (POLISH-003) instead of a silent failure. **Google sign-in** marks the email verified automatically. **Guest checkout** (`POST /checkout/guest/paystack/init`) stays open so first-time buyers can pay without a prior sign-in step; they receive tickets by email and can verify later from `/check-email`.
+
+---
+
 ## Single happy-path smoke test
 
 1. **Pay** — Sign in (or register), complete checkout for a small paid tier; Paystack succeeds and order is `PAID` (or equivalent) in admin.
@@ -143,16 +151,31 @@ NEXT_PUBLIC_USE_DEMO_EVENTS=false
 
 Record the test order reference and any webhook delivery IDs in your incident log if this is a formal go-live gate.
 
-### Smoke log (POLISH-002)
+### Smoke log template (POLISH-002 — copy for next operator run)
+
+**Pre-flight (Vercel):** Web `NEXT_PUBLIC_USE_DEMO_EVENTS=false`, checkout + API URLs set; API `FRONTEND_URL` = Web origin; Paystack webhook → `/api/webhooks/paystack`; redeploy both projects after env changes.
 
 | Field | Value |
 | ----- | ----- |
-| Date | |
-| Staging Web URL | |
-| Staging API URL | |
-| Order ID / reference | |
-| Resend message ID | |
-| Pay / Email / Scan / Refund | pass / fail each |
+| **Date** | YYYY-MM-DD |
+| **Tester** | name / email used for checkout |
+| **Staging Web URL** | `https://…` |
+| **Staging API URL** | `https://…` |
+| **Event / tier** | UUID event slug or id + tier id (not `demo-evt-*`) |
+| **Order ID / Paystack reference** | |
+| **Resend message ID** | from Resend dashboard after PAID order |
+| **Ticket verify URL** | `https://<web>/v/…` from QR or email |
+
+| Step | Result | Notes |
+| ---- | ------ | ----- |
+| **1 Pay** | pass / fail | Order **PAID** in `/admin/orders` |
+| **2 Email** | pass / fail | Receipt/ticket in inbox; Resend log id above |
+| **3 Scan** | pass / fail | `/v/…` loads; check-in once via organizer or admin scanner |
+| **4 Refund** | pass / fail | Order **REFUNDED**; Paystack test refund if applicable |
+
+**Paystack test card:** `4084084084084081`, CVV `408`, future expiry, PIN `0000`, OTP `123456`.
+
+**Repo gate (2026-05-22):** routes and env map verified in source — prior 404s on deployed URLs were a **deploy/env gap**, not missing code. See [PHASE0_GO_LIVE.md §6](./PHASE0_GO_LIVE.md#6-unblock-checklist-from-2026-05-16-smoke-repo-re-verified-2026-05-22).
 
 ---
 

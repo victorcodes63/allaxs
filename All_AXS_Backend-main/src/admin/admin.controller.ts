@@ -33,6 +33,7 @@ import { Repository } from 'typeorm';
 import { Event } from '../events/entities/event.entity';
 import { TicketType } from '../events/entities/ticket-type.entity';
 import { Order } from '../domain/order.entity';
+import { OrderItem } from '../domain/order-item.entity';
 import { User } from '../users/entities/user.entity';
 import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
 import { AdminAuditLog } from './entities/admin-audit-log.entity';
@@ -59,6 +60,8 @@ export class AdminController {
     private readonly ticketTypeRepository: Repository<TicketType>,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    @InjectRepository(OrderItem)
+    private readonly orderItemRepository: Repository<OrderItem>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectRepository(OrganizerProfile)
@@ -581,6 +584,108 @@ export class AdminController {
           }
         : null,
     }));
+  }
+
+  /**
+   * Recompute each tier's `quantitySold` from paid order line items. Useful
+   * when inventory counters drift from order rows after manual DB fixes or
+   * legacy bugs.
+   */
+  @Post('events/:id/resync-tier-sold-counts')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Recompute ticket tier sold counts from paid orders',
+  })
+  @ApiParam({ name: 'id', description: 'Event ID' })
+  @ApiResponse({ status: 200, description: 'Sold counts resynced' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async resyncTierSoldCounts(
+    @Param('id') eventId: string,
+    @GetUser() user: CurrentUser,
+    @Req() request: Request,
+  ) {
+    const event = await this.eventRepository.findOne({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    const ticketTypes = await this.ticketTypeRepository.find({
+      where: { eventId },
+      order: { createdAt: 'ASC' },
+    });
+
+    const soldRows = await this.orderItemRepository
+      .createQueryBuilder('item')
+      .innerJoin('item.order', 'order')
+      .select('item.ticketTypeId', 'ticketTypeId')
+      .addSelect('COALESCE(SUM(item.qty), 0)::int', 'sold')
+      .where('order.eventId = :eventId', { eventId })
+      .andWhere('order.status = :paid', { paid: OrderStatus.PAID })
+      .groupBy('item.ticketTypeId')
+      .getRawMany<{ ticketTypeId: string; sold: number }>();
+
+    const soldByTier = new Map(
+      soldRows.map((row) => [row.ticketTypeId, Number(row.sold)]),
+    );
+
+    const updates: Array<{
+      ticketTypeId: string;
+      name: string;
+      previousSold: number;
+      newSold: number;
+    }> = [];
+
+    for (const tier of ticketTypes) {
+      const computed = Number(soldByTier.get(tier.id) ?? 0);
+      const previousSold = tier.quantitySold;
+      if (computed !== previousSold) {
+        tier.quantitySold = computed;
+        await this.ticketTypeRepository.save(tier);
+        updates.push({
+          ticketTypeId: tier.id,
+          name: tier.name,
+          previousSold,
+          newSold: computed,
+        });
+      }
+    }
+
+    await this.adminAuditService.logAction({
+      adminUserId: user.id,
+      action: 'ADMIN_RESYNC_TIER_SOLD_COUNTS',
+      resourceType: 'event',
+      resourceId: eventId,
+      metadata: {
+        eventTitle: event.title,
+        tiersChecked: ticketTypes.length,
+        tiersUpdated: updates.length,
+        updates,
+      },
+      ipAddress:
+        request.ip ||
+        (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+        (request.headers['x-real-ip'] as string) ||
+        null,
+      userAgent: (request.headers['user-agent'] as string) || null,
+    });
+
+    const refreshed = await this.ticketTypeRepository.find({
+      where: { eventId },
+      order: { createdAt: 'ASC' },
+    });
+
+    return {
+      message:
+        updates.length > 0
+          ? `Updated sold counts for ${updates.length} tier(s).`
+          : 'All tier sold counts already match paid orders.',
+      tiersUpdated: updates.length,
+      ticketTypes: refreshed.map((t) => this.toAdminTicketTypeSafe(t)),
+    };
   }
 
   @Post('events/:id/approve')
@@ -1640,6 +1745,8 @@ export class AdminController {
       submittedAt: event.submittedAt ?? null,
       category: event.category,
       isPublic: event.isPublic,
+      isFeatured: event.isFeatured,
+      featuredSortOrder: event.featuredSortOrder ?? null,
       metadata: event.metadata ?? null,
       organizerId: event.organizerId,
       organizer: this.toAdminOrganizerSafe(event.organizer),

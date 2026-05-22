@@ -12,6 +12,7 @@ import {
   type CouponKind,
   type CreateCouponPayload,
 } from "@/lib/coupons-api";
+import { PLATFORM_DEFAULT_CURRENCY } from "@/lib/currency";
 
 interface CouponFormDialogProps {
   open: boolean;
@@ -125,7 +126,7 @@ export function CouponFormDialog({
   open,
   coupon,
   eventId,
-  defaultCurrency = "KES",
+  defaultCurrency = PLATFORM_DEFAULT_CURRENCY,
   onClose,
   onSaved,
 }: CouponFormDialogProps) {
@@ -346,7 +347,7 @@ export function CouponFormDialog({
           ) : (
             <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
               <Input
-                label={`Value (${form.currency || "KES"})`}
+                label={`Value (${form.currency || defaultCurrency})`}
                 type="number"
                 inputMode="decimal"
                 step="0.01"
@@ -362,7 +363,7 @@ export function CouponFormDialog({
                   set("currency", e.target.value.toUpperCase().slice(0, 3))
                 }
                 maxLength={3}
-                placeholder="KES"
+                placeholder={defaultCurrency}
                 className="w-20"
               />
             </div>
@@ -408,7 +409,7 @@ export function CouponFormDialog({
         </div>
 
         <Input
-          label={`Minimum order (${form.currency || "KES"})`}
+          label={`Minimum order (${form.currency || defaultCurrency})`}
           type="number"
           inputMode="decimal"
           step="0.01"

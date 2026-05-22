@@ -5,6 +5,7 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -179,6 +180,7 @@ export class AuthService {
   ): Promise<AuthResponse> {
     const { email, name } = await this.verifyGoogleIdToken(credential);
     const user = await this.usersService.upsertGoogleOAuthUser({ email, name });
+    await this.emailVerificationService.markEmailVerified(user);
     const tokens = await this.issueTokensForUser(user, metadata);
 
     return {
@@ -385,13 +387,20 @@ export class AuthService {
     session.tokenHash = tokenHash;
     await this.refreshTokenRepository.save(session);
 
+    const emailVerified =
+      await this.emailVerificationService.isUserVerified(user.id);
+
     // Create access token
-    const accessPayload = {
+    const accessPayload: Record<string, unknown> = {
       sub: user.id,
       email: user.email,
       name: user.name,
       roles: user.roles,
+      emailVerified,
     };
+    if (user.autoCreatedAt) {
+      accessPayload.autoCreatedAt = user.autoCreatedAt.toISOString();
+    }
 
     const accessToken = await this.jwtService.signAsync(accessPayload, {
       secret: this.configService.get<string>('JWT_SECRET'),
@@ -406,6 +415,67 @@ export class AuthService {
 
   async validateUser(userId: string): Promise<User> {
     return this.usersService.findByIdOrFail(userId);
+  }
+
+  /**
+   * Signed-in checkout requires a verified email. Guest checkout and
+   * Google OAuth (pre-verified) bypass this via separate paths.
+   */
+  async assertEmailVerifiedForCheckout(userId: string): Promise<void> {
+    const verified =
+      await this.emailVerificationService.isUserVerified(userId);
+    if (!verified) {
+      throw new ForbiddenException({
+        message:
+          'Verify your email before completing checkout. Check your inbox or request a new link.',
+        code: 'emailNotVerified',
+      });
+    }
+  }
+
+  /**
+   * Provision (or resolve) a buyer for public guest checkout. New emails
+   * receive a random password, `autoCreatedAt`, and session tokens so
+   * Paystack return can confirm without a prior sign-in step.
+   */
+  async provisionGuestCheckoutUser(
+    params: { email: string; name: string; phone?: string },
+    metadata?: TokenMetadata,
+  ): Promise<{
+    user: User;
+    accountCreated: boolean;
+    tokens?: AuthTokens;
+  }> {
+    const passwordHash = await bcrypt.hash(
+      crypto.randomBytes(32).toString('hex'),
+      10,
+    );
+    const { user, created } =
+      await this.usersService.findOrCreateForGuestCheckout({
+        email: params.email,
+        name: params.name,
+        phone: params.phone,
+        passwordHash,
+      });
+
+    if (created) {
+      this.logger.log(
+        `[guest-checkout] Auto-created account userId=${user.id} email=${user.email}`,
+      );
+      const tokens = await this.issueTokensForUser(user, metadata);
+      return { user, accountCreated: true, tokens };
+    }
+
+    return { user, accountCreated: false };
+  }
+
+  /** One-hour magic link for ticket wallet / password setup after purchase. */
+  async buildCheckoutAccessUrl(userId: string): Promise<string> {
+    const user = await this.usersService.findByIdOrFail(userId);
+    const token = await this.passwordResetService.createResetToken(user);
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    return `${frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
   }
 
   /**
@@ -461,6 +531,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
     await this.usersService.updatePassword(passwordReset.userId, passwordHash);
+    await this.usersService.clearAutoCreatedAt(passwordReset.userId);
 
     await this.passwordResetService.markTokenAsUsed(token);
 
@@ -504,6 +575,16 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await this.usersService.updatePassword(userId, passwordHash);
     await this.logoutAll(userId);
+
+    try {
+      await this.emailService.sendPasswordChangeConfirmationEmail(user);
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `Failed to send password change confirmation to ${user.email}: ${err.message}`,
+        err.stack,
+      );
+    }
   }
 
   /**

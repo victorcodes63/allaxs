@@ -1,6 +1,8 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
+import { formatUpstreamErrorMessage } from "@/lib/server/format-upstream-error-message";
+
 const API_URL = process.env.API_URL || "http://localhost:8080";
 
 export async function POST(request: NextRequest) {
@@ -25,10 +27,14 @@ export async function POST(request: NextRequest) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      return NextResponse.json(
-        { message: data.message || "Checkout failed" },
-        { status: response.status }
-      );
+      const message = formatUpstreamErrorMessage(data) ?? "Checkout failed";
+      const code =
+        typeof data === "object" &&
+        data !== null &&
+        typeof (data as { code?: unknown }).code === "string"
+          ? (data as { code: string }).code
+          : undefined;
+      return NextResponse.json({ message, code }, { status: response.status });
     }
 
     return NextResponse.json(data, { status: response.status });

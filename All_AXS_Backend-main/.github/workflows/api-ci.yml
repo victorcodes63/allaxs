@@ -123,6 +123,11 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
+      - name: Email/PDF smoke (dry run, mock Resend)
+        run: npm run smoke:ci:email-pdf
+        env:
+          SKIP_EMAIL_PDF_SMOKE: ${{ vars.SKIP_EMAIL_PDF_SMOKE || '' }}
+
       - name: Build application
         run: npm run build
 

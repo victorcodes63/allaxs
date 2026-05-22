@@ -49,6 +49,18 @@ export function applyHubNotificationReadToSnapshot(id: string): void {
   };
 }
 
+/** Keep hub badge/list aligned after marking all read from the inbox page. */
+export function applyHubNotificationMarkAllReadToSnapshot(): void {
+  if (!snapshot) return;
+  snapshot = {
+    fetchedAt: snapshot.fetchedAt,
+    notifications: snapshot.notifications.map((n) =>
+      n.isRead ? n : { ...n, isRead: true },
+    ),
+    unreadCount: 0,
+  };
+}
+
 export type HubListLoadOk = {
   ok: true;
   fromCache: boolean;

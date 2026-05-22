@@ -1,9 +1,22 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
 import { Notification } from '../domain/notification.entity';
 import { NotifyChannel, NotifyStatus } from '../domain/enums';
 import type { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { EmailService } from '../auth/services/email.service';
+import type {
+  TicketEmailEventInput,
+  TicketEmailTicketInput,
+} from '../tickets/ticket-email.util';
+import { AfricasTalkingSmsAdapter } from './adapters/sms-africastalking';
+import { TwilioWhatsAppAdapter } from './adapters/twilio-whatsapp.adapter';
+import {
+  buildTicketWhatsAppPayload,
+  TICKET_WHATSAPP_TEMPLATE,
+} from './templates/ticket-whatsapp.template';
+import type { TicketWhatsAppPayload } from './dispatch/notification-dispatch.types';
 
 type NotificationPayload = Record<string, unknown>;
 
@@ -15,6 +28,48 @@ export type CreateInAppNotificationInput = {
   category?: 'orders' | 'hosting' | 'system';
   template?: string;
   payload?: NotificationPayload;
+};
+
+export type EnqueueNotificationInput = {
+  channel: NotifyChannel;
+  to: string;
+  template?: string;
+  payload?: NotificationPayload;
+  processInline?: boolean;
+};
+
+export type TicketEmailNotificationInput = {
+  buyerName: string;
+  buyerEmail: string;
+  eventTitle: string;
+  event?: TicketEmailEventInput;
+  tickets: TicketEmailTicketInput[];
+  summary?: {
+    subtotalCents: number;
+    discountCents: number;
+    totalCents: number;
+    currency: string;
+    couponCode?: string | null;
+  };
+  accessUrl?: string;
+  accountCreated?: boolean;
+};
+
+export type TicketWhatsAppNotificationInput = {
+  phone: string;
+  buyerName: string;
+  eventTitle: string;
+  tickets: { id: string; qrNonce: string; qrSignature: string }[];
+  orderId?: string;
+  includeQrImage?: boolean;
+};
+
+export type TicketDeliverySmsInput = {
+  phone: string;
+  eventTitle: string;
+  deepLink: string;
+  buyerName?: string;
+  ticketCount?: number;
 };
 
 export type NotificationListItem = {
@@ -29,12 +84,41 @@ export type NotificationListItem = {
   isRead: boolean;
 };
 
+export type DispatchBatchResult = {
+  processed: number;
+  sent: number;
+  failed: number;
+  retried: number;
+};
+
+class UnconfiguredChannelError extends Error {
+  constructor(channel: NotifyChannel) {
+    super(`${channel} adapter not configured`);
+    this.name = 'UnconfiguredChannelError';
+  }
+}
+
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+  private readonly maxRetries: number;
+  private readonly batchSize: number;
+
   constructor(
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
-  ) {}
+    private readonly emailService: EmailService,
+    private readonly smsAdapter: AfricasTalkingSmsAdapter,
+    private readonly whatsAppAdapter: TwilioWhatsAppAdapter,
+    private readonly configService: ConfigService,
+  ) {
+    this.maxRetries = Number(
+      this.configService.get<string>('NOTIFICATION_MAX_RETRIES', '3'),
+    );
+    this.batchSize = Number(
+      this.configService.get<string>('NOTIFICATION_DISPATCH_BATCH_SIZE', '25'),
+    );
+  }
 
   private payloadOf(entity: Notification): NotificationPayload {
     if (!entity.payload || typeof entity.payload !== 'object') return {};
@@ -85,6 +169,419 @@ export class NotificationsService {
       status: entity.status,
       link,
       isRead: this.isReadForUser(entity, userId),
+    };
+  }
+
+  async enqueueNotification(
+    input: EnqueueNotificationInput,
+  ): Promise<Notification> {
+    return this.notificationRepository.save(
+      this.notificationRepository.create({
+        channel: input.channel,
+        template: input.template,
+        to: input.to.trim(),
+        payload: input.payload,
+        status: NotifyStatus.PENDING,
+        retryCount: 0,
+      }),
+    );
+  }
+
+  async enqueueTicketEmail(
+    input: TicketEmailNotificationInput,
+  ): Promise<Notification> {
+    return this.enqueueNotification({
+      channel: NotifyChannel.EMAIL,
+      to: input.buyerEmail,
+      template: 'ticket_email',
+      payload: this.serializeTicketEmailPayload(input),
+    });
+  }
+
+  async dispatchTicketEmail(
+    input: TicketEmailNotificationInput,
+  ): Promise<Notification> {
+    const notification = await this.enqueueTicketEmail(input);
+    await this.processNotification(notification.id);
+    return (
+      (await this.notificationRepository.findOne({
+        where: { id: notification.id },
+      })) ?? notification
+    );
+  }
+
+  async enqueueTicketWhatsApp(
+    input: TicketWhatsAppNotificationInput,
+  ): Promise<Notification | null> {
+    const phone = input.phone?.trim();
+    if (!phone) return null;
+    if (!this.whatsAppAdapter.isConfigured()) return null;
+    if (this.configService.get<string>('WHATSAPP_TICKET_DELIVERY') === 'false') {
+      return null;
+    }
+
+    const siteOrigin =
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+    const payload = buildTicketWhatsAppPayload({
+      buyerName: input.buyerName,
+      eventTitle: input.eventTitle,
+      siteOrigin,
+      tickets: input.tickets,
+      orderId: input.orderId,
+      includeQrImage: input.includeQrImage,
+    });
+
+    return this.enqueueNotification({
+      channel: NotifyChannel.WHATSAPP,
+      to: phone,
+      template: TICKET_WHATSAPP_TEMPLATE,
+      payload: payload as NotificationPayload,
+    });
+  }
+
+  async sendTicketDeliverySms(
+    input: TicketDeliverySmsInput,
+  ): Promise<Notification | null> {
+    if (this.configService.get<string>('SMS_TICKET_DELIVERY') === 'false') {
+      return null;
+    }
+    if (!this.smsAdapter.isConfigured()) {
+      return null;
+    }
+
+    const phone = input.phone?.trim();
+    if (!phone) return null;
+
+    try {
+      const notification = await this.enqueueNotification({
+        channel: NotifyChannel.SMS,
+        to: phone,
+        template: 'ticket_delivery',
+        payload: {
+          eventTitle: input.eventTitle,
+          deepLink: input.deepLink,
+          buyerName: input.buyerName,
+          ticketCount: input.ticketCount,
+        },
+      });
+      await this.processNotification(notification.id);
+      return (
+        (await this.notificationRepository.findOne({
+          where: { id: notification.id },
+        })) ?? notification
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Ticket delivery SMS failed for ${phone}: ${String(error)}`,
+      );
+      return null;
+    }
+  }
+
+  async enqueueAndDispatch(
+    input: EnqueueNotificationInput,
+  ): Promise<Notification> {
+    const notification = await this.enqueueNotification(input);
+    await this.processNotification(notification.id);
+    return (
+      (await this.notificationRepository.findOne({
+        where: { id: notification.id },
+      })) ?? notification
+    );
+  }
+
+  async processPendingBatch(
+    limit = this.batchSize,
+  ): Promise<DispatchBatchResult> {
+    const pending = await this.notificationRepository.find({
+      where: { status: NotifyStatus.PENDING },
+      order: { createdAt: 'ASC' },
+      take: limit,
+    });
+
+    const result: DispatchBatchResult = {
+      processed: 0,
+      sent: 0,
+      failed: 0,
+      retried: 0,
+    };
+
+    for (const notification of pending) {
+      const outcome = await this.processNotification(notification.id);
+      result.processed += 1;
+      if (outcome === 'sent') result.sent += 1;
+      if (outcome === 'failed') result.failed += 1;
+      if (outcome === 'retry') result.retried += 1;
+    }
+
+    return result;
+  }
+
+  async processNotification(
+    notificationId: string,
+  ): Promise<'sent' | 'failed' | 'retry' | 'skipped'> {
+    const entity = await this.notificationRepository.findOne({
+      where: { id: notificationId },
+    });
+    if (!entity || entity.status !== NotifyStatus.PENDING) {
+      return 'skipped';
+    }
+
+    try {
+      await this.dispatch(entity);
+      entity.status = NotifyStatus.SENT;
+      entity.error = undefined;
+      await this.notificationRepository.save(entity);
+      return 'sent';
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      const permanent = error instanceof UnconfiguredChannelError;
+
+      if (permanent || entity.retryCount + 1 >= this.maxRetries) {
+        entity.status = NotifyStatus.FAILED;
+        entity.retryCount += 1;
+        entity.error = message;
+        await this.notificationRepository.save(entity);
+        this.logger.error(
+          `Notification ${entity.id} failed permanently (${entity.channel}/${entity.template ?? 'default'}): ${message}`,
+        );
+        return 'failed';
+      }
+
+      entity.retryCount += 1;
+      entity.error = message;
+      await this.notificationRepository.save(entity);
+      this.logger.warn(
+        `Notification ${entity.id} failed (attempt ${entity.retryCount}/${this.maxRetries}), will retry: ${message}`,
+      );
+      return 'retry';
+    }
+  }
+
+  private async dispatch(entity: Notification): Promise<void> {
+    switch (entity.channel) {
+      case NotifyChannel.EMAIL:
+        await this.dispatchEmail(entity);
+        return;
+      case NotifyChannel.PUSH:
+        await this.dispatchPush();
+        return;
+      case NotifyChannel.SMS:
+        await this.dispatchSms(entity);
+        return;
+      case NotifyChannel.WHATSAPP:
+        await this.dispatchWhatsApp(entity);
+        return;
+      default:
+        throw new Error(`Unsupported notification channel: ${entity.channel}`);
+    }
+  }
+
+  private async dispatchEmail(entity: Notification): Promise<void> {
+    const template = entity.template ?? 'generic_email';
+    const payload = this.payloadOf(entity);
+
+    switch (template) {
+      case 'ticket_email':
+      case 'ticket_delivery':
+        await this.emailService.sendTicketEmail(
+          this.deserializeTicketEmailPayload(payload),
+        );
+        return;
+      default:
+        throw new Error(`Unsupported email template: ${template}`);
+    }
+  }
+
+  private async dispatchPush(): Promise<void> {
+    // In-app notifications are persisted in the row payload; delivery is marking SENT.
+  }
+
+  private async dispatchSms(entity: Notification): Promise<void> {
+    if (!this.smsAdapter.isConfigured()) {
+      throw new UnconfiguredChannelError(NotifyChannel.SMS);
+    }
+
+    const template = entity.template ?? 'generic';
+    const payload = this.payloadOf(entity);
+
+    switch (template) {
+      case 'ticket_delivery': {
+        const eventTitle = this.requireString(payload, 'eventTitle');
+        const deepLink = this.requireString(payload, 'deepLink');
+        const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+        const buyerName =
+          typeof payload.buyerName === 'string' ? payload.buyerName.trim() : '';
+        const ticketCount =
+          typeof payload.ticketCount === 'number' && payload.ticketCount > 0
+            ? payload.ticketCount
+            : 1;
+        const greeting = buyerName ? `Hi ${buyerName}, ` : '';
+        const ticketLabel = ticketCount === 1 ? 'ticket' : 'tickets';
+        const message = `${greeting}${appName}: Your ${ticketLabel} for ${eventTitle} are ready. View: ${deepLink}`;
+        await this.smsAdapter.send({ to: entity.to, message });
+        return;
+      }
+      case 'generic': {
+        const message = this.requireString(payload, 'message');
+        await this.smsAdapter.send({ to: entity.to, message });
+        return;
+      }
+      default:
+        throw new Error(`Unsupported SMS template: ${template}`);
+    }
+  }
+
+  private async dispatchWhatsApp(entity: Notification): Promise<void> {
+    if (!this.whatsAppAdapter.isConfigured()) {
+      throw new UnconfiguredChannelError(NotifyChannel.WHATSAPP);
+    }
+
+    const template = entity.template ?? TICKET_WHATSAPP_TEMPLATE;
+    const payload = this.payloadOf(entity) as TicketWhatsAppPayload;
+
+    if (template !== TICKET_WHATSAPP_TEMPLATE) {
+      throw new Error(`Unsupported WhatsApp template: ${template}`);
+    }
+    if (
+      !payload.eventTitle ||
+      !Array.isArray(payload.ticketLinks) ||
+      !payload.ticketLinks.length
+    ) {
+      throw new Error('Invalid ticket WhatsApp payload');
+    }
+
+    await this.whatsAppAdapter.sendTicketMessage({
+      toPhone: entity.to,
+      template,
+      payload,
+    });
+  }
+
+  private requireString(payload: NotificationPayload, key: string): string {
+    const value = payload[key];
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new Error(`Missing notification payload field: ${key}`);
+    }
+    return value.trim();
+  }
+
+  private serializeTicketEmailPayload(
+    input: TicketEmailNotificationInput,
+  ): NotificationPayload {
+    return {
+      buyerName: input.buyerName,
+      buyerEmail: input.buyerEmail,
+      eventTitle: input.eventTitle,
+      event: input.event
+        ? {
+            ...input.event,
+            startAt: input.event.startAt?.toISOString(),
+            endAt: input.event.endAt?.toISOString(),
+          }
+        : undefined,
+      tickets: input.tickets.map((ticket) => ({
+        ...ticket,
+        issuedAt: ticket.issuedAt.toISOString(),
+      })),
+      summary: input.summary,
+      accessUrl: input.accessUrl,
+      accountCreated: input.accountCreated,
+    };
+  }
+
+  private deserializeTicketEmailPayload(
+    payload: NotificationPayload,
+  ): Parameters<EmailService['sendTicketEmail']>[0] {
+    const ticketsRaw = Array.isArray(payload.tickets) ? payload.tickets : [];
+    const eventRaw =
+      payload.event && typeof payload.event === 'object'
+        ? (payload.event as Record<string, unknown>)
+        : undefined;
+
+    return {
+      buyerName:
+        typeof payload.buyerName === 'string' ? payload.buyerName : '',
+      buyerEmail:
+        typeof payload.buyerEmail === 'string'
+          ? payload.buyerEmail
+          : typeof payload.to === 'string'
+            ? payload.to
+            : '',
+      eventTitle:
+        typeof payload.eventTitle === 'string' ? payload.eventTitle : 'Event',
+      event: eventRaw
+        ? {
+            title:
+              typeof eventRaw.title === 'string' ? eventRaw.title : 'Event',
+            slug: typeof eventRaw.slug === 'string' ? eventRaw.slug : undefined,
+            startAt:
+              typeof eventRaw.startAt === 'string'
+                ? new Date(eventRaw.startAt)
+                : undefined,
+            endAt:
+              typeof eventRaw.endAt === 'string'
+                ? new Date(eventRaw.endAt)
+                : undefined,
+            venue:
+              typeof eventRaw.venue === 'string'
+                ? eventRaw.venue
+                : eventRaw.venue === null
+                  ? null
+                  : undefined,
+            city:
+              typeof eventRaw.city === 'string'
+                ? eventRaw.city
+                : eventRaw.city === null
+                  ? null
+                  : undefined,
+            country:
+              typeof eventRaw.country === 'string'
+                ? eventRaw.country
+                : eventRaw.country === null
+                  ? null
+                  : undefined,
+            type: eventRaw.type as TicketEmailEventInput['type'],
+            organizerName:
+              typeof eventRaw.organizerName === 'string'
+                ? eventRaw.organizerName
+                : eventRaw.organizerName === null
+                  ? null
+                  : undefined,
+          }
+        : undefined,
+      tickets: ticketsRaw.map((ticket) => {
+        const row = ticket as Record<string, unknown>;
+        return {
+          id: String(row.id ?? ''),
+          tierName: String(row.tierName ?? 'Ticket'),
+          qrNonce: String(row.qrNonce ?? ''),
+          qrSignature: String(row.qrSignature ?? ''),
+          issuedAt:
+            typeof row.issuedAt === 'string'
+              ? new Date(row.issuedAt)
+              : row.issuedAt instanceof Date
+                ? row.issuedAt
+                : new Date(),
+        };
+      }),
+      summary:
+        payload.summary && typeof payload.summary === 'object'
+          ? (payload.summary as {
+              subtotalCents: number;
+              discountCents: number;
+              totalCents: number;
+              currency: string;
+              couponCode?: string | null;
+            })
+          : undefined,
+      accessUrl:
+        typeof payload.accessUrl === 'string' ? payload.accessUrl : undefined,
+      accountCreated:
+        typeof payload.accountCreated === 'boolean'
+          ? payload.accountCreated
+          : undefined,
     };
   }
 

@@ -76,6 +76,23 @@ export class TicketType extends BaseEntity {
   allowInstallments!: boolean;
 
   @ApiPropertyOptional({
+    description:
+      'Hidden from public listings; redeemable only via comp link token',
+    default: false,
+  })
+  @Column({ type: 'boolean', default: false, name: 'is_hidden' })
+  isHidden!: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Unguessable token for VIP/comp share URLs',
+    maxLength: 64,
+    nullable: true,
+  })
+  @Index({ unique: true, where: '"comp_link_token" IS NOT NULL' })
+  @Column({ type: 'varchar', length: 64, nullable: true, name: 'comp_link_token' })
+  compLinkToken?: string | null;
+
+  @ApiPropertyOptional({
     description: 'Installment configuration (JSON)',
     nullable: true,
   })

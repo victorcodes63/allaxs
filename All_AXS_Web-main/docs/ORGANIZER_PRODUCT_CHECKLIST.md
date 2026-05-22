@@ -36,12 +36,12 @@
 | # | Capability | Web | API | Status | Notes |
 |---|------------|-----|-----|--------|-------|
 | 11 | Orders list (organizer view) | GAP | GAP | GAP | Filter by event, status, date; link to attendees |
-| 12 | Attendees / guest list export | GAP | GAP | GAP | CSV for door + sponsor badges |
+| 12 | Attendees / guest list export | `OrganizerSalesView`, `OrganizerTicketsView`, `EventSalesTab`; `downloadOrganizerAttendeesCsv` in `lib/organizer-sales.ts`; proxy `app/api/organizer/sales/events/[eventId]/attendees/export/route.ts` | `GET /organizers/sales/events/:eventId/attendees/export` (`OrganizerTicketsService.exportAttendeesCsv`) | DONE | CSV: attendee name, email, tier, order ref, ticket status, checked-in yes/no; paid tickets only; organizer ownership or ADMIN |
 | 13 | Refunds / cancellations | GAP | GAP | GAP | Policy + Paystack reversal or manual workflow |
 | 14 | Payout status + statements | GAP | GAP | GAP | Tie to `organizer_profiles` payout fields |
 | 15 | Fee transparency (platform vs organizer) | GAP | GAP | GAP | Show in UI + contract copy |
 | 16 | Comp / hidden ticket links | GAP | GAP | GAP | VIP lists, speaker codes |
-| 16a | Coupon / promo codes (per event) | Organizer CRUD: `components/organizer/event-editor/EventCouponsTab.tsx` (+ admin parity in `app/admin/events/[id]/edit/page.tsx`). Buyer-side "Have a code?" input in `components/checkout/CheckoutExperience.tsx` with `app/api/checkout/coupons/preview/route.ts` proxy and `lib/checkout-coupons.ts`. | `Coupon` + `CouponRedemption` entities, `CouponsService` (`src/events/coupons.service.ts`), `CheckoutService.previewCoupon` / `redeem` hooks (`src/checkout/checkout.service.ts`), refund rollback (`src/admin/order-refund.service.ts`). Migrations: `1762980000000-AddCouponMinOrderAndCurrency.ts`, `1762981000000-AddCouponRedemptionsAndOrderDiscount.ts`. | DONE | See `docs/COUPONS_SPEC.md`. Per-event scope, no stacking (1 coupon / order, `UQ_coupon_redemptions_order_id`), per-code + per-user caps, FIXED / PERCENT, optional `minOrderCents` + `currency`, discount applied **before** platform fee, 100%-off skips Paystack and finalises in-band. Order confirmation page + ticket email show `Subtotal / Discount / Total paid`. Refund rolls back `usedCount` and removes the redemption row. Tests pending. |
+| 16a | Coupon / promo codes (per event) | Organizer CRUD: `components/organizer/event-editor/EventCouponsTab.tsx` (+ admin parity in `app/admin/events/[id]/edit/page.tsx`). Buyer-side "Have a code?" input in `components/checkout/CheckoutExperience.tsx` with `app/api/checkout/coupons/preview/route.ts` proxy and `lib/checkout-coupons.ts`. | `Coupon` + `CouponRedemption` entities, `CouponsService` (`src/events/coupons.service.ts`), `CheckoutService.previewCoupon` / `redeem` hooks (`src/checkout/checkout.service.ts`), refund rollback (`src/admin/order-refund.service.ts`). Migrations: `1762980000000-AddCouponMinOrderAndCurrency.ts`, `1762981000000-AddCouponRedemptionsAndOrderDiscount.ts`. | DONE | See `docs/COUPONS_SPEC.md`. Per-event scope, no stacking (1 coupon / order, `UQ_coupon_redemptions_order_id`), per-code + per-user caps, FIXED / PERCENT, optional `minOrderCents` + `currency`, discount applied **before** platform fee, 100%-off skips Paystack and finalises in-band. Order confirmation page + ticket email show `Subtotal / Discount / Total paid`. Refund rolls back `usedCount` and removes the redemption row. **Tests (AUDIT-A1-T):** `coupons.service.spec.ts`, `order-refund.service.spec.ts`, `cypress/e2e/coupons-checkout.cy.ts`, `cypress/e2e/coupons-organizer.cy.ts`. |
 
 ---
 
@@ -94,7 +94,7 @@
 2. Production **checkout** (replace demo) if demo is not acceptable for stakeholders.  
 3. **P1 #11–12** (orders + export) — highest ROI for summit producers.  
 4. **P1 #13–15** money trust.  
-5. **P1 #16a** coupon test coverage (unit + integration + Cypress for organizer CRUD and buyer apply / 100%-off / refund rollback) — ship now that schema + flow are in place.  
+5. ~~**P1 #16a** coupon test coverage~~ — **DONE (AUDIT-A1-T):** `coupons.service.spec.ts`, `order-refund.service.spec.ts`, `cypress/e2e/coupons-checkout.cy.ts`, `cypress/e2e/coupons-organizer.cy.ts`.  
 6. **P2 #17** check-in when door story is required for launch.
 
 When an item moves from GAP → DONE, update the **Status** column and add a one-line **PR / commit** reference if helpful.

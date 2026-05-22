@@ -222,4 +222,21 @@ export class TicketTypesController {
       throw error;
     }
   }
+
+  @Post('ticket-types/:id/comp-link')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ORGANIZER, Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Generate or rotate comp link token for a hidden ticket tier',
+  })
+  @ApiParam({ name: 'id', description: 'Ticket type ID' })
+  @ApiResponse({ status: 200, description: 'Comp link token issued', type: TicketType })
+  async regenerateCompLink(
+    @Param('id') id: string,
+    @GetUser() user: CurrentUser,
+  ) {
+    return this.ticketTypesService.regenerateCompLink(id, user.id, user.roles);
+  }
 }

@@ -613,6 +613,107 @@ export class EmailService {
     }
   }
 
+  async sendPasswordChangeConfirmationEmail(user: User): Promise<void> {
+    this.logger.log(
+      `[sendPasswordChangeConfirmationEmail] Entry - Provider: ${this.emailProvider}, From: ${this.resendFrom || 'NOT CONFIGURED'}`,
+    );
+
+    if (this.emailProvider !== 'resend') {
+      const errorMsg = `Email provider '${this.emailProvider}' is not supported. Only 'resend' is currently supported.`;
+      this.logger.error(`[sendPasswordChangeConfirmationEmail] ${errorMsg}`);
+      if (this.isDevelopment) {
+        this.logger.warn(
+          `[sendPasswordChangeConfirmationEmail] In development mode, email sending is disabled due to unsupported provider.`,
+        );
+      }
+      return;
+    }
+
+    if (!this.resendApiKey) {
+      const errorMsg =
+        'RESEND_API_KEY is not configured. Password change confirmation emails cannot be sent.';
+      this.logger.error(`[sendPasswordChangeConfirmationEmail] ${errorMsg}`);
+      if (this.isDevelopment) {
+        this.logger.warn(
+          `[sendPasswordChangeConfirmationEmail] In development mode, email sending is disabled due to missing RESEND_API_KEY.`,
+        );
+      }
+      return;
+    }
+
+    if (!this.resendFrom) {
+      const errorMsg =
+        'RESEND_FROM is not configured. Password change confirmation emails cannot be sent.';
+      this.logger.error(`[sendPasswordChangeConfirmationEmail] ${errorMsg}`);
+      if (this.isDevelopment) {
+        this.logger.warn(
+          `[sendPasswordChangeConfirmationEmail] In development mode, email sending is disabled due to missing RESEND_FROM.`,
+        );
+      }
+      return;
+    }
+
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+    const forgotPasswordUrl = `${this.frontendUrl || 'http://localhost:3000'}/forgot-password`;
+
+    const html = this.renderEmailShell({
+      preheader: `Your ${appName} password was changed from account settings.`,
+      title: 'Password changed',
+      intro: `Hello${user.name ? ` ${user.name}` : ''}, your password was changed successfully from your account settings. All other sessions were signed out for your security.`,
+      actionLabel: 'Reset password',
+      actionUrl: forgotPasswordUrl,
+      note: `If this wasn't you, contact support immediately — your account may be compromised. You can also use the link above to request a password reset.`,
+    });
+
+    if (
+      this.isDevelopment &&
+      (!this.resend || !this.resendApiKey || !this.resendFrom)
+    ) {
+      this.logger.warn(
+        `[sendPasswordChangeConfirmationEmail] DEVELOPMENT MODE - Email would be sent to: ${user.email}`,
+      );
+      this.logger.warn(
+        `[sendPasswordChangeConfirmationEmail] DEVELOPMENT MODE - Forgot password URL: ${forgotPasswordUrl}`,
+      );
+      this.logger.warn(
+        `[sendPasswordChangeConfirmationEmail] DEVELOPMENT MODE - Subject: Your ${appName} password was changed`,
+      );
+      return;
+    }
+
+    this.logger.log(
+      `[sendPasswordChangeConfirmationEmail] Attempting to send confirmation to: ${user.email}`,
+    );
+
+    try {
+      if (!this.resend) {
+        throw new Error('Resend client not initialized');
+      }
+
+      const result = await this.resend.emails.send({
+        from: this.resendFrom,
+        to: user.email,
+        subject: `Your ${appName} password was changed`,
+        html,
+      });
+
+      const resendId = this.assertResendSendOk(
+        result,
+        'sendPasswordChangeConfirmationEmail',
+      );
+      this.logger.log(
+        `[sendPasswordChangeConfirmationEmail] Confirmation sent to: ${user.email}. Resend ID: ${resendId}`,
+      );
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `[sendPasswordChangeConfirmationEmail] Error sending to ${user.email}: ${err.message}`,
+        err.stack,
+      );
+      throw error;
+    }
+  }
+
   async sendWelcomeEmail(user: User): Promise<void> {
     this.logger.log(
       `[sendWelcomeEmail] Entry - Provider: ${this.emailProvider}, From: ${this.resendFrom || 'NOT CONFIGURED'}`,
@@ -718,6 +819,145 @@ export class EmailService {
     }
   }
 
+  /**
+   * Notifies the organizer or an admin when an event enters the moderation queue.
+   */
+  async sendEventSubmittedForReviewEmail(
+    input: {
+      to: string;
+      recipientName?: string | null;
+      eventTitle: string;
+      eventId: string;
+      orgName?: string | null;
+      venue?: string | null;
+      startAt: Date;
+      audience: 'organizer' | 'admin';
+    },
+  ): Promise<void> {
+    const context = 'sendEventSubmittedForReviewEmail';
+    this.logger.log(
+      `[${context}] Entry (${input.audience}) - Provider: ${this.emailProvider}, From: ${this.resendFrom || 'NOT CONFIGURED'}`,
+    );
+
+    if (this.emailProvider !== 'resend') {
+      this.logger.error(
+        `[${context}] Email provider '${this.emailProvider}' is not supported.`,
+      );
+      if (this.isDevelopment) return;
+      return;
+    }
+
+    if (!this.resendApiKey || !this.resendFrom) {
+      this.logger.error(
+        `[${context}] RESEND_API_KEY or RESEND_FROM is not configured.`,
+      );
+      if (this.isDevelopment) return;
+      return;
+    }
+
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+    const homeUrl = (this.frontendUrl || 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    const isAdmin = input.audience === 'admin';
+    const actionUrl = isAdmin
+      ? `${homeUrl}/admin/moderation`
+      : `${homeUrl}/organizer/events/${input.eventId}/edit`;
+    const greeting = input.recipientName?.trim()
+      ? `Hello ${input.recipientName.trim()},`
+      : 'Hello,';
+    const whenLabel = new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(input.startAt);
+    const orgLine = input.orgName?.trim()
+      ? `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Organizer</td><td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">${input.orgName.trim()}</td></tr>`
+      : '';
+    const venueLine = input.venue?.trim()
+      ? `<tr><td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Venue</td><td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">${input.venue.trim()}</td></tr>`
+      : '';
+
+    const bodyHtml = `
+      <tr>
+        <td style="padding:8px 28px 0 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;">
+            <tr>
+              <td colspan="2" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#111827;font-weight:700;padding:0 0 8px 0;">${input.eventTitle}</td>
+            </tr>
+            ${orgLine}
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Starts</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">${whenLabel}</td>
+            </tr>
+            ${venueLine}
+          </table>
+        </td>
+      </tr>
+    `;
+
+    const subject = isAdmin
+      ? `Review needed: ${input.eventTitle}`
+      : `Submitted for review: ${input.eventTitle}`;
+    const title = isAdmin ? 'Event awaiting review' : 'Event submitted for review';
+    const intro = isAdmin
+      ? `${greeting} <strong>${input.eventTitle}</strong> was submitted and is waiting in the moderation queue. Please review it when you can so the organizer can go live sooner.`
+      : `${greeting} we received <strong>${input.eventTitle}</strong> for review. Our team will check the details and notify you once it is approved or if changes are needed.`;
+    const actionLabel = isAdmin ? 'Open moderation queue' : 'View your event';
+    const preheader = isAdmin
+      ? `${input.eventTitle} is waiting for admin review on ${appName}.`
+      : `${input.eventTitle} was submitted for review on ${appName}.`;
+
+    const html = this.renderEmailShell({
+      preheader,
+      title,
+      intro,
+      bodyHtml,
+      actionLabel,
+      actionUrl,
+      note: isAdmin
+        ? 'You are receiving this because you have admin access on All AXS.'
+        : 'Typical review times are within one business day. You can still edit media and ticket tiers while the event is pending review.',
+    });
+
+    if (
+      this.isDevelopment &&
+      (!this.resend || !this.resendApiKey || !this.resendFrom)
+    ) {
+      this.logger.warn(
+        `[${context}] DEVELOPMENT MODE - Email would be sent to: ${input.to}`,
+      );
+      this.logger.warn(`[${context}] DEVELOPMENT MODE - Subject: ${subject}`);
+      this.logger.warn(`[${context}] DEVELOPMENT MODE - URL: ${actionUrl}`);
+      return;
+    }
+
+    try {
+      if (!this.resend) {
+        throw new Error('Resend client not initialized');
+      }
+
+      const result = await this.resend.emails.send({
+        from: this.resendFrom,
+        to: input.to,
+        subject,
+        html,
+      });
+
+      const resendId = this.assertResendSendOk(result, context);
+      this.logger.log(
+        `[${context}] Sent (${input.audience}) to ${input.to}. Resend ID: ${resendId}`,
+      );
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `[${context}] Error sending to ${input.to}: ${err.message}`,
+        err.stack,
+      );
+      throw error;
+    }
+  }
+
   async sendTicketEmail(input: {
     buyerName: string;
     buyerEmail: string;
@@ -736,6 +976,10 @@ export class EmailService {
       currency: string;
       couponCode?: string | null;
     };
+    /** Magic link to set a password / open the ticket wallet. */
+    accessUrl?: string;
+    /** True when the buyer account was auto-provisioned at checkout. */
+    accountCreated?: boolean;
   }): Promise<void> {
     if (!input.tickets.length) return;
     if (!this.resend || !this.resendFrom) {
@@ -805,13 +1049,38 @@ export class EmailService {
         ? 'Your ticket PDF is attached — open it at the door to scan the QR code.'
         : `${input.tickets.length} ticket PDFs are attached — open each pass at the door to scan the QR code.`;
 
+    const accountNote = input.accountCreated
+      ? ' We also created an All AXS account so you can manage your passes online — use the button below to access your tickets (no password required until you choose to set one).'
+      : input.accessUrl
+        ? ' Use the button below to access your ticket wallet anytime.'
+        : '';
+
+    const primaryActionUrl = input.accessUrl ?? `${frontendUrl}/tickets`;
+    const primaryActionLabel = input.accessUrl
+      ? 'Access your tickets'
+      : 'View all tickets';
+
+    const accountBanner = input.accountCreated
+      ? `
+        <tr>
+          <td style="padding:0 24px 12px 24px;">
+            <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#334155;background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:12px 14px;">
+              <strong style="color:#0f172a;">Your account has been created.</strong>
+              We saved this purchase to ${input.buyerEmail}. You can open your passes now using the secure link below — set a password when it suits you.
+            </p>
+          </td>
+        </tr>
+      `
+      : '';
+
     const html = this.renderEmailShell({
       preheader: `Your tickets for ${input.eventTitle} are ready.`,
       title: `Your tickets for ${input.eventTitle}`,
-      intro: `Hello ${input.buyerName || 'there'}, your payment was successful and your tickets are ready. ${pdfNote}`,
-      actionLabel: 'View all tickets',
-      actionUrl: `${frontendUrl}/tickets`,
+      intro: `Hello ${input.buyerName || 'there'}, your payment was successful and your tickets are ready. ${pdfNote}${accountNote}`,
+      actionLabel: primaryActionLabel,
+      actionUrl: primaryActionUrl,
       bodyHtml: `
+        ${accountBanner}
         ${summaryHtml}
         <tr>
           <td style="padding:12px 24px 4px 24px;">
@@ -835,5 +1104,441 @@ export class EmailService {
     this.logger.log(
       `[sendTicketEmail] Sent to ${input.buyerEmail} with ${attachments.length} attachment(s) (Resend ID: ${ticketId})`,
     );
+  }
+
+  /**
+   * Notifies the buyer after a successful order refund (full or partial).
+   */
+  async sendOrderRefundEmail(input: {
+    buyerEmail: string;
+    buyerName?: string | null;
+    orderReference: string;
+    eventTitle: string;
+    refundAmountCents: number;
+    currency: string;
+    isPartialRefund?: boolean;
+  }): Promise<void> {
+    const context = 'sendOrderRefundEmail';
+    this.logger.log(
+      `[${context}] Entry - Provider: ${this.emailProvider}, From: ${this.resendFrom || 'NOT CONFIGURED'}`,
+    );
+
+    if (this.emailProvider !== 'resend') {
+      this.logger.error(
+        `[${context}] Email provider '${this.emailProvider}' is not supported.`,
+      );
+      if (this.isDevelopment) return;
+      return;
+    }
+
+    if (!this.resendApiKey || !this.resendFrom) {
+      this.logger.error(
+        `[${context}] RESEND_API_KEY or RESEND_FROM is not configured.`,
+      );
+      if (this.isDevelopment) return;
+      return;
+    }
+
+    const homeUrl = (this.frontendUrl || 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    const ticketsUrl = `${homeUrl}/tickets`;
+    const supportEmail = 'hello@allaxs.com';
+    const supportUrl = `mailto:${supportEmail}`;
+    const greeting = input.buyerName?.trim()
+      ? `Hello ${input.buyerName.trim()},`
+      : 'Hello,';
+    const refundLabel = input.isPartialRefund ? 'Partial refund' : 'Refund amount';
+    const amountLabel = this.formatMoney(
+      input.refundAmountCents,
+      input.currency,
+    );
+
+    const bodyHtml = `
+      <tr>
+        <td style="padding:8px 28px 0 28px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;">
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Order reference</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;font-weight:600;padding:4px 0;">${input.orderReference}</td>
+            </tr>
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Event</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">${input.eventTitle}</td>
+            </tr>
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#111827;font-weight:700;padding:10px 0 0 0;border-top:1px solid #e5e7eb;">${refundLabel}</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#111827;font-weight:700;padding:10px 0 0 0;border-top:1px solid #e5e7eb;">${amountLabel}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td align="center" style="padding:14px 28px 0 28px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#64748b;">
+          Your tickets for this order are no longer valid for entry. Refunds typically appear on your original payment method within 5–10 business days.
+          <br /><br />
+          Questions? <a href="${supportUrl}" style="color:#0b5fff;text-decoration:none;font-weight:700;">Contact support</a>
+        </td>
+      </tr>
+    `;
+
+    const subject = input.isPartialRefund
+      ? `Partial refund for ${input.eventTitle}`
+      : `Refund processed for ${input.eventTitle}`;
+    const title = input.isPartialRefund ? 'Partial refund issued' : 'Refund processed';
+    const intro = `${greeting} we processed a ${input.isPartialRefund ? 'partial ' : ''}refund for your order for <strong>${input.eventTitle}</strong>.`;
+
+    const html = this.renderEmailShell({
+      preheader: `${refundLabel}: ${amountLabel} for ${input.eventTitle}.`,
+      title,
+      intro,
+      bodyHtml,
+      actionLabel: 'View my tickets',
+      actionUrl: ticketsUrl,
+      note: `If you did not expect this refund, contact ${supportEmail} right away.`,
+    });
+
+    if (
+      this.isDevelopment &&
+      (!this.resend || !this.resendApiKey || !this.resendFrom)
+    ) {
+      this.logger.warn(
+        `[${context}] DEVELOPMENT MODE - Email would be sent to: ${input.buyerEmail}`,
+      );
+      this.logger.warn(`[${context}] DEVELOPMENT MODE - Subject: ${subject}`);
+      this.logger.warn(`[${context}] DEVELOPMENT MODE - URL: ${ticketsUrl}`);
+      return;
+    }
+
+    try {
+      if (!this.resend) {
+        throw new Error('Resend client not initialized');
+      }
+
+      const result = await this.resend.emails.send({
+        from: this.resendFrom,
+        to: input.buyerEmail,
+        subject,
+        html,
+      });
+
+      const resendId = this.assertResendSendOk(result, context);
+      this.logger.log(
+        `[${context}] Sent to ${input.buyerEmail}. Resend ID: ${resendId}`,
+      );
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `[${context}] Error sending to ${input.buyerEmail}: ${err.message}`,
+        err.stack,
+      );
+      // Do not rethrow — refund already succeeded; email must not block the response.
+    }
+  }
+
+  private formatMoney(cents: number, currency: string): string {
+    const major = Math.abs(cents) / 100;
+    const formatted = major.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return `${formatted} ${currency}`;
+  }
+
+  /**
+   * Sends a volunteer scanner-link invite email.
+   * The email contains nothing about attendees — only the scanner URL and label.
+   */
+  async sendScannerInviteEmail(input: {
+    to: string;
+    label: string;
+    eventTitle: string;
+    scanUrl: string;
+    expiresAt: Date;
+    organizerName: string;
+  }): Promise<void> {
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+
+    if (this.emailProvider !== 'resend' || !this.resend || !this.resendFrom) {
+      this.logger.warn(
+        `[sendScannerInviteEmail] Email not configured — would have sent scanner invite to ${input.to}`,
+      );
+      this.logger.warn(`[sendScannerInviteEmail] Scanner URL: ${input.scanUrl}`);
+      return;
+    }
+
+    const expiryStr = input.expiresAt.toLocaleString('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+
+    const html = this.renderEmailShell({
+      preheader: `You've been invited to scan tickets for ${input.eventTitle}.`,
+      title: `You're a door scanner for ${input.eventTitle}`,
+      intro: `${input.organizerName} has invited you to check in guests at <strong>${input.label}</strong>. Tap the button below on your phone to open the scanner — no account or login required.`,
+      actionLabel: 'Open Scanner',
+      actionUrl: input.scanUrl,
+      linkLabel: 'Or copy this link and open it on your phone:',
+      expiresText: `This scanner link is valid until ${expiryStr}. After that it will stop working automatically.`,
+      note: `If you weren't expecting this, ignore this email. The link only works for the event it was created for.`,
+      footer: `Sent by ${input.organizerName} via ${appName}.`,
+    });
+
+    try {
+      const result = await this.resend.emails.send({
+        from: this.resendFrom,
+        to: input.to,
+        subject: `Scanner invite: ${input.label} — ${input.eventTitle}`,
+        html,
+      });
+      const id = this.assertResendSendOk(result, 'sendScannerInviteEmail');
+      this.logger.log(
+        `[sendScannerInviteEmail] Sent scanner invite to ${input.to} (Resend ID: ${id})`,
+      );
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `[sendScannerInviteEmail] Failed to send to ${input.to}: ${err.message}`,
+        err.stack,
+      );
+      // Do not rethrow — email failure must not block session creation
+    }
+  }
+
+  /** Invites a co-organizer to join an organization team. */
+  async sendOrganizationInviteEmail(input: {
+    to: string;
+    orgName: string;
+    role: string;
+    token: string;
+    inviterName?: string | null;
+  }): Promise<void> {
+    const context = 'sendOrganizationInviteEmail';
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+    const homeUrl = (this.frontendUrl || 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    const acceptUrl = `${homeUrl}/organizer/team/join?token=${encodeURIComponent(input.token)}`;
+    const roleLabel =
+      input.role === 'SCANNER'
+        ? 'Scanner'
+        : input.role === 'EDITOR'
+          ? 'Editor'
+          : input.role;
+    const inviter = input.inviterName?.trim() || 'An organizer';
+
+    if (this.emailProvider !== 'resend' || !this.resend || !this.resendFrom) {
+      this.logger.warn(
+        `[${context}] Email not configured — would have sent invite to ${input.to}`,
+      );
+      this.logger.warn(`[${context}] Accept URL: ${acceptUrl}`);
+      return;
+    }
+
+    const html = this.renderEmailShell({
+      preheader: `Join ${input.orgName} on ${appName} as ${roleLabel}.`,
+      title: `You're invited to ${input.orgName}`,
+      intro: `${inviter} invited you to join <strong>${input.orgName}</strong> as <strong>${roleLabel}</strong>. Sign in with this email address and accept the invite to access the organizer dashboard.`,
+      actionLabel: 'Accept invitation',
+      actionUrl: acceptUrl,
+      linkLabel: 'Or copy this link:',
+      expiresText: 'This invitation expires in 7 days.',
+      note: `If you weren't expecting this invite, you can ignore this email.`,
+      footer: `Sent by ${appName}.`,
+    });
+
+    try {
+      const result = await this.resend.emails.send({
+        from: this.resendFrom,
+        to: input.to,
+        subject: `Invitation to join ${input.orgName} on ${appName}`,
+        html,
+      });
+      const id = this.assertResendSendOk(result, context);
+      this.logger.log(
+        `[${context}] Sent organization invite to ${input.to} (Resend ID: ${id})`,
+      );
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `[${context}] Failed to send to ${input.to}: ${err.message}`,
+        err.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Notifies the next waitlist buyer when a tier seat opens after a refund.
+   */
+  async sendWaitlistSpotAvailableEmail(input: {
+    to: string;
+    eventTitle: string;
+    tierName: string;
+    purchaseUrl: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    const context = 'sendWaitlistSpotAvailableEmail';
+    this.logger.log(
+      `[${context}] Entry - Provider: ${this.emailProvider}, From: ${this.resendFrom || 'NOT CONFIGURED'}`,
+    );
+
+    if (this.emailProvider !== 'resend') {
+      this.logger.error(
+        `[${context}] Email provider '${this.emailProvider}' is not supported.`,
+      );
+      if (this.isDevelopment) return;
+      return;
+    }
+
+    if (!this.resendApiKey || !this.resendFrom) {
+      this.logger.error(
+        `[${context}] RESEND_API_KEY or RESEND_FROM is not configured.`,
+      );
+      if (this.isDevelopment) return;
+      return;
+    }
+
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+    const expiryStr = new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(input.expiresAt);
+
+    const html = this.renderEmailShell({
+      preheader: `A spot opened for ${input.tierName} — ${input.eventTitle}`,
+      title: 'Your waitlist spot is ready',
+      intro: `Good news — a ticket opened up for <strong>${input.tierName}</strong> at <strong>${input.eventTitle}</strong>. Complete checkout before the link expires to secure your place.`,
+      actionLabel: 'Complete purchase',
+      actionUrl: input.purchaseUrl,
+      linkLabel: 'Or copy this checkout link:',
+      expiresText: `This link expires at ${expiryStr} (30 minutes). If you miss the window, the next person on the waitlist may be notified.`,
+      note: 'Use the same email address you joined the waitlist with when checking out.',
+      footer: `Sent by ${appName}.`,
+    });
+
+    if (
+      this.isDevelopment &&
+      (!this.resend || !this.resendApiKey || !this.resendFrom)
+    ) {
+      this.logger.warn(
+        `[${context}] DEVELOPMENT MODE - Email would be sent to: ${input.to}`,
+      );
+      this.logger.warn(`[${context}] DEVELOPMENT MODE - URL: ${input.purchaseUrl}`);
+      return;
+    }
+
+    try {
+      if (!this.resend) {
+        throw new Error('Resend client not initialized');
+      }
+
+      const result = await this.resend.emails.send({
+        from: this.resendFrom,
+        to: input.to,
+        subject: `Spot available: ${input.tierName} — ${input.eventTitle}`,
+        html,
+      });
+
+      const resendId = this.assertResendSendOk(result, context);
+      this.logger.log(
+        `[${context}] Sent to ${input.to}. Resend ID: ${resendId}`,
+      );
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error(
+        `[${context}] Error sending to ${input.to}: ${err.message}`,
+        err.stack,
+      );
+      throw error;
+    }
+  }
+
+  /** Batch-send organizer announcements with a fixed delay between sends. */
+  async sendOrganizerAnnouncementBatch(input: {
+    recipients: string[];
+    subject: string;
+    eventTitle: string;
+    bodyHtml: string;
+  }): Promise<{ sent: number; failed: number }> {
+    const context = 'sendOrganizerAnnouncementBatch';
+    const delayMs = 550;
+
+    if (this.emailProvider !== 'resend') {
+      this.logger.error(
+        `[${context}] Email provider '${this.emailProvider}' is not supported.`,
+      );
+      if (this.isDevelopment) {
+        return { sent: 0, failed: input.recipients.length };
+      }
+      throw new Error(`Unsupported email provider: ${this.emailProvider}`);
+    }
+
+    if (!this.resendApiKey || !this.resendFrom || !this.resend) {
+      const errorMsg =
+        'RESEND_API_KEY or RESEND_FROM is not configured. Announcement emails cannot be sent.';
+      this.logger.error(`[${context}] ${errorMsg}`);
+      if (this.isDevelopment) {
+        this.logger.warn(
+          `[${context}] DEVELOPMENT MODE - Would send to ${input.recipients.length} recipient(s)`,
+        );
+        return { sent: 0, failed: input.recipients.length };
+      }
+      throw new Error(errorMsg);
+    }
+
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+    const wrappedBody = `
+      <tr>
+        <td style="padding:8px 28px 0 28px;">
+          <div style="font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:26px;color:#334155;">
+            ${input.bodyHtml}
+          </div>
+        </td>
+      </tr>
+    `;
+
+    let sent = 0;
+    let failed = 0;
+
+    for (let i = 0; i < input.recipients.length; i++) {
+      const to = input.recipients[i];
+      const html = this.renderEmailShell({
+        preheader: input.subject,
+        title: input.eventTitle,
+        intro: `You have a message from the organizer of <strong>${input.eventTitle}</strong>:`,
+        bodyHtml: wrappedBody,
+        footer: `This message was sent by the event organizer via ${appName}. If you have questions about your tickets, reply to the organizer or contact support through your order confirmation.`,
+      });
+
+      try {
+        const result = await this.resend.emails.send({
+          from: this.resendFrom,
+          to,
+          subject: input.subject,
+          html,
+        });
+        this.assertResendSendOk(result, context);
+        sent++;
+      } catch (error) {
+        failed++;
+        const err = error as Error;
+        this.logger.error(
+          `[${context}] Failed to send announcement to ${to}: ${err.message}`,
+          err.stack,
+        );
+      }
+
+      if (i < input.recipients.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    this.logger.log(
+      `[${context}] Finished batch for "${input.eventTitle}": sent=${sent}, failed=${failed}`,
+    );
+    return { sent, failed };
   }
 }

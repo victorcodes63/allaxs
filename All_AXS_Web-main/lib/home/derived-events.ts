@@ -4,14 +4,41 @@ export function toYmd(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function deriveHomeEventsLists(events: PublicEvent[]): {
+function sortFeatured(events: PublicEvent[]): PublicEvent[] {
+  return [...events].sort((a, b) => {
+    const ao = a.featuredSortOrder ?? Number.MAX_SAFE_INTEGER;
+    const bo = b.featuredSortOrder ?? Number.MAX_SAFE_INTEGER;
+    if (ao !== bo) return ao - bo;
+    return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+  });
+}
+
+function deriveFeaturedFromCatalog(events: PublicEvent[]): PublicEvent[] {
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+  );
+  const flagged = sorted.filter((e) => e.isFeatured);
+  if (flagged.length > 0) {
+    return sortFeatured(flagged).slice(0, 6);
+  }
+  return sorted.slice(0, 6);
+}
+
+export function deriveHomeEventsLists(
+  events: PublicEvent[],
+  options?: { featuredFromApi?: PublicEvent[] },
+): {
   featuredEvents: PublicEvent[];
   startingSoonEvents: PublicEvent[];
 } {
   const sorted = [...events].sort(
-    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()
+    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
   );
-  const featuredEvents = sorted.slice(0, 6);
+
+  const featuredEvents = options?.featuredFromApi?.length
+    ? sortFeatured(options.featuredFromApi).slice(0, 6)
+    : deriveFeaturedFromCatalog(sorted);
+
   const featuredIds = new Set(featuredEvents.map((e) => e.id));
   const now = Date.now();
   const horizon = new Date();

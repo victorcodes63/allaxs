@@ -57,6 +57,12 @@ export class EventsController {
   @ApiQuery({ name: 'dateFrom', required: false, type: String })
   @ApiQuery({ name: 'dateTo', required: false, type: String })
   @ApiQuery({ name: 'city', required: false, type: String })
+  @ApiQuery({
+    name: 'featured',
+    required: false,
+    type: Boolean,
+    description: 'When true, return only homepage-featured published events',
+  })
   @ApiResponse({ status: 200, description: 'Events list with pagination' })
   async findPublicEvents(
     @Query('page') page?: string,
@@ -66,6 +72,7 @@ export class EventsController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('city') city?: string,
+    @Query('featured') featured?: string,
   ) {
     return this.eventsService.findPublicEvents({
       page: page ? parseInt(page, 10) : undefined,
@@ -75,6 +82,7 @@ export class EventsController {
       dateFrom,
       dateTo,
       city,
+      featured: featured === 'true' || featured === '1',
     });
   }
 
@@ -86,6 +94,54 @@ export class EventsController {
   @ApiResponse({ status: 404, description: 'Event not found' })
   async findBySlug(@Param('slug') slug: string) {
     return this.eventsService.findBySlug(slug);
+  }
+
+  @Get('by-slug/:slug/comp/:token')
+  @Public()
+  @ApiOperation({ summary: 'Resolve hidden comp/VIP tier by slug and token' })
+  @ApiParam({ name: 'slug', description: 'Event slug' })
+  @ApiParam({ name: 'token', description: 'Comp link token' })
+  @ApiResponse({ status: 200, description: 'Comp link resolved' })
+  @ApiResponse({ status: 404, description: 'Comp link not found' })
+  async resolveCompLink(
+    @Param('slug') slug: string,
+    @Param('token') token: string,
+  ) {
+    const { event, tier, quantity } = await this.eventsService.resolveCompLink(
+      slug,
+      token,
+    );
+    return {
+      event: {
+        id: event.id,
+        title: event.title,
+        slug: event.slug,
+        description: event.description,
+        type: event.type,
+        venue: event.venue,
+        city: event.city,
+        country: event.country,
+        startAt: event.startAt,
+        endAt: event.endAt,
+        bannerUrl: event.bannerUrl,
+        organizer: {
+          id: event.organizer.id,
+          orgName: event.organizer.orgName,
+        },
+      },
+      tier: {
+        id: tier.id,
+        name: tier.name,
+        description: tier.description,
+        priceCents: tier.priceCents,
+        currency: tier.currency,
+        quantityTotal: tier.quantityTotal,
+        quantitySold: tier.quantitySold,
+        minPerOrder: tier.minPerOrder,
+        maxPerOrder: tier.maxPerOrder,
+      },
+      quantity,
+    };
   }
 
   @Get(':id/slug')
@@ -136,6 +192,40 @@ export class EventsController {
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     return this.eventsService.create(user.id, dto, idempotencyKey);
+  }
+
+  @Get(':id/admin-overrides')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ORGANIZER)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      'Recent admin edits on an organiser-owned event (audit-log summary)',
+  })
+  @ApiParam({ name: 'id', description: 'Event ID' })
+  @ApiQuery({
+    name: 'withinDays',
+    required: false,
+    type: Number,
+    description: 'Look back window in days (1–365, default 90)',
+  })
+  @ApiResponse({ status: 200, description: 'Admin override summary' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async getAdminOverrideSummary(
+    @Param('id') id: string,
+    @GetUser() user: CurrentUser,
+    @Query('withinDays') withinDays?: string,
+  ) {
+    const parsed =
+      withinDays !== undefined && withinDays !== ''
+        ? Number.parseInt(withinDays, 10)
+        : 90;
+    return this.eventsService.getAdminOverrideSummaryForOrganizer(
+      id,
+      user.id,
+      Number.isFinite(parsed) ? parsed : 90,
+    );
   }
 
   @Get(':id')

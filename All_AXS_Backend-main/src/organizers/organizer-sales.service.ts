@@ -10,6 +10,11 @@ import { Event } from '../events/entities/event.entity';
 import { Order } from '../domain/order.entity';
 import { OrderItem } from '../domain/order-item.entity';
 import { OrderStatus } from '../domain/enums';
+import {
+  normalizeCurrencyCode,
+  PLATFORM_DEFAULT_CURRENCY,
+  resolveCurrencyFromTicketTypes,
+} from '../common/currency';
 
 function parseBuyerNameFromNotes(notes: string | null | undefined): string {
   if (!notes) return '';
@@ -113,7 +118,7 @@ export class OrganizerSalesService {
           netCents: 0,
           ticketsSold: 0,
           ordersCount: 0,
-          currency: 'KES',
+          currency: PLATFORM_DEFAULT_CURRENCY,
         },
       };
     }
@@ -126,6 +131,7 @@ export class OrganizerSalesService {
       .addSelect('COUNT(o.id)', 'ordersCount')
       .addSelect('SUM(o.amountCents)', 'grossCents')
       .addSelect('SUM(o.feesCents)', 'feesCents')
+      .addSelect('MAX(o.currency)', 'currency')
       .where('o.status = :st', { st: OrderStatus.PAID })
       .andWhere('o.eventId IN (:...eventIds)', { eventIds })
       .groupBy('o.eventId')
@@ -143,13 +149,21 @@ export class OrganizerSalesService {
 
     const orderByEvent = new Map<
       string,
-      { ordersCount: number; grossCents: number; feesCents: number }
+      {
+        ordersCount: number;
+        grossCents: number;
+        feesCents: number;
+        currency: string;
+      }
     >();
     for (const row of orderAgg) {
       orderByEvent.set(row.eventId, {
         ordersCount: toInt(row.ordersCount),
         grossCents: toInt(row.grossCents),
         feesCents: toInt(row.feesCents),
+        currency: normalizeCurrencyCode(
+          typeof row.currency === 'string' ? row.currency : undefined,
+        ),
       });
     }
 
@@ -163,9 +177,10 @@ export class OrganizerSalesService {
         (sum, t) => sum + (t.quantityTotal ?? 0),
         0,
       );
-      const currency =
-        (e.ticketTypes ?? []).find((t) => t.currency)?.currency ?? 'KES';
       const o = orderByEvent.get(e.id);
+      const currency =
+        o?.currency ||
+        resolveCurrencyFromTicketTypes(e.ticketTypes ?? []);
       const gross = o?.grossCents ?? 0;
       const fees = o?.feesCents ?? 0;
       return {
@@ -204,7 +219,7 @@ export class OrganizerSalesService {
     );
 
     if (!rollup.currency) {
-      rollup.currency = 'KES';
+      rollup.currency = PLATFORM_DEFAULT_CURRENCY;
     }
 
     return { events: rows, rollup };
@@ -280,7 +295,7 @@ export class OrganizerSalesService {
         amountCents: gross,
         feesCents: fees,
         netCents: Math.max(0, gross - fees),
-        currency: o.currency,
+        currency: normalizeCurrencyCode(o.currency),
         ticketsInOrder,
         lineSummary,
       };

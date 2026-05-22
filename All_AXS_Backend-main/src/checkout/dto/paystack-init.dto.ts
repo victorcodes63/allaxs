@@ -1,6 +1,7 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsInt,
   IsOptional,
@@ -50,4 +51,29 @@ export class PaystackInitDto {
   @IsOptional()
   @IsString()
   couponCode?: string;
+
+  /** Internal flag for public guest checkout (set server-side). */
+  @IsOptional()
+  guestCheckout?: boolean;
+
+  /**
+   * When true, creates a payment plan and charges only installment 1 via
+   * Paystack. Requires a single cart line on a tier with allowInstallments.
+   */
+  @IsOptional()
+  @IsBoolean()
+  payInInstallments?: boolean;
+
+  /** Signed waitlist purchase token from notification email (30 min). */
+  @IsOptional()
+  @IsString()
+  waitlistToken?: string;
+
+  /**
+   * When `email_and_whatsapp` and `buyerPhone` are set, the API sends a
+   * WhatsApp template with ticket links after payment.
+   */
+  @IsOptional()
+  @IsString()
+  ticketDelivery?: 'account' | 'email' | 'email_and_whatsapp';
 }

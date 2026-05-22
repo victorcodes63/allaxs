@@ -7,10 +7,12 @@ import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
+import { useAuth } from "@/lib/auth";
 
 function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refresh: refreshAuth } = useAuth();
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   );
@@ -33,11 +35,20 @@ function VerifyEmailContent() {
 
         if (response.status === 200) {
           setStatus("success");
-          setMessage("Email verified successfully! You can now log in.");
-          // Redirect to login after 3 seconds
+          let redirectPath = "/login";
+          try {
+            await axios.post("/api/auth/refresh");
+            await refreshAuth();
+            redirectPath = "/dashboard";
+            setMessage("Email verified! Taking you to your dashboard…");
+          } catch {
+            setMessage(
+              "Email verified successfully! Sign in to continue with your account.",
+            );
+          }
           setTimeout(() => {
-            router.push("/login");
-          }, 3000);
+            router.push(redirectPath);
+          }, 2500);
         }
       } catch (err) {
         setStatus("error");
@@ -49,7 +60,7 @@ function VerifyEmailContent() {
     };
 
     verifyEmail();
-  }, [searchParams, router]);
+  }, [searchParams, router, refreshAuth]);
 
   return (
     <AuthPageShell>
@@ -75,12 +86,10 @@ function VerifyEmailContent() {
               <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 text-sm">
                 {message}
               </div>
-              <p className="text-sm text-black/60 text-center">
-                Redirecting to login page...
-              </p>
-              <Link href="/login">
+              <p className="text-sm text-black/60 text-center">Redirecting…</p>
+              <Link href="/dashboard">
                 <Button variant="primary" className="w-full">
-                  Continue to Sign In
+                  Continue
                 </Button>
               </Link>
             </>

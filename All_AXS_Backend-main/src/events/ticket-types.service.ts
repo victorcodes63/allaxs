@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryFailedError } from 'typeorm';
+import * as crypto from 'crypto';
 import { TicketType } from './entities/ticket-type.entity';
 import { Event } from './entities/event.entity';
 import { EventStatus, TicketTypeStatus, Role } from 'src/domain/enums';
@@ -16,6 +17,10 @@ import { UpdateTicketTypeDto } from './dto/update-ticket-type.dto';
 import { EventsService } from './events.service';
 import { InstallmentConfigValidator } from './installment-config.validator';
 import { AdminAuditLog } from 'src/admin/entities/admin-audit-log.entity';
+import {
+  normalizeCurrencyCode,
+  resolveCurrencyFromTicketTypes,
+} from '../common/currency';
 
 @Injectable()
 export class TicketTypesService {
@@ -85,8 +90,28 @@ export class TicketTypesService {
       dto.salesStartAt === undefined &&
       dto.salesEndAt === undefined &&
       dto.allowInstallments === undefined &&
-      dto.installmentConfig === undefined
+      dto.installmentConfig === undefined &&
+      dto.isHidden === undefined
     );
+  }
+
+  private generateCompLinkToken(): string {
+    return crypto.randomBytes(24).toString('base64url');
+  }
+
+  private applyCompLinkFields(
+    ticketType: TicketType,
+    isHidden: boolean | undefined,
+  ): void {
+    if (isHidden === undefined) return;
+    ticketType.isHidden = isHidden;
+    if (isHidden) {
+      if (!ticketType.compLinkToken) {
+        ticketType.compLinkToken = this.generateCompLinkToken();
+      }
+    } else {
+      ticketType.compLinkToken = null;
+    }
   }
 
   /**
@@ -235,12 +260,20 @@ export class TicketTypesService {
         );
       }
 
+      const existingTiers = await this.ticketTypeRepository.find({
+        where: { eventId: event.id },
+        select: ['currency'],
+      });
+      const currency = normalizeCurrencyCode(
+        dto.currency ?? resolveCurrencyFromTicketTypes(existingTiers),
+      );
+
       const ticketType = this.ticketTypeRepository.create({
         eventId: event.id,
         name: dto.name.trim(),
         description: dto.description?.trim() || undefined,
         priceCents,
-        currency: 'KES', // Default currency
+        currency,
         quantityTotal: quantity,
         quantitySold: 0,
         minPerOrder: 1, // Default minimum
@@ -252,6 +285,8 @@ export class TicketTypesService {
         status,
         allowInstallments: dto.allowInstallments || false,
         installmentConfig: dto.installmentConfig || null,
+        isHidden: dto.isHidden === true,
+        compLinkToken: dto.isHidden === true ? this.generateCompLinkToken() : null,
       });
 
       const saved = await this.ticketTypeRepository.save(ticketType);
@@ -596,6 +631,9 @@ export class TicketTypesService {
         ticketType.status = TicketTypeStatus.DISABLED;
       }
     }
+    if (dto.currency !== undefined) {
+      ticketType.currency = normalizeCurrencyCode(dto.currency);
+    }
     if (dto.maxPerOrder !== undefined) {
       if (dto.maxPerOrder === null || dto.maxPerOrder === undefined) {
         ticketType.maxPerOrder = undefined;
@@ -618,6 +656,9 @@ export class TicketTypesService {
     }
     if (dto.installmentConfig !== undefined) {
       ticketType.installmentConfig = dto.installmentConfig || null;
+    }
+    if (dto.isHidden !== undefined) {
+      this.applyCompLinkFields(ticketType, dto.isHidden);
     }
 
     try {
@@ -845,5 +886,25 @@ export class TicketTypesService {
       );
       throw new BadRequestException('Failed to delete ticket type');
     }
+  }
+
+  /**
+   * Generate or rotate the comp link token for a hidden tier.
+   */
+  async regenerateCompLink(
+    id: string,
+    userId: string,
+    userRoles: Role[],
+  ): Promise<TicketType> {
+    const ticketType = await this.findOne(id, userId, userRoles);
+    await this.eventsService.ensureOwnership(
+      ticketType.eventId,
+      userId,
+      userRoles,
+    );
+
+    ticketType.isHidden = true;
+    ticketType.compLinkToken = this.generateCompLinkToken();
+    return this.ticketTypeRepository.save(ticketType);
   }
 }

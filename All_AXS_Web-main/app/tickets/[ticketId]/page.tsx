@@ -66,6 +66,7 @@ export default function TicketDetailPage() {
   const [eventLoading, setEventLoading] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [walletError, setWalletError] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
 
   useEffect(() => {
@@ -225,7 +226,7 @@ export default function TicketDetailPage() {
   const hasEventMeta = Boolean(whenLine || venueLine || organizerName);
 
   const downloadPdf = async () => {
-    if (!ticket || !qrValue) return;
+    if (!ticket) return;
     if (typeof window === "undefined") return;
     setPdfError(null);
     setDownloadingPdf(true);
@@ -237,18 +238,64 @@ export default function TicketDetailPage() {
           attendeeEmail: ticket.attendeeEmail,
           ticketId: ticket.id,
           issuedAtLabel: issued,
-          qrPayload: qrValue,
           whenLine,
           venueLine,
           organizerName: organizerName ?? null,
           formatChip,
         },
-        { origin: window.location.origin }
+        { origin: window.location.origin, ticket }
       );
     } catch {
       setPdfError("Could not generate PDF right now. Please try again.");
     } finally {
       setDownloadingPdf(false);
+    }
+  };
+
+  const addToGoogleWallet = async () => {
+    if (!ticket) return;
+    setWalletError(null);
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/wallet/google`, {
+        credentials: "same-origin",
+        redirect: "follow",
+      });
+      if (res.redirected && res.url) {
+        window.location.assign(res.url);
+        return;
+      }
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        setWalletError(data.message || "Google Wallet is not available yet.");
+        return;
+      }
+      setWalletError("Could not open Google Wallet. Please try again.");
+    } catch {
+      setWalletError("Could not open Google Wallet. Please try again.");
+    }
+  };
+
+  const addToAppleWallet = async () => {
+    if (!ticket) return;
+    setWalletError(null);
+    try {
+      const res = await fetch(`/api/tickets/${ticket.id}/wallet/apple`, {
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { message?: string };
+        setWalletError(data.message || "Apple Wallet is not available yet.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `allaxs-${ticket.id.slice(0, 8)}.pkpass`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setWalletError("Could not download Apple Wallet pass. Please try again.");
     }
   };
 
@@ -363,7 +410,7 @@ export default function TicketDetailPage() {
         </div>
       </article>
 
-      <div className="flex flex-col items-stretch gap-3 sm:items-center sm:flex-row sm:justify-center">
+      <div className="flex flex-col items-stretch gap-3 sm:items-center sm:flex-row sm:flex-wrap sm:justify-center">
         <button
           type="button"
           onClick={() => void downloadPdf()}
@@ -372,6 +419,24 @@ export default function TicketDetailPage() {
         >
           {downloadingPdf ? "Generating PDF..." : "Download PDF ticket"}
         </button>
+        {isApiCheckoutEnabled() ? (
+          <>
+            <button
+              type="button"
+              onClick={() => void addToGoogleWallet()}
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-5 text-sm font-semibold text-foreground transition-colors hover:border-primary/45"
+            >
+              Add to Google Wallet
+            </button>
+            <button
+              type="button"
+              onClick={() => void addToAppleWallet()}
+              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-5 text-sm font-semibold text-foreground transition-colors hover:border-primary/45"
+            >
+              Add to Apple Wallet
+            </button>
+          </>
+        ) : null}
         {eventSlugForLink ? (
           <ArrowCtaLink
             href={`/e/${eventSlugForLink}`}
@@ -387,6 +452,7 @@ export default function TicketDetailPage() {
         )}
       </div>
       {pdfError ? <p className="text-center text-sm text-primary">{pdfError}</p> : null}
+      {walletError ? <p className="text-center text-sm text-primary">{walletError}</p> : null}
     </div>
   );
 }

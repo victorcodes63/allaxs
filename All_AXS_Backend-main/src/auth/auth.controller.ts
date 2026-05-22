@@ -167,6 +167,14 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @Public()
   @Throttle({ default: { limit: 15, ttl: 60000 } })
   @Post('google')
   @HttpCode(HttpStatus.OK)

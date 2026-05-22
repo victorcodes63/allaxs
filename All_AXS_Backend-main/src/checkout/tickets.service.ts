@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Ticket } from '../domain/ticket.entity';
+import { normalizeCurrencyCode } from '../common/currency';
 
 export type TicketMineRow = {
   id: string;
@@ -32,7 +33,9 @@ export class TicketsService {
       tierName: t.ticketType?.name ?? 'Ticket',
       attendeeEmail: t.attendeeEmail ?? '',
       issuedAt: t.createdAt.toISOString(),
-      currency: t.ticketType?.currency ?? 'KES',
+      currency: normalizeCurrencyCode(
+        t.ticketType?.currency ?? t.order?.currency,
+      ),
       qrNonce: t.qrNonce,
       qrSignature: t.qrSignature,
     };

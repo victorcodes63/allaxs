@@ -16,11 +16,14 @@ import { userCanSwitchAttendeeOrganizerHub } from "@/lib/auth/hub-routing";
 import { useAuth } from "@/lib/auth";
 import { NOTIFICATIONS_LAST_VISITED_AT_KEY, type NotificationCategory } from "@/lib/notifications-inbox";
 import {
+  applyHubNotificationMarkAllReadToSnapshot,
   applyHubNotificationReadToSnapshot,
   isHubNotificationsSnapshotFresh,
   loadHubNotificationsList,
   type CachedHubNotification,
 } from "@/lib/notifications-hub-list";
+import { loadOrganizerEventSlugIndex } from "@/lib/organizer-event-slug-index";
+import { resolveNotificationLink } from "@/lib/notifications-navigation";
 
 export type HubKind = "attendee" | "organizer" | "admin";
 
@@ -170,6 +173,8 @@ export function HubTopBar({
   const [dropdownCategoryFilter, setDropdownCategoryFilter] =
     useState<DropdownCategoryFilter>("all");
   const [dropdownLastVisitedAt, setDropdownLastVisitedAt] = useState<number | null>(null);
+  const [organizerSlugToId, setOrganizerSlugToId] = useState<Record<string, string>>({});
+  const dropdownMarkedAllReadRef = useRef(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -232,6 +237,20 @@ export function HubTopBar({
       setUnreadCount(result.unreadCount);
     } finally {
       setNotificationsLoading(false);
+    }
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+    setUnreadCount(0);
+    applyHubNotificationMarkAllReadToSnapshot();
+    try {
+      await fetch("/api/notifications/read-all", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    } catch {
+      /* optimistic */
     }
   }, []);
 
@@ -312,6 +331,35 @@ export function HubTopBar({
   useEffect(() => {
     void loadNotifications();
   }, [loadNotifications]);
+
+  useEffect(() => {
+    if (hubKind !== "organizer") return;
+    void loadOrganizerEventSlugIndex().then(setOrganizerSlugToId);
+  }, [hubKind]);
+
+  useEffect(() => {
+    if (!notificationsOpen) {
+      dropdownMarkedAllReadRef.current = false;
+      return;
+    }
+    if (dropdownMarkedAllReadRef.current) return;
+    if (notificationsLoading || notificationsError) return;
+    const hasUnread =
+      unreadCount > 0 || notifications.some((item) => !item.isRead);
+    if (!hasUnread) {
+      dropdownMarkedAllReadRef.current = true;
+      return;
+    }
+    dropdownMarkedAllReadRef.current = true;
+    void markAllNotificationsRead();
+  }, [
+    notificationsOpen,
+    notificationsLoading,
+    notificationsError,
+    unreadCount,
+    notifications,
+    markAllNotificationsRead,
+  ]);
 
   useEffect(() => {
     if (!notificationsOpen) return;
@@ -516,7 +564,13 @@ export function HubTopBar({
                           onClick={() => {
                             void markNotificationRead(item.id);
                             setNotificationsOpen(false);
-                            if (item.link) router.push(item.link);
+                            const href = resolveNotificationLink(item.link, {
+                              hub: hubKind,
+                              category: item.category,
+                              organizerSlugToId:
+                                hubKind === "organizer" ? organizerSlugToId : undefined,
+                            });
+                            if (href) router.push(href);
                           }}
                           className={[
                             "w-full px-3 py-2.5 text-left transition-colors hover:bg-wash",

@@ -8,13 +8,15 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Event } from './entities/event.entity';
-import { EventStatus, EventType, Role } from 'src/domain/enums';
+import { TicketType } from './entities/ticket-type.entity';
+import { EventStatus, EventType, Role, TicketTypeStatus } from 'src/domain/enums';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { OrganizerProfile } from 'src/users/entities/organizer-profile.entity';
 import { User } from 'src/users/entities/user.entity';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { AdminAuditLog } from 'src/admin/entities/admin-audit-log.entity';
+import { EmailService } from 'src/auth/services/email.service';
 
 @Injectable()
 export class EventsService {
@@ -23,11 +25,14 @@ export class EventsService {
   constructor(
     @InjectRepository(Event)
     private readonly eventRepository: Repository<Event>,
+    @InjectRepository(TicketType)
+    private readonly ticketTypeRepository: Repository<TicketType>,
     @InjectRepository(OrganizerProfile)
     private readonly organizerProfileRepository: Repository<OrganizerProfile>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
     @InjectRepository(AdminAuditLog)
     private readonly adminAuditLogRepository: Repository<AdminAuditLog>,
   ) {}
@@ -178,29 +183,67 @@ export class EventsService {
     );
   }
 
-  private async notifyAdminsEventSubmitted(event: Event): Promise<void> {
+  private async notifyEventSubmittedForReview(event: Event): Promise<void> {
     const admins = await this.userRepository
       .createQueryBuilder('user')
       .where(':role = ANY(user.roles)', { role: Role.ADMIN })
       .getMany();
 
-    await Promise.allSettled(
-      admins.map((admin) =>
-        this.notificationsService.createInAppNotification({
-          to: admin.email,
-          title: 'Event submitted for review',
-          body: `${event.title} is waiting in the moderation queue.`,
-          link: '/admin/moderation',
-          category: 'hosting',
-          template: 'event_submitted_for_review',
-          payload: {
-            eventId: event.id,
-            eventTitle: event.title,
-            eventStatus: EventStatus.PENDING_REVIEW,
-          },
+    const organizerEmail = event.organizer?.user?.email;
+    const organizerName = event.organizer?.user?.name ?? null;
+    const orgName = event.organizer?.orgName ?? null;
+    const emailBase = {
+      eventTitle: event.title,
+      eventId: event.id,
+      orgName,
+      venue: event.venue ?? null,
+      startAt: event.startAt,
+    };
+
+    const tasks: Promise<unknown>[] = admins.flatMap((admin) => [
+      this.notificationsService.createInAppNotification({
+        to: admin.email,
+        title: 'Event submitted for review',
+        body: `${event.title} is waiting in the moderation queue.`,
+        link: '/admin/moderation',
+        category: 'hosting',
+        template: 'event_submitted_for_review',
+        payload: {
+          eventId: event.id,
+          eventTitle: event.title,
+          eventStatus: EventStatus.PENDING_REVIEW,
+        },
+      }),
+      this.emailService.sendEventSubmittedForReviewEmail({
+        to: admin.email,
+        recipientName: admin.name,
+        audience: 'admin',
+        ...emailBase,
+      }),
+    ]);
+
+    if (organizerEmail) {
+      tasks.push(
+        this.emailService.sendEventSubmittedForReviewEmail({
+          to: organizerEmail,
+          recipientName: organizerName,
+          audience: 'organizer',
+          ...emailBase,
         }),
-      ),
-    );
+      );
+    }
+
+    const results = await Promise.allSettled(tasks);
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          `Event submitted notification failed for ${event.id}`,
+          result.reason instanceof Error
+            ? result.reason.stack
+            : String(result.reason),
+        );
+      }
+    }
   }
 
   private async notifyOrganizerReviewDecision(
@@ -421,6 +464,20 @@ export class EventsService {
       event.endAt = new Date(dto.endsAt);
     }
 
+    if (dto.isFeatured !== undefined || dto.featuredSortOrder !== undefined) {
+      if (!isAdmin) {
+        throw new ForbiddenException(
+          'Only admins can update featured homepage settings',
+        );
+      }
+      if (dto.isFeatured !== undefined) {
+        event.isFeatured = dto.isFeatured;
+      }
+      if (dto.featuredSortOrder !== undefined) {
+        event.featuredSortOrder = dto.featuredSortOrder;
+      }
+    }
+
     const savedEvent = await this.eventRepository.save(event);
 
     if (isAdmin && event.organizer.userId !== userId) {
@@ -484,7 +541,14 @@ export class EventsService {
     // "first ever".
     event.submittedAt = new Date();
     const savedEvent = await this.eventRepository.save(event);
-    await this.notifyAdminsEventSubmitted(savedEvent);
+
+    const eventForNotify = await this.eventRepository.findOne({
+      where: { id: savedEvent.id },
+      relations: ['organizer', 'organizer.user'],
+    });
+    if (eventForNotify) {
+      await this.notifyEventSubmittedForReview(eventForNotify);
+    }
 
     if (isAdmin && event.organizer.userId !== userId) {
       await this.recordAdminAction(userId, 'ADMIN_SUBMIT_EVENT', eventId, {
@@ -643,6 +707,7 @@ export class EventsService {
     dateFrom?: string;
     dateTo?: string;
     city?: string;
+    featured?: boolean;
   }): Promise<{ events: Event[]; total: number; page: number; size: number }> {
     const page = options.page || 1;
     const size = Math.min(options.size || 20, 100); // Max 100 per page
@@ -653,8 +718,16 @@ export class EventsService {
       .innerJoinAndSelect('event.organizer', 'organizer')
       .leftJoinAndSelect('event.ticketTypes', 'ticketTypes')
       .where('event.status = :status', { status: EventStatus.PUBLISHED })
-      .andWhere('event.isPublic = :isPublic', { isPublic: true })
-      .orderBy('event.startAt', 'ASC');
+      .andWhere('event.isPublic = :isPublic', { isPublic: true });
+
+    if (options.featured) {
+      queryBuilder
+        .andWhere('event.isFeatured = :isFeatured', { isFeatured: true })
+        .orderBy('event.featuredSortOrder', 'ASC', 'NULLS LAST')
+        .addOrderBy('event.startAt', 'ASC');
+    } else {
+      queryBuilder.orderBy('event.startAt', 'ASC');
+    }
 
     // Search query
     if (options.q) {
@@ -695,12 +768,21 @@ export class EventsService {
     // Get paginated results
     const events = await queryBuilder.skip(skip).take(size).getMany();
 
+    for (const event of events) {
+      event.ticketTypes = this.filterPublicTicketTypes(event.ticketTypes);
+    }
+
     return {
       events,
       total,
       page,
       size,
     };
+  }
+
+  /** Omit hidden comp tiers from buyer-facing listings. */
+  private filterPublicTicketTypes(ticketTypes?: TicketType[]): TicketType[] {
+    return (ticketTypes ?? []).filter((tier) => !tier.isHidden);
   }
 
   /**
@@ -720,7 +802,103 @@ export class EventsService {
       throw new NotFoundException('Event not found');
     }
 
+    event.ticketTypes = this.filterPublicTicketTypes(event.ticketTypes);
     return event;
+  }
+
+  /**
+   * Resolve a hidden comp/VIP tier by event slug + secret token.
+   */
+  async resolveCompLink(slug: string, token: string) {
+    const event = await this.eventRepository.findOne({
+      where: {
+        slug,
+        status: EventStatus.PUBLISHED,
+        isPublic: true,
+      },
+      relations: ['organizer'],
+    });
+    if (!event) {
+      throw new NotFoundException('Comp link not found');
+    }
+
+    const tier = await this.ticketTypeRepository.findOne({
+      where: {
+        eventId: event.id,
+        compLinkToken: token,
+        isHidden: true,
+      },
+    });
+    if (!tier || tier.status !== TicketTypeStatus.ACTIVE) {
+      throw new NotFoundException('Comp link not found');
+    }
+
+    const now = new Date();
+    if (tier.salesStart && now < tier.salesStart) {
+      throw new BadRequestException('This comp link is not active yet');
+    }
+    if (tier.salesEnd && now > tier.salesEnd) {
+      throw new BadRequestException('This comp link has expired');
+    }
+
+    const remaining = tier.quantityTotal - tier.quantitySold;
+    const quantity = tier.minPerOrder ?? 1;
+    if (remaining < quantity) {
+      throw new BadRequestException('This comp allocation is sold out');
+    }
+
+    return { event, tier, quantity };
+  }
+
+  /**
+   * Recent admin override edits visible to the event organiser. Filters
+   * `admin_audit_logs` to ADMIN_* mutation actions (excludes moderation
+   * approve/reject) so the organiser editor can warn when platform staff
+   * changed their listing.
+   */
+  async getAdminOverrideSummaryForOrganizer(
+    eventId: string,
+    userId: string,
+    withinDays = 90,
+  ): Promise<{
+    hasRecentAdminEdits: boolean;
+    withinDays: number;
+    recentEditCount: number;
+    lastEditedAt: string | null;
+    entries: Array<{
+      id: string;
+      action: string;
+      createdAt: string;
+    }>;
+  }> {
+    await this.ensureOwnership(eventId, userId);
+
+    const boundedDays = Math.min(Math.max(withinDays, 1), 365);
+    const since = new Date();
+    since.setDate(since.getDate() - boundedDays);
+
+    const rows = await this.adminAuditLogRepository
+      .createQueryBuilder('audit')
+      .where('audit.resourceType = :type', { type: 'event' })
+      .andWhere('audit.resourceId = :id', { id: eventId })
+      .andWhere("audit.action LIKE 'ADMIN_%'")
+      .andWhere('audit.status = :status', { status: 'SUCCESS' })
+      .andWhere('audit.createdAt >= :since', { since })
+      .orderBy('audit.createdAt', 'DESC')
+      .limit(20)
+      .getMany();
+
+    return {
+      hasRecentAdminEdits: rows.length > 0,
+      withinDays: boundedDays,
+      recentEditCount: rows.length,
+      lastEditedAt: rows[0]?.createdAt?.toISOString() ?? null,
+      entries: rows.map((row) => ({
+        id: row.id,
+        action: row.action,
+        createdAt: row.createdAt.toISOString(),
+      })),
+    };
   }
 
   /**

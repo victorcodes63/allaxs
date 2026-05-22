@@ -144,8 +144,15 @@ export const ticketTierSchema = z
       .optional(),
     salesStartAt: z.string().optional(),
     salesEndAt: z.string().optional(),
+    currency: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter ISO code")
+      .optional(),
     allowInstallments: z.boolean().optional(),
     installmentConfig: installmentConfigSchema.optional(),
+    isHidden: z.boolean().optional(),
   })
   .refine(
     (data) => {

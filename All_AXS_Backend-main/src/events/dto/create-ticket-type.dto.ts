@@ -8,6 +8,7 @@ import {
   ValidateIf,
   IsBoolean,
   ValidateNested,
+  Length,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -41,6 +42,16 @@ export class CreateTicketTypeDto {
   @Min(0, { message: 'Quantity must be non-negative' })
   @Type(() => Number)
   quantity!: number;
+
+  @ApiPropertyOptional({
+    description: 'ISO 4217 currency code (defaults to existing event tiers or platform default)',
+    minLength: 3,
+    maxLength: 3,
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 3, { message: 'currency must be a 3-letter ISO 4217 code' })
+  currency?: string;
 
   @ApiPropertyOptional({
     description: 'Maximum tickets per order',
@@ -106,4 +117,13 @@ export class CreateTicketTypeDto {
   @ValidateNested()
   @Type(() => InstallmentConfigDto)
   installmentConfig?: InstallmentConfigDto;
+
+  @ApiPropertyOptional({
+    description:
+      'Hide from public listings and issue a comp link for VIP/speaker access',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isHidden?: boolean;
 }

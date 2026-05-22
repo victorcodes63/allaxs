@@ -8,6 +8,8 @@
  * per-user cap component.
  */
 
+import { normalizeCurrencyCode } from "@/lib/currency";
+
 export interface CouponPreviewLine {
   ticketTypeId: string;
   quantity: number;
@@ -75,6 +77,6 @@ export async function previewCheckoutCoupon(
     discountCents: data.discountCents ?? 0,
     amountCents: data.amountCents ?? 0,
     feesCents: data.feesCents ?? 0,
-    currency: data.currency ?? "KES",
+    currency: normalizeCurrencyCode(data.currency),
   };
 }

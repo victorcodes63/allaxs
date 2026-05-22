@@ -2,7 +2,11 @@
  * Send every platform transactional email to one inbox (for design / Resend QA).
  *
  *   cd All_AXS_Backend-main
- *   SMOKE_EMAIL_TO=vichumo38@gmail.com npm run smoke:all-emails
+ *
+ *   SMOKE_EMAIL_TO=you@example.com npm run smoke:all-emails
+ *
+ *
+ * Non-interactive (mock Resend): DRY_RUN=1 npm run smoke:all-emails  OR  npm run smoke:ci:email-pdf
  */
 import * as dotenv from 'dotenv';
 import * as path from 'path';
@@ -31,6 +35,17 @@ function mockUser(email: string): User {
 }
 
 async function main() {
+  if (process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true') {
+    const { spawnSync } = require('child_process');
+    const r = spawnSync('npm', ['run', 'smoke:ci:email-pdf'], {
+      stdio: 'inherit',
+      cwd: path.join(__dirname, '..'),
+      env: process.env,
+      shell: process.platform === 'win32',
+    });
+    process.exit(r.status ?? 1);
+  }
+
   const to = (process.env.SMOKE_EMAIL_TO || process.argv[2])?.trim();
   if (!to) {
     console.error(
@@ -49,23 +64,55 @@ async function main() {
 
   const steps: { label: string; run: () => Promise<void> }[] = [
     {
-      label: '1/5 Email verification',
+      label: '1/9 Email verification',
       run: () => emailService.sendVerificationEmail(user, demoToken),
     },
     {
-      label: '2/5 Password reset link',
+      label: '2/9 Password reset link',
       run: () => emailService.sendPasswordResetEmail(user, demoToken),
     },
     {
-      label: '3/5 Password reset confirmation',
+      label: '3/9 Password reset confirmation',
       run: () => emailService.sendPasswordResetConfirmationEmail(user),
     },
     {
-      label: '4/5 Welcome (post-verify)',
+      label: '4/9 Password change confirmation',
+      run: () => emailService.sendPasswordChangeConfirmationEmail(user),
+    },
+    {
+      label: '5/9 Welcome (post-verify)',
       run: () => emailService.sendWelcomeEmail(user),
     },
     {
-      label: '5/5 Ticket / order confirmation',
+      label: '6/9 Event submitted — organizer',
+      run: () =>
+        emailService.sendEventSubmittedForReviewEmail({
+          to,
+          recipientName: user.name,
+          eventTitle: 'Smoke Test Summit',
+          eventId: '00000000-0000-4000-8000-0000000000e1',
+          orgName: 'Smoke Org',
+          venue: 'KICC Grounds',
+          startAt: new Date(Date.now() + 14 * 86400000),
+          audience: 'organizer',
+        }),
+    },
+    {
+      label: '7/9 Event submitted — admin',
+      run: () =>
+        emailService.sendEventSubmittedForReviewEmail({
+          to,
+          recipientName: 'Demo Admin',
+          eventTitle: 'Smoke Test Summit',
+          eventId: '00000000-0000-4000-8000-0000000000e1',
+          orgName: 'Smoke Org',
+          venue: 'KICC Grounds',
+          startAt: new Date(Date.now() + 14 * 86400000),
+          audience: 'admin',
+        }),
+    },
+    {
+      label: '8/9 Ticket / order confirmation',
       run: () =>
         emailService.sendTicketEmail({
           buyerName: user.name ?? 'Guest',
@@ -98,6 +145,18 @@ async function main() {
             currency: 'KES',
             couponCode: 'SMOKE50',
           },
+        }),
+    },
+    {
+      label: '9/9 Order refund confirmation',
+      run: () =>
+        emailService.sendOrderRefundEmail({
+          buyerEmail: to,
+          buyerName: user.name,
+          orderReference: 'SMOKE-REF-001',
+          eventTitle: 'Smoke Test Concert',
+          refundAmountCents: 200000,
+          currency: 'KES',
         }),
     },
   ];

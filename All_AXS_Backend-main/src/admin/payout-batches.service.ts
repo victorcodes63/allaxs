@@ -7,14 +7,20 @@ import { DataSource, In } from 'typeorm';
 import { PayoutBatch } from '../domain/payout-batch.entity';
 import { PayoutBatchLine } from '../domain/payout-batch-line.entity';
 import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
-import { PayoutBatchStatus } from '../domain/enums';
+import { PayoutBatchStatus, PayoutMethod } from '../domain/enums';
 import { OrganizerLedgerService } from '../domain/organizer-ledger.service';
+import {
+  normalizeCurrencyCode,
+  PLATFORM_DEFAULT_CURRENCY,
+} from '../common/currency';
+import { DarajaB2cService } from '../payments/daraja-b2c.service';
 
 @Injectable()
 export class PayoutBatchesService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly organizerLedgerService: OrganizerLedgerService,
+    private readonly darajaB2cService: DarajaB2cService,
   ) {}
 
   async createDraft(
@@ -41,7 +47,7 @@ export class PayoutBatchesService {
         amountCents: number;
         currency: string;
       }[] = [];
-      let currency = 'KES';
+      let batchCurrency = '';
 
       for (const oid of unique) {
         const summary =
@@ -49,12 +55,21 @@ export class PayoutBatchesService {
         if (summary.availableCents <= 0) {
           continue;
         }
+        const lineCurrency = normalizeCurrencyCode(summary.currency);
+        if (
+          batchCurrency &&
+          batchCurrency !== lineCurrency
+        ) {
+          throw new BadRequestException(
+            'Selected organizers must share the same payout currency',
+          );
+        }
+        batchCurrency = batchCurrency || lineCurrency;
         lineData.push({
           organizerId: oid,
           amountCents: summary.availableCents,
-          currency: summary.currency,
+          currency: lineCurrency,
         });
-        currency = summary.currency;
       }
 
       if (!lineData.length) {
@@ -65,7 +80,7 @@ export class PayoutBatchesService {
 
       const batch = manager.create(PayoutBatch, {
         status: PayoutBatchStatus.DRAFT,
-        currency,
+        currency: batchCurrency || lineData[0]?.currency || PLATFORM_DEFAULT_CURRENCY,
         createdByUserId: createdByUserId ?? null,
       });
       await manager.save(batch);
@@ -152,6 +167,73 @@ export class PayoutBatchesService {
       }
       batch.status = PayoutBatchStatus.EXPORTED;
       await manager.save(batch);
+      return manager.findOneOrFail(PayoutBatch, {
+        where: { id: batchId },
+        relations: ['lines', 'lines.organizer'],
+      });
+    });
+  }
+
+  async disburse(batchId: string): Promise<PayoutBatch> {
+    return this.dataSource.transaction(async (manager) => {
+      const batch = await manager.findOne(PayoutBatch, {
+        where: { id: batchId },
+        relations: ['lines', 'lines.organizer'],
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!batch) {
+        throw new NotFoundException('Payout batch not found');
+      }
+      if (
+        batch.status !== PayoutBatchStatus.APPROVED &&
+        batch.status !== PayoutBatchStatus.EXPORTED
+      ) {
+        throw new BadRequestException(
+          'Only approved or exported batches can be disbursed',
+        );
+      }
+
+      for (const line of batch.lines ?? []) {
+        if (line.disbursedAt) {
+          continue;
+        }
+
+        const organizer = line.organizer;
+        if (!organizer || organizer.payoutMethod !== PayoutMethod.MPESA) {
+          continue;
+        }
+
+        const phone =
+          organizer.supportPhone?.trim() ||
+          (typeof organizer.payoutDetails?.phone === 'string'
+            ? organizer.payoutDetails.phone.trim()
+            : '');
+
+        if (!phone) {
+          line.disbursementError =
+            'M-Pesa payout phone is missing (set support phone on organizer profile)';
+          await manager.save(line);
+          continue;
+        }
+
+        try {
+          const result = await this.darajaB2cService.initiateB2cPayment({
+            amountCents: line.amountCents,
+            phone,
+            accountReference: `batch-${batch.id}`,
+            remarks: `Payout ${organizer.orgName}`.slice(0, 100),
+          });
+          line.disbursedAt = new Date();
+          line.disbursementError = null;
+          line.externalReference = result.conversationId;
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : 'Daraja B2C payout failed';
+          line.disbursementError = message;
+        }
+        await manager.save(line);
+      }
+
       return manager.findOneOrFail(PayoutBatch, {
         where: { id: batchId },
         relations: ['lines', 'lines.organizer'],

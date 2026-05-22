@@ -105,6 +105,21 @@ export class Event extends BaseEntity {
   @Column({ type: 'boolean', default: true })
   isPublic!: boolean;
 
+  @ApiProperty({
+    description: 'Whether event is featured on the public homepage',
+    default: false,
+  })
+  @Index()
+  @Column({ type: 'boolean', default: false, name: 'is_featured' })
+  isFeatured!: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Optional sort order for featured homepage rail (lower first)',
+    nullable: true,
+  })
+  @Column({ type: 'integer', nullable: true, name: 'featured_sort_order' })
+  featuredSortOrder?: number | null;
+
   @ApiPropertyOptional({
     description: 'Additional metadata (JSON)',
   })

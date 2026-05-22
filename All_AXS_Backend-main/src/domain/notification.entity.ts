@@ -21,6 +21,9 @@ export class Notification extends BaseEntity {
   @Column({ type: 'enum', enum: NotifyStatus, default: NotifyStatus.PENDING })
   status!: NotifyStatus;
 
+  @Column({ type: 'int', default: 0 })
+  retryCount!: number;
+
   @Column({ type: 'text', nullable: true })
   error?: string;
 }

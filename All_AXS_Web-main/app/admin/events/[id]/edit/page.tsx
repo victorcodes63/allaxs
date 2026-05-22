@@ -36,6 +36,7 @@ import { EventTicketTiersTab } from "@/components/organizer/event-editor/EventTi
 import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab";
 import { EventCouponsTab } from "@/components/organizer/event-editor/EventCouponsTab";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
+import { resolveCurrencyFromTiers } from "@/lib/currency";
 
 interface TicketType {
   id: string;
@@ -239,9 +240,7 @@ export default function AdminEventEditorPage() {
       content: (
         <EventCouponsTab
           eventId={event.id}
-          defaultCurrency={
-            event.ticketTypes?.find((t) => t.currency)?.currency ?? "KES"
-          }
+          defaultCurrency={resolveCurrencyFromTiers(event.ticketTypes)}
           canEditOverride
         />
       ),

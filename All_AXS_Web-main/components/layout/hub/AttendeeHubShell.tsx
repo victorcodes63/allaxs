@@ -12,6 +12,9 @@ function attendeePageTitle(pathname: string): string {
   if (pathname === "/organizer/onboarding" || pathname.startsWith("/organizer/onboarding/")) {
     return "Become a host";
   }
+  if (pathname === "/organizer/team/join" || pathname.startsWith("/organizer/team/join/")) {
+    return "Team invite";
+  }
   if (pathname === "/dashboard/events" || pathname.startsWith("/dashboard/events/")) {
     return "Browse events";
   }

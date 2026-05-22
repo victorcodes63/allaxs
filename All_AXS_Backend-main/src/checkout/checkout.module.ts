@@ -6,6 +6,7 @@ import { PaystackWebhookController } from './paystack-webhook.controller';
 import { CheckoutService } from './checkout.service';
 import { TicketsController } from './tickets.controller';
 import { TicketsService } from './tickets.service';
+import { WalletPassService } from '../tickets/wallet-pass.service';
 import { Order } from '../domain/order.entity';
 import { OrderItem } from '../domain/order-item.entity';
 import { Ticket } from '../domain/ticket.entity';
@@ -14,6 +15,7 @@ import { Event } from '../events/entities/event.entity';
 import { TicketType } from '../events/entities/ticket-type.entity';
 import { DomainModule } from '../domain/domain.module';
 import { EventsModule } from '../events/events.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -28,8 +30,9 @@ import { EventsModule } from '../events/events.module';
     AuthModule,
     DomainModule,
     EventsModule,
+    NotificationsModule,
   ],
   controllers: [CheckoutController, PaystackWebhookController, TicketsController],
-  providers: [CheckoutService, TicketsService],
+  providers: [CheckoutService, TicketsService, WalletPassService],
 })
 export class CheckoutModule {}

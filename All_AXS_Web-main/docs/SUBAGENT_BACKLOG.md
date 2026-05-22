@@ -31,6 +31,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Depends on** | — |
 | **Status** | `[x]` |
 
+**Repo follow-up (2026-05-22):** Env map in `STAGING_CHECKLIST.md` re-verified against both `.env.example` files; launch-gate route inventory recorded in `PHASE0_GO_LIVE.md` §6.
+
 **Goal:** Confirm staging/production env vars are documented and consistent so emails, Paystack, and ticket links work outside localhost.
 
 **Scope**
@@ -56,7 +58,9 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` (use browser MCP if available) |
 | **Repos** | Web + API |
 | **Depends on** | POLISH-001 (env must be set on staging) |
-| **Status** | `[x]` |
+| **Status** | `[x]` (2026-05-16 run blocked; **next operator run** pending live redeploy + env) |
+
+**Repo follow-up (2026-05-22):** Scan/`/v`/wallet routes confirmed in Web + API source; updated smoke log template in `STAGING_CHECKLIST.md`. Live pass still requires Vercel operator.
 
 **Goal:** Execute `docs/STAGING_CHECKLIST.md` happy path on **staging** and record results.
 
@@ -144,7 +148,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` |
 | **Repos** | Web + API |
 | **Depends on** | POLISH-003 (recommended) |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Decide and implement whether checkout requires `emailVerified`.
 
@@ -156,8 +160,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] Behavior is consistent Web + API (no silent API 403 without UI).
-- [ ] One paragraph product decision recorded in docs.
+- [x] Behavior is consistent Web + API (no silent API 403 without UI).
+- [x] One paragraph product decision recorded in docs.
 
 ---
 
@@ -168,7 +172,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` |
 | **Repos** | Web |
 | **Depends on** | POLISH-002 (optional, for realistic copy) |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Post-purchase UI tells users to open **PDF attachment** and use My tickets / download PDF.
 
@@ -192,7 +196,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `explore` then `generalPurpose` |
 | **Repos** | Web + API |
 | **Depends on** | POLISH-004 |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Download-from-browser PDF matches email PDF layout (no header/footer clash).
 
@@ -204,8 +208,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] Side-by-side PDF from email smoke script vs browser download for same ticket fields look equivalent.
-- [ ] QR in both encodes same verify URL pattern.
+- [x] Side-by-side PDF from email smoke script vs browser download for same ticket fields look equivalent.
+- [x] QR in both encodes same verify URL pattern.
 
 ---
 
@@ -216,7 +220,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` |
 | **Repos** | Web |
 | **Depends on** | POLISH-003 |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** E2E coverage for critical auth paths (mock API or test env).
 
@@ -230,8 +234,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] New specs under `cypress/e2e/` pass in CI pattern used by repo.
-- [ ] Document required env for e2e in README or `cypress.config`.
+- [x] New specs under `cypress/e2e/` pass in CI pattern used by repo.
+- [x] Document required env for e2e in README or `cypress.config`.
 
 ---
 
@@ -244,7 +248,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` |
 | **Repos** | API (email + hook), Web (optional preview) |
 | **Depends on** | — |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Email organizer when admin approves or rejects an event (in-app notification exists today).
 
@@ -256,8 +260,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] Approve + reject both send (smoke script entry or admin test route).
-- [ ] Subject/body include event title and reject reason when applicable.
+- [x] Approve + reject both send (smoke script entry or admin test route).
+- [x] Subject/body include event title and reject reason when applicable.
 
 ---
 
@@ -268,7 +272,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` |
 | **Repos** | API |
 | **Depends on** | — |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Email buyer when admin issues full (or partial) refund.
 
@@ -279,8 +283,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] Refund smoke path documented; email in `smoke-all-emails` or dedicated script.
-- [ ] No email on failed refund.
+- [x] Refund smoke path documented; email in `smoke-all-emails` or dedicated script.
+- [x] No email on failed refund.
 
 ---
 
@@ -291,7 +295,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` |
 | **Repos** | API |
 | **Depends on** | — |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** When user changes password while logged in (not reset flow), send security notice email.
 
@@ -303,8 +307,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] Email sent on successful password change from account settings.
-- [ ] Not duplicated when reset flow already sends confirmation.
+- [x] Email sent on successful password change from account settings.
+- [x] Not duplicated when reset flow already sends confirmation.
 
 ---
 
@@ -317,7 +321,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` |
 | **Repos** | Web (+ API if list endpoint needed) |
 | **Depends on** | — |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Footer “Stay in the loop” is honest—either functional or removed.
 
@@ -328,8 +332,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] No fake success toast on submit.
-- [ ] Privacy copy if storing emails.
+- [x] No fake success toast on submit.
+- [x] Privacy copy if storing emails.
 
 ---
 
@@ -340,7 +344,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `explore` → `generalPurpose` |
 | **Repos** | Web + API |
 | **Depends on** | — |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Clarify or implement guest purchase → account ticket linking.
 
@@ -352,8 +356,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] Documented behavior in checkout README or docs.
-- [ ] No dead-end for guest who paid with email matching later registration (if implement linking).
+- [x] Documented behavior in checkout README or docs.
+- [x] No dead-end for guest who paid with email matching later registration (if implement linking).
 
 ---
 
@@ -364,7 +368,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `shell` or `ci-investigator` |
 | **Repos** | API |
 | **Depends on** | POLISH-004 |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Non-interactive check that PDF generation and email HTML build do not throw.
 
@@ -375,8 +379,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] Job runs on PR without live Resend key.
-- [ ] Document skip conditions.
+- [x] Job runs on PR without live Resend key.
+- [x] Document skip conditions.
 
 ---
 
@@ -387,7 +391,7 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `generalPurpose` |
 | **Repos** | Web + API |
 | **Depends on** | — |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Complete **one** high-value item from `docs/ADMIN_TODO.md`.
 
@@ -402,8 +406,8 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 
 **Acceptance criteria**
 
-- [ ] One slice shipped end-to-end.
-- [ ] `ADMIN_TODO.md` updated with `[x]` for that slice.
+- [x] One slice shipped end-to-end (slice **15d**: organiser admin-edit badge).
+- [x] `ADMIN_TODO.md` updated with `[x]` for that slice.
 
 ---
 
@@ -416,11 +420,11 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | **Agent** | `ai-architect` or `generalPurpose` |
 | **Repos** | API + Web |
 | **Depends on** | POLISH-002, POLISH-007 |
-| **Status** | `[ ]` |
+| **Status** | `[x]` |
 
 **Goal:** Spike only—requirements, signing certs, pass structure, estimate.
 
-**Deliverable:** `docs/WALLET_PASSES_SPIKE.md` (no implementation required in spike task).
+**Deliverable:** `docs/WALLET_PASSES.md` (MVP endpoints + cert setup documented).
 
 ---
 
@@ -451,13 +455,13 @@ Structured work items for parallel Cursor sub-agents. Each task is **independent
 | POLISH-006 | Order/ticket UX copy | generalPurpose | P1 | 002 |
 | POLISH-007 | PDF parity Web/API | explore → generalPurpose | P1 | 004 |
 | POLISH-008 | Cypress auth E2E | generalPurpose | P1 | 003 |
-| POLISH-009 | Organizer moderation email | generalPurpose | P1 | — |
+| POLISH-009 | Organizer moderation email | generalPurpose | P1 | `[x]` |
 | POLISH-010 | Refund email | generalPurpose | P1 | — |
 | POLISH-011 | Change-password email | generalPurpose | P1 | — |
-| POLISH-012 | Newsletter wire/remove | generalPurpose | P2 | — |
+| POLISH-012 | Newsletter wire/remove | generalPurpose | P2 | `[x]` |
 | POLISH-013 | Guest checkout messaging | explore → generalPurpose | P2 | — |
 | POLISH-014 | CI email/PDF check | shell | P2 | 004 |
-| POLISH-015 | Admin TODO slice | generalPurpose | P2 | — |
+| POLISH-015 | Admin TODO slice | generalPurpose | P2 | — ✓ 15d |
 | POLISH-016 | Wallet passes spike | ai-architect | P2 | 002, 007 |
 | POLISH-017 | WhatsApp spike | generalPurpose | P2 | — |
 

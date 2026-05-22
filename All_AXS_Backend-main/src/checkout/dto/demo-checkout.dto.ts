@@ -50,4 +50,13 @@ export class DemoCheckoutDto {
   @IsOptional()
   @IsString()
   couponCode?: string;
+
+  @IsOptional()
+  @IsString()
+  ticketDelivery?: 'account' | 'email' | 'email_and_whatsapp';
+
+  /** Signed waitlist purchase token (see PaystackInitDto.waitlistToken). */
+  @IsOptional()
+  @IsString()
+  waitlistToken?: string;
 }

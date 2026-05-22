@@ -92,8 +92,20 @@ export default function AdminPayoutBatchDetailPage() {
   const st = batch.status;
   const canApprove = st === "DRAFT";
   const canExport = st === "APPROVED";
+  const canDisburse =
+    st === "APPROVED" &&
+    (batch.lines ?? []).some((line) => line.payoutMethod === "MPESA" && !line.externalReference);
   const canMarkPaid = st === "APPROVED" || st === "EXPORTED";
   const canCancel = st === "DRAFT" || st === "APPROVED" || st === "EXPORTED";
+
+  async function sendPayout() {
+    const mpesaCount = (batch.lines ?? []).filter((line) => line.payoutMethod === "MPESA").length;
+    const ok = window.confirm(
+      `Send ${mpesaCount} M-Pesa payout${mpesaCount === 1 ? "" : "s"} via Daraja B2C? This initiates real transfers when Daraja is enabled in production.`,
+    );
+    if (!ok) return;
+    await postAction(`/api/admin/payout-batches/${id}/disburse`);
+  }
 
   return (
     <div className={ADMIN_PAGE_SHELL}>
@@ -145,6 +157,14 @@ export default function AdminPayoutBatchDetailPage() {
         </Button>
         <Button
           type="button"
+          className="w-auto"
+          disabled={!canDisburse || busy}
+          onClick={() => void sendPayout()}
+        >
+          Send payout
+        </Button>
+        <Button
+          type="button"
           variant="secondary"
           className="w-auto"
           disabled={!canCancel || busy}
@@ -156,10 +176,11 @@ export default function AdminPayoutBatchDetailPage() {
 
       {canMarkPaid ? (
         <section className="rounded-[var(--radius-panel)] border border-border bg-surface/90 p-4 sm:p-6">
-          <h2 className="text-sm font-semibold text-foreground">Mark paid</h2>
+          <h2 className="text-sm font-semibold text-foreground">Mark paid (manual fallback)</h2>
           <p className="mt-1 text-xs text-muted">
-            Posts negative ledger entries for each line and closes the batch. Use after funds have left
-            your bank / Paystack balance.
+            Posts negative ledger entries for each line and closes the batch. Use after bank transfers,
+            or when Daraja B2C is disabled. M-Pesa lines already sent via &quot;Send payout&quot; are
+            skipped automatically.
           </p>
           <input
             type="text"
@@ -190,7 +211,9 @@ export default function AdminPayoutBatchDetailPage() {
           <thead className="bg-surface/80 text-xs uppercase tracking-wide text-muted">
             <tr>
               <th className="px-4 py-3">Organizer</th>
+              <th className="px-4 py-3">Method</th>
               <th className="px-4 py-3 text-right">Amount</th>
+              <th className="px-4 py-3">Disbursement</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/40">
@@ -200,8 +223,23 @@ export default function AdminPayoutBatchDetailPage() {
                   <div className="font-medium text-foreground">{line.orgName ?? "—"}</div>
                   <div className="font-mono text-xs text-muted">{line.organizerId}</div>
                 </td>
+                <td className="px-4 py-3 text-muted">{line.payoutMethod ?? "—"}</td>
                 <td className="px-4 py-3 text-right font-medium tabular-nums">
                   {formatMoneyFromCents(line.amountCents, line.currency)}
+                </td>
+                <td className="px-4 py-3 text-sm">
+                  {line.externalReference ? (
+                    <div>
+                      <span className="text-emerald-200">Sent</span>
+                      <div className="font-mono text-xs text-muted">{line.externalReference}</div>
+                    </div>
+                  ) : line.disbursementError ? (
+                    <span className="text-amber-100">{line.disbursementError}</span>
+                  ) : line.payoutMethod === "MPESA" ? (
+                    <span className="text-muted">Ready for Daraja B2C</span>
+                  ) : (
+                    <span className="text-muted">Manual payout</span>
+                  )}
                 </td>
               </tr>
             ))}

@@ -7,9 +7,31 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Textarea } from "@/components/ui/Textarea";
 import { EventStatus } from "@/lib/validation/event";
 
+export type EventReviewResult = {
+  action: "approve" | "reject";
+  event: {
+    id: string;
+    status: string;
+    previousStatus: string;
+    rejectionReason?: string;
+  };
+  reason?: string;
+};
+
+interface ApproveRejectResponse {
+  message?: string;
+  event?: {
+    id: string;
+    title?: string;
+    status: string;
+    previousStatus?: string;
+    rejectionReason?: string;
+  };
+}
+
 interface EventReviewActionsProps {
   event: { id: string; title: string; status: string };
-  onActionComplete: () => void;
+  onActionComplete: (result: EventReviewResult) => void;
   /**
    * Optional layout override. Defaults to a horizontal action row suitable
    * for sitting next to a page title in the admin event detail header.
@@ -59,9 +81,18 @@ export function EventReviewActions({
     setIsApproving(true);
     setError(null);
     try {
-      await axios.post(`/api/admin/events/${event.id}/approve`);
+      const { data } = await axios.post<ApproveRejectResponse>(
+        `/api/admin/events/${event.id}/approve`,
+      );
       setApproveDialogOpen(false);
-      onActionComplete();
+      onActionComplete({
+        action: "approve",
+        event: {
+          id: data.event?.id ?? event.id,
+          status: data.event?.status ?? "PUBLISHED",
+          previousStatus: data.event?.previousStatus ?? event.status,
+        },
+      });
     } catch (err) {
       setError(resolveError(err, "Failed to approve event. Please try again."));
     } finally {
@@ -73,12 +104,25 @@ export function EventReviewActions({
     setIsRejecting(true);
     setError(null);
     try {
-      await axios.post(`/api/admin/events/${event.id}/reject`, {
-        reason: rejectReason || undefined,
-      });
+      const trimmedReason = rejectReason.trim();
+      const { data } = await axios.post<ApproveRejectResponse>(
+        `/api/admin/events/${event.id}/reject`,
+        {
+          reason: trimmedReason || undefined,
+        },
+      );
       setRejectDialogOpen(false);
       setRejectReason("");
-      onActionComplete();
+      onActionComplete({
+        action: "reject",
+        reason: trimmedReason || undefined,
+        event: {
+          id: data.event?.id ?? event.id,
+          status: data.event?.status ?? "REJECTED",
+          previousStatus: data.event?.previousStatus ?? event.status,
+          rejectionReason: data.event?.rejectionReason,
+        },
+      });
     } catch (err) {
       setError(resolveError(err, "Failed to reject event. Please try again."));
     } finally {

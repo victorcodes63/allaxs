@@ -51,7 +51,7 @@ Also creates one **PUBLISHED** public event with two ticket types (paid + free).
 
 The seed admin drives the review queue end-to-end:
 
-1. Sign in as the **organizer** (`demo-organizer@allaxs.demo`), open an event editor, and click **Submit for review** — the event moves to `PENDING_REVIEW` and a notification fires to every admin.
+1. Sign in as the **organizer** (`demo-organizer@allaxs.demo`), open an event editor, and click **Submit for review** — the event moves to `PENDING_REVIEW`, every admin gets an in-app notification plus email, and the organizer receives a confirmation email.
 2. Sign in as the **admin** (`demo-admin@allaxs.demo`), visit `/admin/moderation`, click **Review** on the queued event, and choose **Approve** or **Reject**.
 3. Approval flips the event to `PUBLISHED` (now visible on `/events`); rejection flips it to `REJECTED` and stores the optional reason on `event.metadata.rejectionReason`. Either way, the organizer is notified and the event surfaces under **Needs your attention** until they action it (rejected events are editable and can be **Resubmit**ted).
 

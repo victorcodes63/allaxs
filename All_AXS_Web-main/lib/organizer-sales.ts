@@ -1,3 +1,8 @@
+import {
+  normalizeCurrencyCode,
+  PLATFORM_DEFAULT_CURRENCY,
+} from "@/lib/currency";
+
 /** Shapes returned by `GET /organizers/sales/summary` (proxied as `/api/organizer/sales/summary`). */
 
 export type OrganizerSalesEventRow = {
@@ -91,7 +96,7 @@ export function normalizeOrganizerSalesSummary(
       slug: str(row.slug),
       status: str(row.status, "DRAFT"),
       startAt: str(row.startAt),
-      currency: str(row.currency, "KES"),
+      currency: normalizeCurrencyCode(str(row.currency) || undefined),
       capacityTotal: num(row.capacityTotal),
       ticketsSold: num(row.ticketsSold),
       ordersCount: num(row.ordersCount),
@@ -112,7 +117,7 @@ export function normalizeOrganizerSalesSummary(
       ),
       ticketsSold: num(rollupRaw.ticketsSold),
       ordersCount: num(rollupRaw.ordersCount),
-      currency: str(rollupRaw.currency, "KES"),
+      currency: normalizeCurrencyCode(str(rollupRaw.currency) || undefined),
     },
   };
 }
@@ -141,7 +146,7 @@ export function normalizeOrganizerSalesOrders(
       amountCents,
       feesCents,
       netCents: num(row.netCents, Math.max(0, amountCents - feesCents)),
-      currency: str(row.currency, "KES"),
+      currency: normalizeCurrencyCode(str(row.currency) || undefined),
       ticketsInOrder: num(row.ticketsInOrder),
       lineSummary: str(row.lineSummary, "—"),
     });
@@ -156,14 +161,15 @@ export function normalizeOrganizerSalesOrders(
 
 export function formatMoneyFromCents(cents: number, currency: string): string {
   const amount = cents / 100;
+  const code = normalizeCurrencyCode(currency);
   try {
     return new Intl.NumberFormat(undefined, {
       style: "currency",
-      currency: currency.length === 3 ? currency : "KES",
+      currency: code,
       maximumFractionDigits: 0,
     }).format(amount);
   } catch {
-    return `${amount.toFixed(0)} ${currency}`;
+    return `${amount.toFixed(0)} ${code || PLATFORM_DEFAULT_CURRENCY}`;
   }
 }
 
@@ -177,4 +183,41 @@ export function formatShortDateTime(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function parseContentDispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  const match = /filename="([^"]+)"/i.exec(header);
+  return match?.[1] ?? null;
+}
+
+/** Download paid ticket holders for one event as CSV (via Next proxy). */
+export async function downloadOrganizerAttendeesCsv(eventId: string): Promise<void> {
+  const res = await fetch(
+    `/api/organizer/sales/events/${encodeURIComponent(eventId)}/attendees/export`,
+  );
+  if (!res.ok) {
+    let message = `Export failed (${res.status})`;
+    try {
+      const data = (await res.json()) as { message?: string };
+      if (data.message) message = data.message;
+    } catch {
+      // non-JSON error body
+    }
+    throw new Error(message);
+  }
+
+  const blob = await res.blob();
+  const filename =
+    parseContentDispositionFilename(res.headers.get("content-disposition")) ??
+    `attendees-${eventId}.csv`;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

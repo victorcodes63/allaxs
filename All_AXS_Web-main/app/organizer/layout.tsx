@@ -23,16 +23,20 @@ export default function OrganizerLayout({
   const onOnboarding =
     pathname === "/organizer/onboarding" ||
     pathname.startsWith("/organizer/onboarding/");
+  const onTeamJoin =
+    pathname === "/organizer/team/join" ||
+    pathname.startsWith("/organizer/team/join/");
 
   useEffect(() => {
     if (loading) return;
-    if (!user) {
+    if (!user && !onTeamJoin) {
       const nextPath = pathname || "/organizer/dashboard";
       router.replace(
         `/login${buildAuthQuery({ next: nextPath, intent: "host" })}`,
       );
       return;
     }
+    if (!user) return;
     const roles = normalizeWebUserRoles(user.roles);
     if (rolesIncludeAdmin(roles)) {
       router.replace("/admin");
@@ -42,7 +46,21 @@ export default function OrganizerLayout({
     if (!onOnboarding && !canOrganizerApp) {
       router.replace("/organizer/onboarding");
     }
-  }, [loading, user, onOnboarding, router, pathname]);
+  }, [loading, user, onOnboarding, onTeamJoin, router, pathname]);
+
+  if (onTeamJoin) {
+    if (loading) {
+      return (
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <p className="text-muted">Loading…</p>
+        </div>
+      );
+    }
+    if (!user) {
+      return <div className="min-h-[50vh]">{children}</div>;
+    }
+    return <AttendeeHubShell user={user}>{children}</AttendeeHubShell>;
+  }
 
   if (loading || !user) {
     return (

@@ -433,10 +433,10 @@ Frontend (Cypress):
 | 4 | **`/checkout/coupons/preview`** endpoint and frontend integration in `CheckoutExperience.tsx` | **DONE** — `checkout/dto/coupon-preview.dto.ts`, `CheckoutService.previewCoupon`, `CheckoutController.previewCoupon` (JWT-optional), `app/api/checkout/coupons/preview/route.ts`, `lib/checkout-coupons.ts`. Buyer step shows "Have a code?" section with apply / remove and live discount line. |
 | 5 | **Checkout redeem path** — inject into `initializePaystackCheckout`, `completeDemoCheckout` | **DONE** — both flows call `CouponsService.redeem` inside their existing transaction. The order is created provisionally, redeem locks the coupon and writes `coupon_redemptions`, then `amountCents`, `discountCents`, `appliedCouponId`, `feesCents` are reconciled before the payment row is written. Paystack metadata carries `appliedCouponId` + `discountCents`. |
 | 6 | **100%-off skip-Paystack path** | **DONE** — after the init transaction, if `chargeableCents === 0` the service calls `finalizeSuccessfulPayment(reference, …, 'free_order')` (issues tickets, sends email, runs ledger) and returns `{ status: 'PAID', authorizationUrl: null }`. Frontend redirects to `/orders/:id/confirmation` instead of Paystack. |
-| 7 | **Refund rollback** — restore `usedCount` + delete `CouponRedemption` | **PARTIAL** — `CouponsService.rollbackRedemption(manager, orderId)` is in place. Still TODO: call it from `OrderRefundService.refundPaidOrder` inside the existing refund transaction. |
-| 8 | **OrderConfirmation + ticket email copy** — surface discount line | **GAP** |
-| 9 | **Tests** (unit + integration + Cypress) | **GAP** |
-| 10 | **Update `ORGANIZER_PRODUCT_CHECKLIST.md`** — move "Coupons" from GAP → DONE with PR ref | **GAP** |
+| 7 | **Refund rollback** — restore `usedCount` + delete `CouponRedemption` | **DONE** — `OrderRefundService.refundPaidOrder` calls `CouponsService.rollbackRedemption(manager, orderId)` inside the existing refund transaction when `appliedCouponId` is set (best-effort; failures are logged). |
+| 8 | **OrderConfirmation + ticket email copy** — surface discount line | **DONE** — `components/orders/OrderConfirmation.tsx` shows Subtotal / Discount / Total paid when `discountCents > 0`; ticket email includes the discount line via `EmailService.sendTicketEmail`. |
+| 9 | **Tests** (unit + integration + Cypress) | **DONE** — `src/events/coupons.service.spec.ts` (§3 validation + `usageLimit=1` concurrency), `src/admin/order-refund.service.spec.ts` (rollback wiring), `cypress/e2e/coupons-checkout.cy.ts`, `cypress/e2e/coupons-organizer.cy.ts`. |
+| 10 | **Update `ORGANIZER_PRODUCT_CHECKLIST.md`** — move "Coupons" from GAP → DONE with PR ref | **DONE** — row **#16a** marked DONE with test note (AUDIT-A1-T). |
 
 ---
 

@@ -3,7 +3,16 @@ import { NextResponse } from "next/server";
 import { normalizeWebUserRoles } from "@/lib/auth/hub-routing";
 
 // Helper to decode JWT payload without verification (just to get user info)
-function decodeJWT(token: string): { sub?: string; id?: string; email?: string; name?: string; roles?: string[]; exp?: number } | null {
+function decodeJWT(token: string): {
+  sub?: string;
+  id?: string;
+  email?: string;
+  name?: string;
+  roles?: string[];
+  autoCreatedAt?: string;
+  emailVerified?: boolean;
+  exp?: number;
+} | null {
   try {
     const base64Url = token.split(".")[1];
     if (!base64Url) return null;
@@ -56,6 +65,14 @@ export async function GET() {
         email: decoded.email || "",
         name: decoded.name,
         roles: normalizeWebUserRoles((decoded as Record<string, unknown>).roles),
+        autoCreatedAt:
+          typeof decoded.autoCreatedAt === "string"
+            ? decoded.autoCreatedAt
+            : undefined,
+        emailVerified:
+          typeof decoded.emailVerified === "boolean"
+            ? decoded.emailVerified
+            : undefined,
       },
     });
   } catch (error) {

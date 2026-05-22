@@ -117,13 +117,29 @@ ENFORCE_PRODUCTION_ENV=true NEXT_PUBLIC_USE_DEMO_EVENTS=true npm run validate:pr
 
 ---
 
-## 6. Unblock checklist (from 2026-05-16 smoke)
+## 6. Unblock checklist (from 2026-05-16 smoke; repo re-verified 2026-05-22)
 
-- [ ] Web Production: `NEXT_PUBLIC_USE_DEMO_EVENTS=false`, API URLs set, redeployed
-- [ ] API Production: `FRONTEND_URL` = Web URL, Paystack + Resend set, redeployed
-- [ ] `/v/{token}` returns 200 (not 404)
-- [ ] `/organizer/tickets/scan` and scan API routes return 200
-- [ ] One full Pay → Email → Scan → Refund logged as **pass**
+### Verified in repo (no Vercel access required)
+
+- [x] **Production env gate** — `scripts/validate-production-env.mjs` (`prebuild` + `npm run validate:production-env`); pass/fail confirmed locally with staging-shaped vars (see §5).
+- [x] **Web ticket verify page** — `app/v/[token]/page.tsx` (+ `components/tickets/TicketVerifyLanding.tsx`, `lib/ticket-qr.ts`).
+- [x] **Web scan UI** — `app/organizer/tickets/scan/page.tsx`, `app/admin/scan/page.tsx` (both use `components/tickets/TicketScanPanel.tsx`).
+- [x] **Web scan proxies** — `app/api/organizer/tickets/scan/route.ts` → API `POST /organizers/tickets/scan`; `app/api/admin/tickets/scan/route.ts` → API `POST /admin/tickets/scan`.
+- [x] **Web wallet proxies** — `app/api/tickets/[id]/wallet/google/route.ts`, `app/api/tickets/[id]/wallet/apple/route.ts` → API `GET /tickets/:id/wallet/{google,apple}`.
+- [x] **API health** — `src/health.controller.ts` → `GET /health` (also `GET /version`).
+- [x] **API Paystack webhook** — `src/checkout/paystack-webhook.controller.ts` → `POST /api/webhooks/paystack`.
+- [x] **API scan controllers** — `src/admin/admin-ticket-scan.controller.ts`, `src/organizers/organizer-tickets.controller.ts`.
+- [x] **API wallet passes** — `src/checkout/tickets.controller.ts` (`WalletPassService`).
+- [x] **QR URL builder** — API `src/tickets/ticket-qr.util.ts` builds `{FRONTEND_URL}/v/{token}` (must match Web route above).
+- [x] **POLISH-001 env map** — `docs/STAGING_CHECKLIST.md` matches Web `.env.example` and API `.env.example` (no secrets in git).
+
+### Needs operator on Vercel / live staging
+
+- [ ] **Web Production** — set `NEXT_PUBLIC_USE_DEMO_EVENTS=false`, `NEXT_PUBLIC_USE_API_CHECKOUT=true`, `API_URL` + `NEXT_PUBLIC_API_BASE_URL` → API host, `NEXT_PUBLIC_SITE_URL` → Web host; **Redeploy** (build fails if demo catalog is on).
+- [ ] **API Production** — set `FRONTEND_URL` = Web URL (no trailing slash), `PAYSTACK_SECRET_KEY`, `RESEND_*`, `DATABASE_URL`, JWT secrets; **Redeploy**.
+- [ ] **Paystack dashboard** — webhook URL = `https://<api-host>/api/webhooks/paystack`.
+- [ ] **Live HTTP** — `GET https://<web>/v/{valid-token}` → **200** (not 404); `/organizer/tickets/scan` and `/admin/scan` load when signed in; scan POST returns structured result (not 404).
+- [ ] **POLISH-002 smoke** — one full Pay → Email → Scan → Refund run logged as **pass** in `docs/STAGING_CHECKLIST.md` (use real inbox, not `*@allaxs.demo`).
 
 ---
 

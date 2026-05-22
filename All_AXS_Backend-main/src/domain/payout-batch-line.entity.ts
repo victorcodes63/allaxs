@@ -26,4 +26,18 @@ export class PayoutBatchLine extends BaseEntity {
 
   @Column({ type: 'char', length: 3 })
   currency!: string;
+
+  @Column({
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+    name: 'external_reference',
+  })
+  externalReference?: string | null;
+
+  @Column({ type: 'text', nullable: true, name: 'disbursement_error' })
+  disbursementError?: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'disbursed_at' })
+  disbursedAt?: Date | null;
 }

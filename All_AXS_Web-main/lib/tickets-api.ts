@@ -1,4 +1,5 @@
 import type { StoredTicket } from "@/lib/checkout-storage";
+import { resolveTicketApiCurrency } from "@/lib/currency";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -78,7 +79,7 @@ export function normalizeApiTicket(raw: unknown): StoredTicket | null {
     "created_at",
     "issuedAtIso",
   ]);
-  const currency = pickString(o, ["currency"]) || "KES";
+  const currency = resolveTicketApiCurrency(o);
   const qrNonce = pickString(o, ["qrNonce", "qr_nonce"]);
   const qrSignature = pickString(o, ["qrSignature", "qr_signature"]);
 

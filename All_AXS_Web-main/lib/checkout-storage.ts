@@ -45,6 +45,41 @@ export type CheckoutDraft = {
   step: "tickets" | "buyer";
 };
 
+type CheckoutTierQty = { id: string; minPerOrder?: number | null };
+
+/** Empty cart keyed by tier id (all zeros). */
+function emptyCheckoutQuantities(tiers: CheckoutTierQty[]): Record<string, number> {
+  const qty: Record<string, number> = {};
+  for (const t of tiers) {
+    qty[t.id] = 0;
+  }
+  return qty;
+}
+
+/** First available tier pre-selected at its minimum (usually 1). */
+function defaultCheckoutQuantities(tiers: CheckoutTierQty[]): Record<string, number> {
+  const qty = emptyCheckoutQuantities(tiers);
+  if (tiers.length === 0) return qty;
+  const first = tiers[0];
+  qty[first.id] = Math.max(1, first.minPerOrder ?? 1);
+  return qty;
+}
+
+/** Merge saved draft quantities; fall back to one ticket when the cart is empty. */
+export function resolveCheckoutQuantities(
+  tiers: CheckoutTierQty[],
+  savedQty?: Record<string, number> | null,
+): Record<string, number> {
+  if (!savedQty) return defaultCheckoutQuantities(tiers);
+
+  const merged = emptyCheckoutQuantities(tiers);
+  for (const tid of Object.keys(merged)) {
+    if (typeof savedQty[tid] === "number") merged[tid] = savedQty[tid];
+  }
+  const total = Object.values(merged).reduce((sum, q) => sum + q, 0);
+  return total === 0 ? defaultCheckoutQuantities(tiers) : merged;
+}
+
 const CHECKOUT_DRAFT_KEY = "allaxs_checkout_draft";
 
 export function saveCheckoutDraft(draft: CheckoutDraft): void {

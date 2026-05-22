@@ -14,12 +14,7 @@ import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
-import {
-  buildAuthQuery,
-  fetchPostAuthSnapshot,
-  parseIntent,
-  resolvePostAuthRedirect,
-} from "@/lib/auth/post-auth-redirect";
+import { buildAuthQuery, parseIntent } from "@/lib/auth/post-auth-redirect";
 import { useAuth } from "@/lib/auth";
 
 const AUTH_SUBTITLE = "One account for fans and hosts.";
@@ -29,6 +24,7 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const { refresh: refreshAuth } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [guestAccountHintEmail, setGuestAccountHintEmail] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const loginHref = `/login${buildAuthQuery({
     next: searchParams.get("next"),
@@ -46,27 +42,34 @@ function RegisterForm() {
 
   const onSubmit = async (data: RegisterInput) => {
     setError(null);
+    setGuestAccountHintEmail(null);
     setIsSubmitting(true);
 
     try {
       const response = await axios.post("/api/auth/register", data);
 
       if (response.status === 200 || response.status === 201) {
-        const snapshot = await fetchPostAuthSnapshot();
         await refreshAuth();
-        const path = resolvePostAuthRedirect({
-          nextParam: searchParams.get("next"),
-          intent: parseIntent(searchParams.get("intent")),
-          roles: snapshot.roles,
-          hasOrganizerProfile: snapshot.hasOrganizerProfile,
-        });
-        router.push(path);
+        const next = searchParams.get("next");
+        const intent = parseIntent(searchParams.get("intent"));
+        const query = new URLSearchParams();
+        if (next) query.set("next", next);
+        if (intent) query.set("intent", intent);
+        const suffix = query.toString() ? `?${query.toString()}` : "";
+        router.push(`/check-email${suffix}`);
       }
     } catch (err) {
+      const status = (err as { response?: { status?: number; data?: { message?: string } } })
+        .response?.status;
       const message =
         (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
         "An error occurred during registration";
-      setError(message);
+      if (status === 409 || /already exists/i.test(message)) {
+        setGuestAccountHintEmail(data.email);
+        setError(null);
+      } else {
+        setError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -80,6 +83,25 @@ function RegisterForm() {
             onSubmit={handleSubmit(onSubmit)}
             className="space-y-2.5 [&_label]:mb-0.5 [&_label]:text-xs"
           >
+            {guestAccountHintEmail ? (
+              <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary space-y-2">
+                <p>
+                  An account with this email already exists. You may have purchased as a guest—use{" "}
+                  <strong className="font-semibold">Set password</strong> with this email instead of
+                  registering again.
+                </p>
+                <Link
+                  href={`/forgot-password?email=${encodeURIComponent(guestAccountHintEmail)}`}
+                  className="inline-flex font-semibold underline hover:no-underline"
+                >
+                  Set a password
+                </Link>
+                {" · "}
+                <Link href={loginHref} className="font-semibold underline hover:no-underline">
+                  Sign in
+                </Link>
+              </div>
+            ) : null}
             {error ? (
               <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
                 {error}

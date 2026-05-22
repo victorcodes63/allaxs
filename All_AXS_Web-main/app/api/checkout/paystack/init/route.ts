@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { isUuid } from "@/lib/public-events-mode";
+import { formatUpstreamErrorMessage } from "@/lib/server/format-upstream-error-message";
 
 const API_URL = process.env.API_URL || "http://localhost:8080";
 
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
       eventId?: string;
       ticketTypeId?: string;
+      payInInstallments?: boolean;
     };
     if (body.eventId && !isUuid(body.eventId)) {
       return NextResponse.json(
@@ -41,10 +43,21 @@ export async function POST(request: NextRequest) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      return NextResponse.json(
-        { message: data.message || "Unable to initialize payment" },
-        { status: response.status }
-      );
+      const message =
+        formatUpstreamErrorMessage(data) ?? "Unable to initialize payment";
+      const code =
+        typeof data === "object" &&
+        data !== null &&
+        typeof (data as { code?: unknown }).code === "string"
+          ? (data as { code: string }).code
+          : typeof data === "object" &&
+              data !== null &&
+              typeof (data as { message?: { code?: unknown } }).message ===
+                "object" &&
+              (data as { message?: { code?: string } }).message?.code
+            ? (data as { message: { code: string } }).message.code
+            : undefined;
+      return NextResponse.json({ message, code }, { status: response.status });
     }
     return NextResponse.json(data, { status: response.status });
   } catch (error) {

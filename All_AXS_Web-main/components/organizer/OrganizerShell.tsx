@@ -59,6 +59,11 @@ export function OrganizerShell({
             match: (p) => p === "/organizer/events/new",
           },
           {
+            href: "/organizer/team",
+            label: "Team",
+            match: (p) => p === "/organizer/team" || p.startsWith("/organizer/team/"),
+          },
+          {
             href: "/organizer/account",
             label: "Account",
             match: (p) => p === "/organizer/account",

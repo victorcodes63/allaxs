@@ -53,6 +53,7 @@ function isPublicAuthPath(pathname: string | null): boolean {
     "/forgot-password",
     "/reset-password",
     "/verify-email",
+    "/check-email",
     "/resend-verification",
   ] as const;
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -165,16 +166,19 @@ function AppChromeInner({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AppChromeFallback({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-dvh flex-1 w-full flex-col bg-background text-foreground">
+      <main className="flex-1 axs-page-shell py-8 md:py-10" aria-busy="true">
+        {children}
+      </main>
+    </div>
+  );
+}
+
 export function AppChrome({ children }: { children: React.ReactNode }) {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-dvh flex-1 w-full flex-col bg-background text-foreground">
-          <SiteHeader />
-          <main className="flex-1 axs-page-shell py-8 md:py-10">{children}</main>
-        </div>
-      }
-    >
+    <Suspense fallback={<AppChromeFallback>{children}</AppChromeFallback>}>
       <AppChromeInner>{children}</AppChromeInner>
     </Suspense>
   );

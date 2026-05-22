@@ -14,13 +14,18 @@ import { ScanModule } from '../scan/scan.module';
 import { Event } from '../events/entities/event.entity';
 import { TicketType } from '../events/entities/ticket-type.entity';
 import { Order } from '../domain/order.entity';
+import { OrderItem } from '../domain/order-item.entity';
 import { User } from '../users/entities/user.entity';
 import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
 import { PayoutBatch } from '../domain/payout-batch.entity';
 import { PayoutBatchLine } from '../domain/payout-batch-line.entity';
 import { PayoutBatchesService } from './payout-batches.service';
 import { AdminPayoutBatchesController } from './admin-payout-batches.controller';
+import { AdminRefundRequestsController } from './admin-refund-requests.controller';
+import { RefundRequestsService } from './refund-requests.service';
+import { RefundRequest } from '../domain/refund-request.entity';
 import { OrganizersModule } from '../organizers/organizers.module';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
   imports: [
@@ -29,10 +34,12 @@ import { OrganizersModule } from '../organizers/organizers.module';
       Event,
       TicketType,
       Order,
+      OrderItem,
       User,
       OrganizerProfile,
       PayoutBatch,
       PayoutBatchLine,
+      RefundRequest,
     ]),
     AuthModule,
     EventsModule,
@@ -40,18 +47,21 @@ import { OrganizersModule } from '../organizers/organizers.module';
     DomainModule,
     ScanModule,
     OrganizersModule,
+    PaymentsModule,
   ],
   controllers: [
     AdminController,
     AdminTicketScanController,
     AdminPayoutBatchesController,
+    AdminRefundRequestsController,
   ],
   providers: [
     AdminAuditService,
     AdminAuditInterceptor,
     OrderRefundService,
     PayoutBatchesService,
+    RefundRequestsService,
   ],
-  exports: [AdminAuditService],
+  exports: [AdminAuditService, RefundRequestsService],
 })
 export class AdminModule {}

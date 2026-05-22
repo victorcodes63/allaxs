@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
-import { formatMoneyFromCents, normalizeOrganizerSalesSummary } from "@/lib/organizer-sales";
+import { formatMoneyFromCents, downloadOrganizerAttendeesCsv, normalizeOrganizerSalesSummary } from "@/lib/organizer-sales";
+import { PLATFORM_DEFAULT_CURRENCY } from "@/lib/currency";
+import { EventAnnouncementBlast } from "@/components/organizer/event-editor/EventAnnouncementBlast";
 
 export function EventSalesTab({
   eventId,
@@ -21,7 +23,9 @@ export function EventSalesTab({
   const [ticketsSold, setTicketsSold] = useState(0);
   const [ordersCount, setOrdersCount] = useState(0);
   const [capacityTotal, setCapacityTotal] = useState(0);
-  const [currency, setCurrency] = useState("KES");
+  const [currency, setCurrency] = useState<string>(PLATFORM_DEFAULT_CURRENCY);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,7 +45,7 @@ export function EventSalesTab({
         setTicketsSold(0);
         setOrdersCount(0);
         setCapacityTotal(0);
-        setCurrency("KES");
+        setCurrency(PLATFORM_DEFAULT_CURRENCY);
         return;
       }
       setGrossCents(row.grossCents);
@@ -67,6 +71,18 @@ export function EventSalesTab({
     void load();
   }, [load]);
 
+  const handleExportCsv = async () => {
+    setExportError(null);
+    setExporting(true);
+    try {
+      await downloadOrganizerAttendeesCsv(eventId);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Could not export attendees.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[12rem] items-center justify-center">
@@ -86,9 +102,20 @@ export function EventSalesTab({
             Capacity is the sum of tier quantities in your editor.
           </p>
         </div>
-        <Button type="button" variant="secondary" className="w-auto shrink-0" onClick={() => void load()}>
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button type="button" variant="secondary" className="w-auto" onClick={() => void load()}>
+            Refresh
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-auto"
+            disabled={exporting}
+            onClick={() => void handleExportCsv()}
+          >
+            {exporting ? "Exporting…" : "Export CSV"}
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -97,6 +124,15 @@ export function EventSalesTab({
           role="alert"
         >
           {error}
+        </div>
+      ) : null}
+
+      {exportError ? (
+        <div
+          className="rounded-[var(--radius-panel)] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+          role="alert"
+        >
+          {exportError}
         </div>
       ) : null}
 
@@ -132,6 +168,8 @@ export function EventSalesTab({
           </p>
         </div>
       </div>
+
+      <EventAnnouncementBlast eventId={eventId} eventTitle={eventTitle} />
 
       <div className="rounded-[var(--radius-panel)] border border-border bg-background/80 p-5 sm:p-6">
         <p className="text-sm text-muted">

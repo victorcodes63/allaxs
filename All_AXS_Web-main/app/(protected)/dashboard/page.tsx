@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { AutoCreatedAccountBanner } from "@/components/dashboard/AutoCreatedAccountBanner";
+import { EmailVerificationBanner } from "@/components/dashboard/EmailVerificationBanner";
 import { DashboardTicketsOverview } from "./DashboardTicketsOverview";
 import { DashboardHostingCard } from "./DashboardHostingCard";
 
@@ -49,6 +51,9 @@ export default function DashboardPage() {
           </Link>
         </div>
       </header>
+
+      <EmailVerificationBanner />
+      <AutoCreatedAccountBanner />
 
       <DashboardTicketsOverview />
 

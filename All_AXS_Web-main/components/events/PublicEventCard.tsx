@@ -6,6 +6,7 @@ import {
   generatePlaceholderImage,
   shouldUnoptimizeEventImage,
 } from "@/lib/utils/image";
+import { resolveCurrencyFromTiers } from "@/lib/currency";
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -46,10 +47,7 @@ export function PublicEventCard({
     event.ticketTypes && event.ticketTypes.length > 0
       ? Math.min(...event.ticketTypes.map((t) => t.priceCents))
       : null;
-  const currency =
-    event.ticketTypes && event.ticketTypes.length > 0
-      ? event.ticketTypes[0].currency
-      : "KES";
+  const currency = resolveCurrencyFromTiers(event.ticketTypes);
   const href = eventHref ?? `/e/${event.slug}`;
 
   if (listRow) {

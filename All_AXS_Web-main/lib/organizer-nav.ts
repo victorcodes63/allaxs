@@ -6,6 +6,8 @@ export function organizerPageTitle(pathname: string): string {
   if (pathname === "/organizer/tickets") return "Tickets";
   if (pathname === "/organizer/tickets/scan") return "Door scan";
   if (pathname === "/organizer/account") return "Account";
+  if (pathname === "/organizer/team") return "Team";
+  if (pathname === "/organizer/team/join") return "Team invite";
   if (pathname === "/organizer/events" || pathname === "/organizer/events/")
     return "Events";
   if (pathname === "/organizer/events/new") return "Create event";
@@ -40,6 +42,9 @@ export function organizerNavActive(href: string, pathname: string): boolean {
   }
   if (href === "/organizer/account") {
     return pathname === "/organizer/account";
+  }
+  if (href === "/organizer/team") {
+    return pathname === "/organizer/team" || pathname.startsWith("/organizer/team/");
   }
   if (href === "/organizer/events") {
     if (pathname === "/organizer/events" || pathname === "/organizer/events/")

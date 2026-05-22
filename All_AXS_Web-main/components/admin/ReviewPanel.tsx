@@ -51,6 +51,7 @@ export function ReviewPanel({
 }: ReviewPanelProps) {
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -59,16 +60,13 @@ export function ReviewPanel({
   if (!event) return null;
 
   const handleApprove = async () => {
-    if (!confirm("Are you sure you want to approve this event?")) {
-      return;
-    }
-
     setIsApproving(true);
     setError(null);
     setSuccessMessage(null);
 
     try {
       await axios.post(`/api/admin/events/${event.id}/approve`);
+      setApproveDialogOpen(false);
       setSuccessMessage("Event approved successfully!");
       setTimeout(() => {
         onActionComplete();
@@ -180,7 +178,7 @@ export function ReviewPanel({
             </Button>
             <Button
               variant="primary"
-              onClick={handleApprove}
+              onClick={() => setApproveDialogOpen(true)}
               disabled={isApproving || isRejecting}
               className="w-auto"
             >
@@ -326,6 +324,42 @@ export function ReviewPanel({
             </div>
           )}
         </div>
+      </Dialog>
+
+      <Dialog
+        open={approveDialogOpen}
+        onClose={() => {
+          if (!isApproving) setApproveDialogOpen(false);
+        }}
+        title="Approve event?"
+        ariaLabel="Approve event confirmation"
+        footer={
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setApproveDialogOpen(false)}
+              disabled={isApproving}
+              className="w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleApprove}
+              disabled={isApproving}
+              className="w-auto"
+            >
+              {isApproving ? "Approving…" : "Approve & publish"}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-relaxed text-foreground/85">
+          Approving will publish{" "}
+          <span className="font-semibold text-foreground">{event.title}</span> to
+          the public events feed and notify the organiser. You can still
+          unpublish or archive it later.
+        </p>
       </Dialog>
 
       {/* Reject Dialog */}

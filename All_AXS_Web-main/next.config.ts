@@ -1,7 +1,14 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+const webPackageRoot = path.dirname(fileURLToPath(import.meta.url));
+
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: webPackageRoot,
+  },
   images: {
     remotePatterns: [
       {

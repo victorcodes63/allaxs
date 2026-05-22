@@ -5,6 +5,7 @@ import Link from "next/link";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import { formatMoneyFromCents } from "@/lib/organizer-sales";
+import { normalizeCurrencyCode } from "@/lib/currency";
 import type {
   OrganizerEarningsLedgerPayload,
   OrganizerEarningsSummary,
@@ -78,7 +79,7 @@ export default function OrganizerEarningsPage() {
     );
   }
 
-  const cur = summary?.currency ?? "KES";
+  const cur = normalizeCurrencyCode(summary?.currency);
 
   return (
     <div className="space-y-10">

@@ -7,6 +7,7 @@ import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import {
+  downloadOrganizerAttendeesCsv,
   formatShortDateTime,
   normalizeOrganizerSalesSummary,
   type OrganizerSalesEventRow,
@@ -46,6 +47,8 @@ export function OrganizerTicketsContent(): ReactElement {
   const [ticketsError, setTicketsError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const [voidTarget, setVoidTarget] = useState<OrganizerTicketRow | null>(null);
 
@@ -188,6 +191,19 @@ export function OrganizerTicketsContent(): ReactElement {
     setVoidTarget(null);
   };
 
+  const handleExportCsv = useCallback(async () => {
+    if (!filterEventId) return;
+    setExportError(null);
+    setExporting(true);
+    try {
+      await downloadOrganizerAttendeesCsv(filterEventId);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Could not export attendees.");
+    } finally {
+      setExporting(false);
+    }
+  }, [filterEventId]);
+
   if (summaryLoading) {
     return (
       <div className="flex min-h-[30vh] flex-col items-center justify-center gap-2">
@@ -265,6 +281,7 @@ export function OrganizerTicketsContent(): ReactElement {
                 const v = e.target.value;
                 setListOffset(0);
                 setFilterEventId(v);
+                setExportError(null);
                 if (v) {
                   router.replace(`/organizer/tickets?event=${encodeURIComponent(v)}`);
                 } else {
@@ -280,6 +297,20 @@ export function OrganizerTicketsContent(): ReactElement {
               ))}
             </select>
           </div>
+          {filterEventId ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-muted">Export</span>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-auto"
+                disabled={exporting}
+                onClick={() => void handleExportCsv()}
+              >
+                {exporting ? "Exporting…" : "Export CSV"}
+              </Button>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-2 min-w-[11rem]">
             <label className="text-xs font-medium text-muted" htmlFor="tickets-status-filter">
               Ticket status
@@ -314,6 +345,14 @@ export function OrganizerTicketsContent(): ReactElement {
             />
           </div>
         </div>
+        {exportError ? (
+          <div
+            className="rounded-[var(--radius-panel)] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+            role="alert"
+          >
+            {exportError}
+          </div>
+        ) : null}
         <p className="text-xs text-muted">
           Showing passes for <span className="font-medium text-foreground">{filterLabel}</span>
           {statusFilter ? (

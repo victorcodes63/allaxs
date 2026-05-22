@@ -144,6 +144,22 @@ describe('EmailService', () => {
     });
   });
 
+  describe('sendPasswordChangeConfirmationEmail', () => {
+    it('should send password change confirmation email successfully', async () => {
+      const user = createMockUser();
+      await service.sendPasswordChangeConfirmationEmail(user);
+
+      expect(mockResendSend).toHaveBeenCalledWith({
+        from: 'noreply@test.com',
+        to: 'test@example.com',
+        subject: 'Your Test App password was changed',
+        html: expect.stringMatching(
+          /Password changed[\s\S]*\/forgot-password[\s\S]*If this wasn't you, contact support/,
+        ),
+      });
+    });
+  });
+
   describe('sendWelcomeEmail', () => {
     it('should send welcome email successfully', async () => {
       const user = createMockUser();
@@ -157,6 +173,91 @@ describe('EmailService', () => {
           /Welcome to Test App[\s\S]*\/brand\/logo-header\.png/,
         ),
       });
+    });
+  });
+
+  describe('sendOrderRefundEmail', () => {
+    it('sends refund confirmation with tickets and support links', async () => {
+      await service.sendOrderRefundEmail({
+        buyerEmail: 'buyer@example.com',
+        buyerName: 'Buyer User',
+        orderReference: 'AXS-REF-12345',
+        eventTitle: 'Summer Fest',
+        refundAmountCents: 150000,
+        currency: 'KES',
+      });
+
+      expect(mockResendSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'buyer@example.com',
+          subject: 'Refund processed for Summer Fest',
+          html: expect.stringMatching(
+            /View my tickets[\s\S]*\/tickets[\s\S]*Contact support[\s\S]*AXS-REF-12345/,
+          ),
+        }),
+      );
+    });
+
+    it('uses partial refund copy when flagged', async () => {
+      await service.sendOrderRefundEmail({
+        buyerEmail: 'buyer@example.com',
+        orderReference: 'AXS-REF-99',
+        eventTitle: 'Summer Fest',
+        refundAmountCents: 50000,
+        currency: 'KES',
+        isPartialRefund: true,
+      });
+
+      expect(mockResendSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          subject: 'Partial refund for Summer Fest',
+          html: expect.stringContaining('Partial refund issued'),
+        }),
+      );
+    });
+  });
+
+  describe('sendEventSubmittedForReviewEmail', () => {
+    it('sends admin moderation email with queue link', async () => {
+      await service.sendEventSubmittedForReviewEmail({
+        to: 'admin@example.com',
+        recipientName: 'Admin User',
+        eventTitle: 'Jazz Night',
+        eventId: 'event-uuid-1',
+        orgName: 'Acme Events',
+        venue: 'The Loft',
+        startAt: new Date('2026-06-15T18:00:00.000Z'),
+        audience: 'admin',
+      });
+
+      expect(mockResendSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'admin@example.com',
+          subject: 'Review needed: Jazz Night',
+          html: expect.stringContaining('/admin/moderation'),
+        }),
+      );
+    });
+
+    it('sends organizer confirmation with editor link', async () => {
+      await service.sendEventSubmittedForReviewEmail({
+        to: 'organizer@example.com',
+        recipientName: 'Organizer',
+        eventTitle: 'Jazz Night',
+        eventId: 'event-uuid-1',
+        orgName: 'Acme Events',
+        venue: 'The Loft',
+        startAt: new Date('2026-06-15T18:00:00.000Z'),
+        audience: 'organizer',
+      });
+
+      expect(mockResendSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'organizer@example.com',
+          subject: 'Submitted for review: Jazz Night',
+          html: expect.stringContaining('/organizer/events/event-uuid-1/edit'),
+        }),
+      );
     });
   });
 

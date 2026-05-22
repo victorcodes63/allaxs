@@ -10,6 +10,7 @@ import { getEventBannerUrl, generatePlaceholderImage } from "@/lib/utils/image";
 import {
   clearCheckoutDraft,
   loadCheckoutDraft,
+  resolveCheckoutQuantities,
   saveCheckoutDraft,
   saveOrderForSession,
   saveOrderSnapshot,
@@ -17,12 +18,21 @@ import {
   type StoredOrder,
 } from "@/lib/checkout-storage";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
+import { resolveCurrencyFromTiers } from "@/lib/currency";
 import { isUuid } from "@/lib/public-events-mode";
 import {
   previewCheckoutCoupon,
   type CouponPreviewResponse,
 } from "@/lib/checkout-coupons";
 import { ArrowButton } from "@/components/ui/ArrowCta";
+import { PublicGuestCheckout } from "@/components/checkout/PublicGuestCheckout";
+import { isCheckoutEmailNotVerifiedError } from "@/lib/auth/email-verification-gate";
+import { EmailVerificationCheckoutGate } from "@/components/checkout/EmailVerificationCheckoutGate";
+import {
+  canOfferInstallments,
+  firstInstallmentCents,
+  installmentTierForCart,
+} from "@/lib/checkout-installments";
 
 function tierAvailable(tier: NonNullable<PublicEvent["ticketTypes"]>[0]) {
   if (tier.status && tier.status !== "ACTIVE") return false;
@@ -42,10 +52,16 @@ type CheckoutStep = "tickets" | "buyer";
 export function CheckoutExperience({
   event,
   context = "public",
+  waitlistToken,
 }: {
   event: PublicEvent;
   context?: "public" | "dashboard";
+  waitlistToken?: string | null;
 }) {
+  if (context === "public") {
+    return <PublicGuestCheckout event={event} waitlistToken={waitlistToken} />;
+  }
+
   const router = useRouter();
   const tiers = useMemo(
     () => event.ticketTypes?.filter(tierAvailable) ?? [],
@@ -58,17 +74,16 @@ export function CheckoutExperience({
       ? `/dashboard/events/${event.slug}/checkout`
       : `/events/${event.id}/checkout`;
   const [step, setStep] = useState<CheckoutStep>("tickets");
-  const [qty, setQty] = useState<Record<string, number>>(() => {
-    const init: Record<string, number> = {};
-    tiers.forEach((t) => {
-      init[t.id] = 0;
-    });
-    return init;
-  });
+  const [qty, setQty] = useState<Record<string, number>>(() =>
+    resolveCheckoutQuantities(tiers),
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [signedIn, setSignedIn] = useState(false);
+  const [emailVerified, setEmailVerified] = useState<boolean | undefined>(
+    undefined,
+  );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -80,24 +95,12 @@ export function CheckoutExperience({
   const [couponError, setCouponError] = useState<string | null>(null);
   const [appliedCoupon, setAppliedCoupon] =
     useState<CouponPreviewResponse | null>(null);
+  const [payInInstallments, setPayInInstallments] = useState(false);
 
   useEffect(() => {
-    const init: Record<string, number> = {};
-    tiers.forEach((t) => {
-      init[t.id] = 0;
-    });
     const draft = loadCheckoutDraft(event.id);
-    if (draft) {
-      const merged = { ...init };
-      for (const tid of Object.keys(merged)) {
-        if (typeof draft.qty[tid] === "number") merged[tid] = draft.qty[tid];
-      }
-      setQty(merged);
-      setStep(draft.step === "buyer" ? "buyer" : "tickets");
-    } else {
-      setQty(init);
-      setStep("tickets");
-    }
+    setQty(resolveCheckoutQuantities(tiers, draft?.qty));
+    setStep(draft?.step === "buyer" ? "buyer" : "tickets");
   }, [event.id, tiers]);
 
   useEffect(() => {
@@ -111,10 +114,11 @@ export function CheckoutExperience({
           return;
         }
         const data = (await res.json()) as {
-          user?: { email?: string; name?: string };
+          user?: { email?: string; name?: string; emailVerified?: boolean };
         };
         const u = data.user;
         setSignedIn(!!u?.email);
+        setEmailVerified(u?.emailVerified);
         if (u) {
           setEmail((prev) => (prev.trim() ? prev : u.email ?? ""));
           setName((prev) => (prev.trim() ? prev : u.name ?? ""));
@@ -144,7 +148,7 @@ export function CheckoutExperience({
     (s, li) => s + li.unitPriceCents * li.quantity,
     0
   );
-  const currency = tiers[0]?.currency ?? "KES";
+  const currency = resolveCurrencyFromTiers(tiers);
 
   // Reset the applied coupon whenever the cart changes so the buyer
   // can't carry a stale preview into the pay step. They can re-apply
@@ -162,11 +166,22 @@ export function CheckoutExperience({
     setCouponError(null);
   }, [lineSignature]);
 
+  const installmentsAvailable = canOfferInstallments(lineItems, tiers);
+
+  useEffect(() => {
+    if (!installmentsAvailable) setPayInInstallments(false);
+  }, [installmentsAvailable]);
+
   const discountCents =
     appliedCoupon?.valid && appliedCoupon.discountCents > 0
       ? Math.min(appliedCoupon.discountCents, subtotal)
       : 0;
-  const dueToday = Math.max(0, subtotal - discountCents);
+  const netTotalCents = Math.max(0, subtotal - discountCents);
+  const installmentTier = installmentTierForCart(lineItems, tiers);
+  const dueToday =
+    payInInstallments && installmentTier?.installmentConfig
+      ? firstInstallmentCents(netTotalCents, installmentTier.installmentConfig)
+      : netTotalCents;
 
   const applyCoupon = async () => {
     const code = couponInput.trim();
@@ -299,6 +314,11 @@ export function CheckoutExperience({
       }
     }
 
+    if (emailVerified === false) {
+      setError(null);
+      return;
+    }
+
     const ticketDelivery = "account" as const;
 
     setSubmitting(true);
@@ -324,10 +344,14 @@ export function CheckoutExperience({
             buyerEmail: email.trim(),
             buyerPhone: phone.trim() || undefined,
             couponCode: appliedCoupon?.valid ? appliedCoupon.code : undefined,
+            ...(payInInstallments && installmentsAvailable
+              ? { payInInstallments: true }
+              : {}),
           }),
         });
         const data = (await res.json().catch(() => ({}))) as {
           message?: string | string[];
+          code?: string;
           orderId?: string;
           reference?: string;
           authorizationUrl?: string | null;
@@ -336,6 +360,11 @@ export function CheckoutExperience({
           amountCents?: number;
         };
         if (!res.ok) {
+          if (isCheckoutEmailNotVerifiedError(data)) {
+            setEmailVerified(false);
+            setError(null);
+            return;
+          }
           const msg = Array.isArray(data.message)
             ? data.message.join(", ")
             : data.message || "Checkout failed";
@@ -632,7 +661,44 @@ export function CheckoutExperience({
                 </section>
               )}
 
-              {signedIn && (
+              {signedIn && emailVerified === false ? (
+                <EmailVerificationCheckoutGate email={email} />
+              ) : null}
+
+              {signedIn &&
+                emailVerified !== false &&
+                installmentsAvailable &&
+                installmentTier?.installmentConfig ? (
+                  <section className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={payInInstallments}
+                        onChange={(e) => setPayInInstallments(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-border"
+                      />
+                      <span>
+                        <span className="font-semibold text-foreground block">
+                          Pay in installments
+                        </span>
+                        <span className="text-sm text-muted">
+                          Pay{" "}
+                          {(
+                            firstInstallmentCents(
+                              netTotalCents,
+                              installmentTier.installmentConfig,
+                            ) / 100
+                          ).toFixed(0)}{" "}
+                          {currency} today (
+                          {installmentTier.installmentConfig.splits[0]?.pct ?? "—"}%
+                          deposit).
+                        </span>
+                      </span>
+                    </label>
+                  </section>
+                ) : null}
+
+              {signedIn && emailVerified !== false && (
                 <section
                   aria-labelledby="coupon-section-title"
                   className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-4"
@@ -712,7 +778,7 @@ export function CheckoutExperience({
                 </section>
               )}
 
-              {signedIn && (
+              {signedIn && emailVerified !== false && (
                 <section className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-4">
                   <h2 className="font-display text-lg font-semibold text-foreground">Attendee details</h2>
                   <p className="text-sm text-muted">
@@ -770,7 +836,12 @@ export function CheckoutExperience({
 
               <ArrowButton
                 type="submit"
-                disabled={submitting || tiers.length === 0 || !signedIn}
+                disabled={
+                  submitting ||
+                  tiers.length === 0 ||
+                  !signedIn ||
+                  emailVerified === false
+                }
                 className="w-full sm:w-auto"
               >
                 {submitting
@@ -861,8 +932,16 @@ export function CheckoutExperience({
               <dt>Fees</dt>
               <dd className="text-muted">Calculated at payment</dd>
             </div>
+            {payInInstallments && netTotalCents !== dueToday ? (
+              <div className="flex justify-between gap-4">
+                <dt>Plan total</dt>
+                <dd className="font-medium text-foreground tabular-nums">
+                  {netTotalCents / 100} {currency}
+                </dd>
+              </div>
+            ) : null}
             <div className="flex justify-between gap-4 pt-2 border-t border-border text-foreground font-semibold">
-              <dt>Due today</dt>
+              <dt>{payInInstallments ? "Due today (1st installment)" : "Due today"}</dt>
               <dd className="tabular-nums">
                 {dueToday / 100} {currency}
               </dd>

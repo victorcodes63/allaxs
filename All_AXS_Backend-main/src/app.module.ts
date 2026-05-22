@@ -11,7 +11,9 @@ import { DomainModule } from './domain/domain.module';
 import { AdminModule } from './admin/admin.module';
 import { OrganizersModule } from './organizers/organizers.module';
 import { CheckoutModule } from './checkout/checkout.module';
+import { OrdersModule } from './orders/orders.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ScannerModule } from './scanner/scanner.module';
 import { HealthController } from './health.controller';
 import { LoggerModule } from 'nestjs-pino';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -109,7 +111,9 @@ function getTestUtilsModule(): any[] {
     AdminModule,
     OrganizersModule,
     CheckoutModule,
+    OrdersModule,
     NotificationsModule,
+    ScannerModule,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     ...getTestModule(),
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

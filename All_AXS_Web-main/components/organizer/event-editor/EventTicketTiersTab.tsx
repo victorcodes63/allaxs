@@ -19,6 +19,11 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { apiClient } from "@/lib/api-client";
+import {
+  normalizeCurrencyCode,
+  PLATFORM_DEFAULT_CURRENCY,
+  resolveCurrencyFromTiers,
+} from "@/lib/currency";
 
 const baseTicketTierResolver = zodResolver(ticketTierSchema);
 
@@ -63,6 +68,8 @@ interface TicketType {
   currency: string;
   allowInstallments?: boolean;
   installmentConfig?: InstallmentConfig | null;
+  isHidden?: boolean;
+  compLinkToken?: string | null;
   [key: string]: unknown;
 }
 
@@ -198,7 +205,7 @@ function statusLabel(status: TierStatus): string {
   }
 }
 
-function formatPrice(cents: number, currency = "KES"): string {
+function formatPrice(cents: number, currency: string = PLATFORM_DEFAULT_CURRENCY): string {
   if (cents === 0) return "Free";
   const amount = (cents / 100).toLocaleString(undefined, {
     minimumFractionDigits: cents % 100 === 0 ? 0 : 2,
@@ -536,7 +543,15 @@ export function EventTicketTiersTab({
         salesStartAt: salesStartIso ?? undefined,
         salesEndAt: salesEndIso ?? undefined,
         allowInstallments,
+        currency: normalizeCurrencyCode(
+          data.currency || resolveCurrencyFromTiers(ticketTypes),
+        ),
       };
+      if (data.isHidden === true) {
+        payload.isHidden = true;
+      } else if (data.isHidden === false) {
+        payload.isHidden = false;
+      }
 
       if (canPriceEditPublished && editingId !== "new") {
         await apiClient.patch(`/ticket-types/${editingId}`, {
@@ -612,7 +627,19 @@ export function EventTicketTiersTab({
 
   const showList = !loading && editingId === null;
   const isEmpty = ticketTypes.length === 0;
-  const currency = ticketTypes[0]?.currency ?? "KES";
+  const currency = resolveCurrencyFromTiers(ticketTypes);
+
+  const handleRegenerateCompLink = async (tierId: string) => {
+    setError(null);
+    try {
+      await apiClient.post(`/ticket-types/${tierId}/comp-link`);
+      await refresh();
+      setSuccess("Comp link regenerated");
+      setTimeout(() => setSuccess(null), 2500);
+    } catch (err) {
+      setError(extractApiMessage(err) || "Failed to regenerate comp link");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -650,6 +677,7 @@ export function EventTicketTiersTab({
           presetDefaults={editingId === "new" ? presetDefaults : null}
           eventStartAt={event.startAt}
           eventEndAt={event.endAt}
+          defaultCurrency={currency}
           onSubmit={onSubmit}
           onCancel={handleCancel}
           isSubmitting={isSubmitting}
@@ -680,6 +708,7 @@ export function EventTicketTiersTab({
             <li key={tier.id}>
               <TicketTierRow
                 tier={tier}
+                eventSlug={event.slug}
                 eventStatus={event.status}
                 canEdit={canSubmitEdits}
                 canEditAllFields={canEditAnyField}
@@ -687,6 +716,7 @@ export function EventTicketTiersTab({
                 onDuplicate={() => handleDuplicate(tier)}
                 onDelete={() => handleDelete(tier.id)}
                 onQuantityChange={(qty) => handleQuantityChange(tier.id, qty)}
+                onRegenerateCompLink={() => handleRegenerateCompLink(tier.id)}
               />
             </li>
           ))}
@@ -838,6 +868,7 @@ function EmptyState({ presets, onPick, onCustom, canAdd }: EmptyStateProps) {
 
 interface TicketTierRowProps {
   tier: TicketType;
+  eventSlug?: string;
   eventStatus: string;
   canEdit: boolean;
   canEditAllFields: boolean;
@@ -845,10 +876,12 @@ interface TicketTierRowProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onQuantityChange: (qty: number) => void;
+  onRegenerateCompLink: () => void;
 }
 
 function TicketTierRow({
   tier,
+  eventSlug,
   eventStatus,
   canEdit,
   canEditAllFields,
@@ -856,13 +889,15 @@ function TicketTierRow({
   onDuplicate,
   onDelete,
   onQuantityChange,
+  onRegenerateCompLink,
 }: TicketTierRowProps) {
+  const [copied, setCopied] = useState(false);
   const status = tierStatus(tier, eventStatus);
   const sold = tier.quantitySold;
   const total = tier.quantityTotal;
   const available = Math.max(0, total - sold);
   const pct = total > 0 ? Math.min(100, Math.round((sold / total) * 100)) : 0;
-  const window = formatRelativeWindow(tier.salesStart, tier.salesEnd);
+  const salesWindow = formatRelativeWindow(tier.salesStart, tier.salesEnd);
 
   return (
     <article className="rounded-[var(--radius-panel)] border border-border bg-surface/70 p-5 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] transition hover:border-white/15">
@@ -882,6 +917,11 @@ function TicketTierRow({
                 Installments
               </span>
             )}
+            {tier.isHidden && (
+              <span className="rounded-full border border-violet-400/25 bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-100">
+                Hidden / comp
+              </span>
+            )}
           </div>
           {tier.description && (
             <p className="mt-1 text-sm text-muted">{tier.description}</p>
@@ -896,7 +936,7 @@ function TicketTierRow({
             {tier.maxPerOrder ? (
               <RowStat label="Max / order" value={String(tier.maxPerOrder)} />
             ) : null}
-            {window ? <RowStat label="Sales window" value={window} /> : null}
+            {salesWindow ? <RowStat label="Sales window" value={salesWindow} /> : null}
           </dl>
 
           <div className="mt-4">
@@ -917,6 +957,30 @@ function TicketTierRow({
               {sold.toLocaleString()} sold ({pct}%)
             </p>
           </div>
+
+          {tier.isHidden && tier.compLinkToken && eventSlug && (
+            <CompLinkPanel
+              slug={eventSlug}
+              token={String(tier.compLinkToken)}
+              copied={copied}
+              canEdit={canEditAllFields}
+              onCopy={async () => {
+                const origin =
+                  typeof globalThis.window !== "undefined"
+                    ? globalThis.window.location.origin
+                    : "";
+                const url = `${origin}/e/${eventSlug}/comp/${tier.compLinkToken}`;
+                try {
+                  await navigator.clipboard.writeText(url);
+                  setCopied(true);
+                  globalThis.window?.setTimeout(() => setCopied(false), 2000);
+                } catch {
+                  /* clipboard unavailable */
+                }
+              }}
+              onRegenerate={onRegenerateCompLink}
+            />
+          )}
         </div>
 
         <div className="flex flex-col gap-3 lg:items-end lg:text-right">
@@ -976,6 +1040,49 @@ function RowStat({ label, value }: { label: string; value: ReactNode }) {
         {label}
       </dt>
       <dd className="text-sm font-medium text-foreground">{value}</dd>
+    </div>
+  );
+}
+
+function CompLinkPanel({
+  slug,
+  token,
+  copied,
+  canEdit,
+  onCopy,
+  onRegenerate,
+}: {
+  slug: string;
+  token: string;
+  copied: boolean;
+  canEdit: boolean;
+  onCopy: () => void;
+  onRegenerate: () => void;
+}) {
+  const path = `/e/${slug}/comp/${token}`;
+  return (
+    <div className="mt-4 rounded-[var(--radius-card)] border border-violet-400/20 bg-violet-500/5 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-violet-200/90">
+        Comp / VIP link
+      </p>
+      <p className="mt-1 break-all font-mono text-xs text-foreground/90">{path}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="button" variant="secondary" onClick={onCopy} className="w-auto px-3 py-1.5 text-xs">
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+        {canEdit && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="rounded-[var(--radius-button)] border border-border px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-foreground"
+          >
+            Regenerate link
+          </button>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-muted">
+        Hidden from the public event page. Share only with VIPs, speakers, or sponsors.
+      </p>
     </div>
   );
 }
@@ -1042,6 +1149,7 @@ interface TicketTierFormProps {
   presetDefaults?: Partial<TicketTierInput> | null;
   eventStartAt: string;
   eventEndAt: string;
+  defaultCurrency: string;
   onSubmit: (data: TicketTierInput) => Promise<void>;
   onCancel: () => void;
   isSubmitting: boolean;
@@ -1055,6 +1163,7 @@ function TicketTierForm({
   tier,
   presetDefaults,
   eventEndAt,
+  defaultCurrency,
   onSubmit,
   onCancel,
   isSubmitting,
@@ -1087,6 +1196,10 @@ function TicketTierForm({
             ? Number(presetDefaults.priceCents) / 100
             : 0,
       quantity: tier?.quantityTotal ?? presetDefaults?.quantity ?? 100,
+      currency:
+        tier?.currency ??
+        presetDefaults?.currency ??
+        defaultCurrency,
       maxPerOrder: tier?.maxPerOrder ?? presetDefaults?.maxPerOrder,
       salesStartAt: tier?.salesStart
         ? new Date(tier.salesStart).toISOString().slice(0, 16)
@@ -1096,6 +1209,7 @@ function TicketTierForm({
         : (presetDefaults?.salesEndAt ?? ""),
       allowInstallments:
         tier?.allowInstallments ?? presetDefaults?.allowInstallments ?? false,
+      isHidden: tier?.isHidden ?? presetDefaults?.isHidden ?? false,
       installmentConfig: tier?.installmentConfig
         ? {
             mode: "PERCENT_SPLITS" as const,
@@ -1224,9 +1338,25 @@ function TicketTierForm({
             disabled={!canEditPriceField}
           />
           <p className="mt-1 text-xs text-muted">
-            In KES (e.g. 1500 for 1,500 KES). Set 0 for a free tier.
+            In {watch("currency") || defaultCurrency} (minor units as whole
+            numbers, e.g. 1500 for 1,500). Set 0 for a free tier.
           </p>
         </div>
+        <Input
+          label="Currency"
+          type="text"
+          maxLength={3}
+          placeholder={defaultCurrency}
+          {...register("currency", {
+            setValueAs: (v) =>
+              typeof v === "string" ? v.trim().toUpperCase() : v,
+          })}
+          error={errors.currency?.message}
+          disabled={!canEditAllFields}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input
           label="Quantity"
           type="number"
@@ -1469,6 +1599,24 @@ function TicketTierForm({
           </div>
         )}
       </div>
+
+      {canEditAllFields && (
+        <label className="flex items-start gap-3 rounded-[var(--radius-card)] border border-border bg-background/30 p-4 text-sm text-foreground">
+          <input
+            type="checkbox"
+            {...register("isHidden")}
+            disabled={!canEditAllFields}
+            className="mt-0.5 h-4 w-4 accent-[color:var(--color-primary)]"
+          />
+          <span>
+            <span className="font-semibold">Hidden comp / VIP tier</span>
+            <span className="mt-1 block text-muted">
+              Omit from the public event page and issue a private link for
+              complimentary checkout (no payment).
+            </span>
+          </span>
+        </label>
+      )}
 
       {externalError && (
         <div

@@ -146,18 +146,12 @@ export class PaymentPlansService {
   }
 
   /**
-   * Mark an installment as paid (test simulation only)
+   * Mark an installment as paid (Paystack webhook/confirm or test simulation).
    */
   async markInstallmentPaid(
     orderId: string,
     sequence: number,
   ): Promise<{ plan: PaymentPlan; order: Order }> {
-    if (process.env.NODE_ENV === 'production') {
-      throw new BadRequestException(
-        'This endpoint is only available in non-production environments',
-      );
-    }
-
     const order = await this.orderRepository.findOne({
       where: { id: orderId },
       relations: ['paymentPlans', 'paymentPlans.installments', 'items'],

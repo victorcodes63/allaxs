@@ -34,9 +34,12 @@ same tabbed UI as `/organizer/events/[id]/edit`. The "Edit as admin" CTA on
 
 Follow-ups (small):
 
-- [ ] Surface admin override badge in the `/organizer/events/[id]/edit`
+- [x] Surface admin override badge in the `/organizer/events/[id]/edit`
       page when the audit log shows recent admin edits, so the organiser
-      isn't blind-sided by changes to their own event.
+      isn't blind-sided by changes to their own event. Backed by
+      `GET /events/:id/admin-overrides` (organiser-owned events only,
+      `ADMIN_*` audit actions in the last 90 days) and
+      `OrganizerAdminEditBanner` on the editor page.
 
 ## 2. Admin event detail page enhancements
 
@@ -54,12 +57,13 @@ history, and inline Approve / Reject controls. Follow-ups:
       "Approve / Reject" pair of buttons that operate from this page.
       Implemented via `components/admin/EventReviewActions.tsx` with themed
       confirm + reject-reason dialogs.
-- [ ] Wire the revenue strip into a click-through to a future
-      `/admin/events/[id]/orders` view once Section 4 lands.
-- [ ] Add a "Resync sold counts" action for tiers (useful when ticket totals
+- [x] Wire the revenue strip into a click-through to a future
+      `/admin/events/[id]/orders` view once Section 4 lands. Implemented as
+      deep-links into `/admin/orders?eventId=...&status=...` (Section 4).
+- [x] Add a "Resync sold counts" action for tiers (useful when ticket totals
       drift from order rows).
-- [ ] Optimistic update of `audit` + status chip immediately after Approve /
-      Reject (currently relies on a full `load()` refetch).
+- [x] Optimistic update of `audit` + status chip immediately after Approve /
+      Reject (background audit refetch; no full-page `load()` spinner).
 
 ## 3. Moderation queue polish
 
@@ -89,7 +93,7 @@ bulk-approve / bulk-reject confirm dialogs.
 
 ### Follow-ups
 
-- [ ] Migrate `ReviewPanel`'s native `confirm()` to one of the themed
+- [x] Migrate `ReviewPanel`'s native `confirm()` to one of the themed
       dialogs we now use on the queue (Section 8 follow-up).
 - [ ] Server-side bulk endpoints (`POST /admin/events/bulk-approve`,
       `bulk-reject`) once the audit log volume justifies it. Today
@@ -298,7 +302,7 @@ on the next full rebuild and haven't returned.
 - [x] `app/admin/moderation/page.tsx` now uses the same pill filter set as
       `/admin/events` (replaced the legacy `<select>`). Search bar lives in
       a sticky top-aligned bar with a result-count chip in the header.
-- [ ] `ReviewPanel` confirm dialog uses the native `confirm()` — replace with
+- [x] `ReviewPanel` confirm dialog uses the native `confirm()` — replace with
       a themed dialog so the dark hub stays consistent across browsers.
 - [x] Add `/admin/orders` to the `AdminShell` sidebar and page-title helper.
 - [x] Add `/admin/orders` to `HubTopBar` admin quick links.
@@ -316,9 +320,12 @@ on the next full rebuild and haven't returned.
       `cypress/e2e/admin-user-management.cy.ts` ("suspends and then
       reactivates an attendee" and "opens the user detail page and
       force-logs-out the user").
-- [ ] Cypress: end-to-end role-change audit history check (promote
-      attendee → admin, then suspend and reactivate, verify all four
-      entries land in the user audit dialog).
+- [x] Cypress: end-to-end role-change audit history check (promote
+      attendee → admin, then suspend and reactivate, verify role + status
+      entries land in the user audit dialog). Covered by
+      `cypress/e2e/admin-user-management.cy.ts`
+      ("records role-change audit history through promote, suspend, and
+      reactivate").
 
 ## 9. Shared auth foundation
 
@@ -341,18 +348,21 @@ hoisting auth state into a single `<AuthProvider>` at the root.
       `LoggedInBrowseChrome`, `HubAppShell`) to call `setUser(null)` so
       the chrome flips to signed-out state immediately without waiting
       for a context refetch.
-- [ ] Consider broadcasting auth changes across tabs via `storage`
+- [x] Consider broadcasting auth changes across tabs via `storage`
       events or `BroadcastChannel` so signing out in one tab also clears
       the shared context in any others.
-- [ ] Add a Cypress regression: navigate `/login` → admin email → submit
+- [x] Add a Cypress regression: navigate `/login` → admin email → submit
       → land on `/admin` with the admin shell visible, no
-      marketing-header flash, even on a slow `/api/auth/me`.
+      marketing-header flash, even on a slow `/api/auth/me`. Covered by
+      `cypress/e2e/admin-user-management.cy.ts`
+      ("lands on /admin after login without marketing header flash").
+      `AppChrome` Suspense fallback no longer renders `SiteHeader`.
 
 ---
 
-_Last updated: 2026-05-11 — Sections 1, 2, 3, 4, 5, 6 (overview polish),
-7 (typed-routes) and 8 (Cypress admin coverage) are all checked in.
-Highlights:_
+_Last updated: 2026-05-22 — Optimistic approve/reject on
+`/admin/events/[id]`, Cypress role-audit + admin-login chrome regressions,
+and revenue-strip click-through marked shipped._
 
 - _Section 1 (admin event editor): `/admin/events/[id]/edit` ships with
   full `canEditOverride` reuse of the organiser editor; backend
@@ -372,7 +382,7 @@ Highlights:_
   `AddEventSubmittedAt1762960000000` migrations are applied against the
   live database._
 
-_Next recommended stops (small follow-ups only): organiser-visible
-"recent admin edits" banner on `/organizer/events/[id]/edit`; replace
-`ReviewPanel` `confirm()` with a themed dialog; broadcast auth changes
-across tabs; extend Cypress with a role-change audit history regression._
+_Next recommended stops (small follow-ups only): replace `ReviewPanel`
+`confirm()` with a themed dialog; optimistic approve/reject on
+`/admin/events/[id]`; broadcast auth changes across tabs; extend Cypress
+with a role-change audit history regression._

@@ -12,6 +12,7 @@
  */
 
 import { apiClient } from "@/lib/api-client";
+import { normalizeCurrencyCode } from "@/lib/currency";
 
 export type CouponKind = "FIXED" | "PERCENT";
 
@@ -125,11 +126,11 @@ export function formatCouponValue(c: Coupon): string {
     return `${c.percentOff ?? 0}% off`;
   }
   const cents = c.valueCents ?? 0;
-  const currency = c.currency ?? "KES";
+  const currency = normalizeCurrencyCode(c.currency);
   try {
     return `${new Intl.NumberFormat(undefined, {
       style: "currency",
-      currency: currency.length === 3 ? currency : "KES",
+      currency,
       maximumFractionDigits: 0,
     }).format(cents / 100)} off`;
   } catch {

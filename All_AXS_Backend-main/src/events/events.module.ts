@@ -17,10 +17,14 @@ import { StorageModule } from '../storage/storage.module';
 import { OrderItem } from '../domain/order-item.entity';
 import { CouponRedemption } from '../domain/coupon-redemption.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { AuthModule } from '../auth/auth.module';
 // Imported as a plain entity (not the AdminModule) so the events services can
 // write admin audit-log rows directly without introducing a circular module
 // dependency (AdminModule already imports EventsModule).
 import { AdminAuditLog } from '../admin/entities/admin-audit-log.entity';
+import { WaitlistEntry } from './entities/waitlist-entry.entity';
+import { WaitlistController } from './waitlist.controller';
+import { WaitlistService } from './waitlist.service';
 
 @Module({
   imports: [
@@ -33,27 +37,32 @@ import { AdminAuditLog } from '../admin/entities/admin-audit-log.entity';
       OrderItem,
       AdminAuditLog,
       CouponRedemption,
+      WaitlistEntry,
     ]),
     StorageModule,
     NotificationsModule,
+    AuthModule,
   ],
   controllers: [
     EventsController,
     UploadsController,
     TicketTypesController,
     CouponsController,
+    WaitlistController,
   ],
   providers: [
     EventsService,
     TicketTypesService,
     CouponsService,
     InstallmentConfigValidator,
+    WaitlistService,
   ],
   exports: [
     EventsService,
     TicketTypesService,
     CouponsService,
     InstallmentConfigValidator,
+    WaitlistService,
   ],
 })
 export class EventsModule {}

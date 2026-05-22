@@ -6,6 +6,8 @@
  *   2. Admin opens the moderation queue, sees pending events, and approves one.
  *   3. Admin opens /admin/users, searches, and suspends an active attendee.
  *   4. Admin reactivates the same user.
+ *   5. Role-change audit history (promote → suspend → reactivate).
+ *   6. Admin login lands on /admin without marketing header flash.
  *
  * Everything backend-side is intercepted so this spec can run without a live
  * Nest instance — same pattern as `organizer-submit-admin-publish.cy.ts`.
@@ -24,6 +26,22 @@ interface SeededUser {
   updatedAt: string;
   emailVerifiedAt?: string | null;
 }
+
+interface AuditEntry {
+  id: string;
+  action: string;
+  status: string;
+  createdAt: string;
+  metadata?: Record<string, unknown> | null;
+  admin: { id: string; email: string; name?: string | null } | null;
+}
+
+const adminUser = {
+  id: "admin-user-id",
+  email: "demo-admin@allaxs.demo",
+  name: "Demo Admin",
+  roles: ["ADMIN"],
+};
 
 const pendingEvent = {
   id: "evt-pending-admin-e2e",
@@ -55,14 +73,7 @@ describe("Admin: moderation + user management (stubbed APIs)", () => {
     // Admin /api/auth/me — every page-load hits this for role detection.
     cy.intercept("GET", "**/api/auth/me", {
       statusCode: 200,
-      body: {
-        user: {
-          id: "admin-user-id",
-          email: "demo-admin@allaxs.demo",
-          name: "Demo Admin",
-          roles: ["ADMIN"],
-        },
-      },
+      body: { user: adminUser },
     }).as("authMe");
 
     cy.setCookie("accessToken", "mock-admin-access-token");
@@ -240,5 +251,189 @@ describe("Admin: moderation + user management (stubbed APIs)", () => {
       .contains("button", "Sign out everywhere")
       .click();
     cy.wait("@forceLogout");
+  });
+
+  it("records role-change audit history through promote, suspend, and reactivate", () => {
+    const initialUser: SeededUser = {
+      id: attendeeId,
+      email: "fan@example.com",
+      name: "Loyal Fan",
+      roles: ["ATTENDEE"],
+      status: "ACTIVE",
+      createdAt: "2026-04-01T08:00:00.000Z",
+      updatedAt: "2026-04-01T08:00:00.000Z",
+      emailVerifiedAt: "2026-04-01T08:00:00.000Z",
+    };
+
+    let currentUser: SeededUser = { ...initialUser };
+    const auditTrail: AuditEntry[] = [];
+
+    cy.intercept("GET", "**/api/admin/users*", (req) => {
+      req.reply({
+        statusCode: 200,
+        body: {
+          users: [currentUser],
+          total: 1,
+          limit: 25,
+          offset: 0,
+        },
+      });
+    }).as("adminUsers");
+
+    cy.intercept("GET", `**/api/admin/users/${attendeeId}/audit`, (req) => {
+      req.reply({
+        statusCode: 200,
+        body: auditTrail,
+      });
+    }).as("userAudit");
+
+    cy.intercept(
+      "PATCH",
+      `**/api/admin/users/${attendeeId}/roles`,
+      (req) => {
+        const body = req.body as { roles?: SeededUser["roles"] };
+        const oldRoles = [...currentUser.roles];
+        if (body?.roles) {
+          currentUser = {
+            ...currentUser,
+            roles: body.roles,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        auditTrail.unshift({
+          id: `audit-roles-${auditTrail.length}`,
+          action: "UPDATE_USER_ROLES",
+          status: "SUCCESS",
+          createdAt: new Date().toISOString(),
+          metadata: {
+            oldRoles,
+            newRoles: currentUser.roles,
+          },
+          admin: adminUser,
+        });
+        req.reply({ statusCode: 200, body: currentUser });
+      },
+    ).as("patchRoles");
+
+    cy.intercept(
+      "PATCH",
+      `**/api/admin/users/${attendeeId}/status`,
+      (req) => {
+        const body = req.body as { status?: SeededUser["status"] };
+        const previousStatus = currentUser.status;
+        if (body?.status) {
+          currentUser = {
+            ...currentUser,
+            status: body.status,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        auditTrail.unshift({
+          id: `audit-status-${auditTrail.length}`,
+          action: "UPDATE_USER_STATUS",
+          status: "SUCCESS",
+          createdAt: new Date().toISOString(),
+          metadata: {
+            previousStatus,
+            newStatus: currentUser.status,
+          },
+          admin: adminUser,
+        });
+        req.reply({ statusCode: 200, body: currentUser });
+      },
+    ).as("patchStatus");
+
+    cy.visit("/admin/users");
+    cy.wait("@authMe");
+    cy.wait("@adminUsers");
+
+    cy.get('[aria-label="Promote Loyal Fan to admin"]').click();
+    cy.get('[role="dialog"]').contains("button", "Promote").click();
+    cy.wait("@patchRoles");
+    cy.wait("@adminUsers");
+
+    cy.get('[aria-label="Suspend Loyal Fan"]').click();
+    cy.get('[role="dialog"]').contains("button", "Suspend").click();
+    cy.wait("@patchStatus")
+      .its("request.body")
+      .should("deep.include", { status: "SUSPENDED" });
+    cy.wait("@adminUsers");
+
+    cy.get('[aria-label="Reactivate Loyal Fan"]').click();
+    cy.get('[role="dialog"]').contains("button", "Reactivate").click();
+    cy.wait("@patchStatus")
+      .its("request.body")
+      .should("deep.include", { status: "ACTIVE" });
+    cy.wait("@adminUsers");
+
+    cy.get('[aria-label="Audit history for Loyal Fan"]').click();
+    cy.wait("@userAudit");
+
+    cy.get('[role="dialog"]').within(() => {
+      cy.contains("Updated roles").should("be.visible");
+      cy.contains("ATTENDEE").should("be.visible");
+      cy.contains("ADMIN").should("be.visible");
+      cy.contains("Updated status").should("have.length", 2);
+      cy.contains("ACTIVE").should("be.visible");
+      cy.contains("SUSPENDED").should("be.visible");
+    });
+  });
+
+  it("lands on /admin after login without marketing header flash", () => {
+    cy.intercept("POST", "**/api/auth/login", {
+      statusCode: 200,
+      body: { message: "Login successful" },
+    }).as("login");
+
+    cy.intercept("GET", "**/api/auth/me", (req) => {
+      req.reply({
+        delay: 1500,
+        statusCode: 200,
+        body: { user: adminUser },
+      });
+    }).as("slowAuthMe");
+
+    cy.intercept("GET", "**/api/admin/overview", {
+      statusCode: 200,
+      body: {
+        generatedAt: new Date().toISOString(),
+        events: {
+          byStatus: {},
+          submissionTrend: [],
+          pendingReviewQueue: [],
+        },
+        orders: {
+          byStatus: {},
+          paid: { count: 0, grossCents: 0, feesCents: 0, netCents: 0 },
+          refunded: { count: 0, grossCents: 0 },
+          paidTrend: [],
+          refundedTrend: [],
+        },
+        users: {
+          total: 0,
+          admins: 1,
+          organizers: 0,
+          attendees: 0,
+        },
+        recentActivity: [],
+      },
+    }).as("adminOverview");
+
+    cy.visit("/login");
+    cy.get('input[type="email"]').type(adminUser.email);
+    cy.get('input[type="password"]').type("demo-password");
+    cy.contains("button", "Sign In").click();
+
+    cy.wait("@login");
+    cy.url().should("include", "/admin");
+
+    // Marketing chrome must never appear while auth resolves slowly.
+    cy.contains("a", "For organizers").should("not.exist");
+    cy.contains("a", "Sign up").should("not.exist");
+
+    cy.contains("Admin overview", { timeout: 10000 }).should("be.visible");
+    cy.wait("@slowAuthMe");
+    cy.wait("@adminOverview");
+    cy.contains("a", "For organizers").should("not.exist");
   });
 });

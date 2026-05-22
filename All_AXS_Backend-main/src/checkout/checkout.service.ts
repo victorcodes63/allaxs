@@ -25,6 +25,7 @@ import {
 import { DemoCheckoutDto } from './dto/demo-checkout.dto';
 import { PaystackInitDto } from './dto/paystack-init.dto';
 import { CouponPreviewDto } from './dto/coupon-preview.dto';
+import { CompCheckoutInitDto } from './dto/comp-checkout-init.dto';
 import { EmailService } from '../auth/services/email.service';
 import {
   eventToEmailContext,
@@ -33,7 +34,25 @@ import {
 import { computePlatformFeeCents } from './platform-fee.util';
 import { OrganizerLedgerService } from '../domain/organizer-ledger.service';
 import { CouponsService } from '../events/coupons.service';
+import { EventsService } from '../events/events.service';
 import { Coupon } from '../events/entities/coupon.entity';
+import { AuthService } from '../auth/auth.service';
+import { TokenMetadata } from '../auth/services/refresh-token.service';
+import { User } from '../users/entities/user.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  parseOrderNotes,
+  shouldSendTicketWhatsApp,
+} from '../notifications/order-notes.util';
+import { PaymentPlansService } from '../domain/payment-plans.service';
+import {
+  PaymentInstallment,
+  PaymentInstallmentStatus,
+} from '../domain/payment-installment.entity';
+import {
+  WaitlistService,
+  type WaitlistPurchaseContext,
+} from '../events/waitlist.service';
 
 @Injectable()
 export class CheckoutService {
@@ -45,7 +64,68 @@ export class CheckoutService {
     private readonly emailService: EmailService,
     private readonly organizerLedgerService: OrganizerLedgerService,
     private readonly couponsService: CouponsService,
+    private readonly eventsService: EventsService,
+    private readonly authService: AuthService,
+    private readonly notificationsService: NotificationsService,
+    private readonly paymentPlansService: PaymentPlansService,
+    private readonly waitlistService: WaitlistService,
   ) {}
+
+  private assertInstallmentCheckoutAllowed(
+    dto: PaystackInitDto,
+    tierById: Map<string, TicketType>,
+  ): TicketType {
+    if (dto.lines.length !== 1) {
+      throw new BadRequestException(
+        'Installment checkout supports one ticket tier per order',
+      );
+    }
+    const tier = tierById.get(dto.lines[0].ticketTypeId);
+    if (!tier?.allowInstallments || !tier.installmentConfig) {
+      throw new BadRequestException(
+        'This ticket tier does not support installment payments',
+      );
+    }
+    return tier;
+  }
+
+  private async resolveWaitlistContext(dto: {
+    eventId: string;
+    buyerEmail: string;
+    waitlistToken?: string;
+    lines: { ticketTypeId: string; quantity: number }[];
+  }): Promise<WaitlistPurchaseContext | null> {
+    if (!dto.waitlistToken?.trim()) {
+      return null;
+    }
+    const ctx = await this.waitlistService.resolvePurchaseContext(
+      dto.waitlistToken.trim(),
+      dto.buyerEmail,
+      dto.eventId,
+    );
+    if (
+      dto.lines.length !== 1 ||
+      dto.lines[0].ticketTypeId !== ctx.tierId
+    ) {
+      throw new BadRequestException(
+        'Waitlist checkout must purchase only the tier from your offer',
+      );
+    }
+    return ctx;
+  }
+
+  private assertTierOnSale(
+    tier: TicketType,
+    waitlistContext: WaitlistPurchaseContext | null,
+  ): void {
+    if (tier.status === TicketTypeStatus.ACTIVE) {
+      return;
+    }
+    if (waitlistContext && tier.id === waitlistContext.tierId) {
+      return;
+    }
+    throw new BadRequestException(`Ticket type ${tier.name} is not on sale`);
+  }
 
   private assertDemoCheckoutEnabled(): void {
     const enabled = this.configService.get<string>('ENABLE_DEMO_CHECKOUT') === 'true';
@@ -91,6 +171,8 @@ export class CheckoutService {
     };
   }> {
     this.assertDemoCheckoutEnabled();
+    await this.authService.assertEmailVerifiedForCheckout(userId);
+    const waitlistContext = await this.resolveWaitlistContext(dto);
 
     return this.dataSource.transaction(async (manager) => {
       const event = await manager.findOne(Event, {
@@ -121,9 +203,7 @@ export class CheckoutService {
             `Ticket type ${line.ticketTypeId} does not belong to this event`,
           );
         }
-        if (tier.status !== TicketTypeStatus.ACTIVE) {
-          throw new BadRequestException(`Ticket type ${tier.name} is not on sale`);
-        }
+        this.assertTierOnSale(tier, waitlistContext);
         const locked = await manager.findOne(TicketType, {
           where: { id: tier.id },
           lock: { mode: 'pessimistic_write' },
@@ -170,7 +250,14 @@ export class CheckoutService {
         reference,
         email: dto.buyerEmail,
         phone: dto.buyerPhone,
-        notes: JSON.stringify({ demo: true, buyerName: dto.buyerName }),
+        notes: JSON.stringify({
+          demo: true,
+          buyerName: dto.buyerName,
+          ...(dto.ticketDelivery ? { ticketDelivery: dto.ticketDelivery } : {}),
+          ...(waitlistContext
+            ? { waitlistEntryId: waitlistContext.entryId }
+            : {}),
+        }),
       });
       await manager.save(order);
 
@@ -303,6 +390,11 @@ export class CheckoutService {
             ? { code: dto.couponCode.trim().toUpperCase(), discountCents }
             : undefined,
       };
+    }).then(async (result) => {
+      if (waitlistContext) {
+        await this.waitlistService.markPurchased(waitlistContext.entryId);
+      }
+      return result;
     });
   }
 
@@ -397,7 +489,163 @@ export class CheckoutService {
     };
   }
 
+  /**
+   * Public guest checkout: resolve or auto-create the buyer, then start
+   * Paystack. New accounts receive session tokens for the return URL.
+   */
+  async initializeGuestPaystackCheckout(
+    dto: PaystackInitDto,
+    metadata?: TokenMetadata,
+  ) {
+    const provisioned = await this.authService.provisionGuestCheckoutUser(
+      {
+        email: dto.buyerEmail,
+        name: dto.buyerName,
+        phone: dto.buyerPhone,
+      },
+      metadata,
+    );
+
+    const checkout = await this.initializePaystackCheckout(provisioned.user.id, {
+      ...dto,
+      guestCheckout: true,
+    });
+
+    return {
+      ...checkout,
+      accountCreated: provisioned.accountCreated,
+      user: {
+        id: provisioned.user.id,
+        email: provisioned.user.email,
+        name: provisioned.user.name ?? '',
+      },
+      tokens: provisioned.tokens,
+    };
+  }
+
+  /**
+   * Comp / VIP link checkout — fixed hidden tier, 100% comp discount,
+   * skips Paystack via the same free-order finalize path as coupons.
+   */
+  async initializeCompCheckout(
+    dto: CompCheckoutInitDto,
+    metadata?: TokenMetadata,
+  ) {
+    const { event, tier, quantity } = await this.eventsService.resolveCompLink(
+      dto.slug,
+      dto.compToken,
+    );
+
+    const provisioned = await this.authService.provisionGuestCheckoutUser(
+      {
+        email: dto.buyerEmail,
+        name: dto.buyerName,
+        phone: dto.buyerPhone,
+      },
+      metadata,
+    );
+
+    const reference = `comp_${crypto.randomUUID().replace(/-/g, '')}`;
+
+    const prepared = await this.dataSource.transaction(async (manager) => {
+      const locked = await manager.findOne(TicketType, {
+        where: { id: tier.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!locked || locked.status !== TicketTypeStatus.ACTIVE) {
+        throw new BadRequestException('This comp link is no longer available');
+      }
+      const remaining = locked.quantityTotal - locked.quantitySold;
+      if (quantity > remaining) {
+        throw new BadRequestException('This comp allocation is sold out');
+      }
+
+      const subtotalCents = locked.priceCents * quantity;
+      const discountCents = subtotalCents;
+      const chargeableCents = 0;
+      const feesCents = 0;
+
+      const order = manager.create(Order, {
+        userId: provisioned.user.id,
+        eventId: event.id,
+        status: OrderStatus.PENDING,
+        amountCents: chargeableCents,
+        feesCents,
+        discountCents,
+        appliedCouponId: null,
+        currency: locked.currency,
+        reference,
+        email: dto.buyerEmail,
+        phone: dto.buyerPhone,
+        notes: JSON.stringify({
+          buyerName: dto.buyerName,
+          guestCheckout: true,
+          compLink: true,
+          compToken: dto.compToken,
+          ticketTypeId: locked.id,
+        }),
+      });
+      await manager.save(order);
+
+      await manager.save(
+        manager.create(OrderItem, {
+          orderId: order.id,
+          ticketTypeId: locked.id,
+          qty: quantity,
+          unitPriceCents: locked.priceCents,
+          currency: locked.currency,
+        }),
+      );
+
+      await manager.save(
+        manager.create(Payment, {
+          orderId: order.id,
+          gateway: PaymentGateway.PAYSTACK,
+          intentId: reference,
+          status: PaymentStatus.INITIATED,
+          amountCents: chargeableCents,
+          currency: locked.currency,
+          txRef: reference,
+          rawPayload: {
+            stage: 'comp_link_initialized',
+            compToken: dto.compToken,
+            discountCents,
+          },
+        }),
+      );
+
+      return { order, chargeableCents, discountCents };
+    });
+
+    await this.finalizeSuccessfulPayment(
+      reference,
+      { reference, status: 'success', source: 'free_order', compLink: true },
+      'free_order',
+    );
+
+    return {
+      orderId: prepared.order.id,
+      reference,
+      authorizationUrl: null,
+      status: 'PAID' as const,
+      discountCents: prepared.discountCents,
+      amountCents: 0,
+      accountCreated: provisioned.accountCreated,
+      user: {
+        id: provisioned.user.id,
+        email: provisioned.user.email,
+        name: provisioned.user.name ?? '',
+      },
+      tokens: provisioned.tokens,
+    };
+  }
+
   async initializePaystackCheckout(userId: string, dto: PaystackInitDto) {
+    if (!dto.guestCheckout) {
+      await this.authService.assertEmailVerifiedForCheckout(userId);
+    }
+    const waitlistContext = await this.resolveWaitlistContext(dto);
+
     const reference = `pay_${crypto.randomUUID().replace(/-/g, '')}`;
     const callbackUrl = this.getPaystackCallbackUrl();
     const secret = this.getPaystackSecret();
@@ -412,6 +660,9 @@ export class CheckoutService {
       }
 
       const tierById = new Map((event.ticketTypes ?? []).map((t) => [t.id, t]));
+      const installmentTier = dto.payInInstallments
+        ? this.assertInstallmentCheckoutAllowed(dto, tierById)
+        : null;
       let totalCents = 0;
       const normalizedLines: {
         ticketTypeId: string;
@@ -428,9 +679,7 @@ export class CheckoutService {
             `Ticket type ${line.ticketTypeId} does not belong to this event`,
           );
         }
-        if (tier.status !== TicketTypeStatus.ACTIVE) {
-          throw new BadRequestException(`Ticket type ${tier.name} is not on sale`);
-        }
+        this.assertTierOnSale(tier, waitlistContext);
         const locked = await manager.findOne(TicketType, {
           where: { id: tier.id },
           lock: { mode: 'pessimistic_write' },
@@ -479,7 +728,12 @@ export class CheckoutService {
         reference,
         email: dto.buyerEmail,
         phone: dto.buyerPhone,
-        notes: JSON.stringify({ buyerName: dto.buyerName }),
+        notes: JSON.stringify({
+          buyerName: dto.buyerName,
+          guestCheckout: dto.guestCheckout === true,
+          ...(dto.ticketDelivery ? { ticketDelivery: dto.ticketDelivery } : {}),
+          ...(dto.payInInstallments ? { payInInstallments: true } : {}),
+        }),
       });
       await manager.save(order);
 
@@ -549,13 +803,51 @@ export class CheckoutService {
         chargeableCents,
         discountCents,
         appliedCouponId,
+        installmentTier,
       };
     });
+
+    let paystackAmountCents = prepared.chargeableCents;
+    let installmentSequence = 0;
+
+    if (dto.payInInstallments && prepared.installmentTier) {
+      const plan = await this.paymentPlansService.createPaymentPlan(
+        prepared.order.id,
+        prepared.installmentTier.id,
+        prepared.chargeableCents,
+        prepared.order.currency,
+        prepared.installmentTier.installmentConfig!,
+        prepared.order.createdAt,
+      );
+      const firstInst = [...(plan.installments ?? [])].sort(
+        (a, b) => a.sequence - b.sequence,
+      )[0];
+      if (!firstInst) {
+        throw new BadRequestException('Installment plan is missing the first payment');
+      }
+      paystackAmountCents = firstInst.amount;
+      installmentSequence = firstInst.sequence;
+
+      const paymentRepo = this.dataSource.getRepository(Payment);
+      const payment = await paymentRepo.findOne({
+        where: { intentId: reference },
+      });
+      if (payment) {
+        payment.amountCents = paystackAmountCents;
+        payment.rawPayload = {
+          ...(payment.rawPayload ?? {}),
+          payInInstallments: true,
+          installmentSequence,
+          planTotalCents: prepared.chargeableCents,
+        };
+        await paymentRepo.save(payment);
+      }
+    }
 
     // 100%-off coupon path (COUPONS_SPEC §6). Skip Paystack entirely
     // and finalize the order in-band so tickets + emails get issued
     // the same way `processPaystackWebhook` would have.
-    if (prepared.chargeableCents === 0) {
+    if (paystackAmountCents === 0) {
       await this.finalizeSuccessfulPayment(
         reference,
         { reference, status: 'success', source: 'free_order' },
@@ -579,7 +871,7 @@ export class CheckoutService {
       },
       body: JSON.stringify({
         email: dto.buyerEmail,
-        amount: prepared.chargeableCents,
+        amount: paystackAmountCents,
         currency: prepared.order.currency,
         reference,
         callback_url: callbackUrl,
@@ -591,6 +883,13 @@ export class CheckoutService {
           buyerPhone: dto.buyerPhone ?? '',
           appliedCouponId: prepared.appliedCouponId,
           discountCents: prepared.discountCents,
+          ...(dto.payInInstallments
+            ? {
+                payInInstallments: true,
+                installmentSequence,
+                planTotalCents: prepared.chargeableCents,
+              }
+            : {}),
         },
       }),
     });
@@ -622,6 +921,7 @@ export class CheckoutService {
     if (payment) {
       payment.status = PaymentStatus.AUTH_REQUIRED;
       payment.rawPayload = {
+        ...(payment.rawPayload ?? {}),
         stage: 'paystack_initialized',
         initializeResponse: initData,
       };
@@ -634,7 +934,14 @@ export class CheckoutService {
       authorizationUrl: initData.data.authorization_url,
       status: 'AUTH_REQUIRED' as const,
       discountCents: prepared.discountCents,
-      amountCents: prepared.chargeableCents,
+      amountCents: paystackAmountCents,
+      ...(dto.payInInstallments
+        ? {
+            payInInstallments: true,
+            planTotalCents: prepared.chargeableCents,
+            installmentSequence,
+          }
+        : {}),
     };
   }
 
@@ -642,6 +949,33 @@ export class CheckoutService {
     if (!reference?.trim()) {
       throw new BadRequestException('reference is required');
     }
+    const order = await this.dataSource.getRepository(Order).findOne({
+      where: { reference, userId },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return this.confirmPaystackForOrder(order, reference);
+  }
+
+  /**
+   * Confirm payment by Paystack reference only (guest buyers without a
+   * session cookie on the Paystack return URL).
+   */
+  async confirmPaystackByReference(reference: string) {
+    if (!reference?.trim()) {
+      throw new BadRequestException('reference is required');
+    }
+    const order = await this.dataSource.getRepository(Order).findOne({
+      where: { reference },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    return this.confirmPaystackForOrder(order, reference);
+  }
+
+  private async confirmPaystackForOrder(order: Order, reference: string) {
     const secret = this.getPaystackSecret();
 
     const response = await fetch(
@@ -663,19 +997,12 @@ export class CheckoutService {
       throw new BadRequestException(payload.message ?? 'Unable to verify payment');
     }
 
-    const order = await this.dataSource.getRepository(Order).findOne({
-      where: { reference, userId },
-    });
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
     if (payload.data.status !== 'success') {
-      return { status: 'PENDING', orderId: order.id, reference };
+      return { status: 'PENDING' as const, orderId: order.id, reference };
     }
 
     await this.finalizeSuccessfulPayment(reference, payload.data, 'confirm');
-    return { status: 'PAID', orderId: order.id, reference };
+    return { status: 'PAID' as const, orderId: order.id, reference };
   }
 
   async processPaystackWebhook(
@@ -764,6 +1091,22 @@ export class CheckoutService {
     return { resent: true };
   }
 
+  private resolveInstallmentSequence(
+    payment: Payment,
+    installments: PaymentInstallment[],
+  ): number {
+    const raw = (payment.rawPayload ?? {}) as {
+      installmentSequence?: number;
+    };
+    if (typeof raw.installmentSequence === 'number' && raw.installmentSequence > 0) {
+      return raw.installmentSequence;
+    }
+    const nextPending = [...installments]
+      .filter((i) => i.status === PaymentInstallmentStatus.PENDING)
+      .sort((a, b) => a.sequence - b.sequence)[0];
+    return nextPending?.sequence ?? 1;
+  }
+
   private async finalizeSuccessfulPayment(
     reference: string,
     gatewayPayload: Record<string, unknown>,
@@ -778,6 +1121,8 @@ export class CheckoutService {
           'order.items.ticketType',
           'order.event',
           'order.event.organizer',
+          'order.paymentPlans',
+          'order.paymentPlans.installments',
         ],
         lock: { mode: 'pessimistic_write' },
       });
@@ -792,7 +1137,65 @@ export class CheckoutService {
 
       const order = payment.order;
       if (order.status === OrderStatus.PAID && payment.status === PaymentStatus.SUCCESS) {
-        return { order, issuedTickets: [] as Ticket[], paymentIntentId: reference };
+        return {
+          order,
+          issuedTickets: [] as Ticket[],
+          paymentIntentId: reference,
+          installmentSequence: null as number | null,
+        };
+      }
+
+      const plan = order.paymentPlans?.[0];
+      const installments = plan?.installments ?? [];
+      if (plan && order.status !== OrderStatus.PAID) {
+        const sequence = this.resolveInstallmentSequence(payment, installments);
+        const installment = installments.find((i) => i.sequence === sequence);
+        if (installment?.status === PaymentInstallmentStatus.PAID) {
+          if (payment.status !== PaymentStatus.SUCCESS) {
+            payment.status = PaymentStatus.SUCCESS;
+            payment.rawPayload = {
+              ...(payment.rawPayload ?? {}),
+              finalizedBy: source,
+              gatewayPayload,
+            };
+            await manager.save(payment);
+          }
+          return {
+            order,
+            issuedTickets: [] as Ticket[],
+            paymentIntentId: reference,
+            installmentSequence: null,
+          };
+        }
+        if (installment && payment.amountCents !== installment.amount) {
+          throw new BadRequestException(
+            'Payment amount does not match installment due',
+          );
+        }
+
+        payment.status = PaymentStatus.SUCCESS;
+        const paystackId =
+          typeof gatewayPayload.id === 'number'
+            ? gatewayPayload.id
+            : typeof gatewayPayload.id === 'string' &&
+                /^\d+$/.test(gatewayPayload.id)
+              ? Number.parseInt(gatewayPayload.id, 10)
+              : undefined;
+        payment.rawPayload = {
+          ...(payment.rawPayload ?? {}),
+          finalizedBy: source,
+          gatewayPayload,
+          installmentSequence: sequence,
+          ...(paystackId !== undefined ? { paystackTransactionId: paystackId } : {}),
+        };
+        await manager.save(payment);
+
+        return {
+          order,
+          issuedTickets: [] as Ticket[],
+          paymentIntentId: reference,
+          installmentSequence: sequence,
+        };
       }
 
       for (const item of order.items ?? []) {
@@ -871,8 +1274,50 @@ export class CheckoutService {
         );
       }
 
-      return { order, issuedTickets, paymentIntentId: reference };
+      return {
+        order,
+        issuedTickets,
+        paymentIntentId: reference,
+        installmentSequence: null,
+      };
     });
+
+    if (tx.installmentSequence !== null) {
+      const installmentResult = await this.paymentPlansService.markInstallmentPaid(
+        tx.order.id,
+        tx.installmentSequence,
+      );
+      if (installmentResult.order.status === OrderStatus.PAID) {
+        const event = await this.dataSource.getRepository(Event).findOne({
+          where: { id: installmentResult.order.eventId },
+          relations: ['organizer'],
+        });
+        const organizerId =
+          event?.organizer?.id ??
+          (event as Event & { organizerId?: string })?.organizerId;
+        if (organizerId) {
+          await this.dataSource.transaction(async (manager) =>
+            this.organizerLedgerService.ensureOrderEarnings(
+              manager,
+              installmentResult.order,
+              organizerId,
+            ),
+          );
+        }
+        const fullTickets = await this.dataSource.getRepository(Ticket).find({
+          where: { orderId: installmentResult.order.id },
+          relations: ['ticketType'],
+        });
+        if (fullTickets.length > 0) {
+          await this.sendInstallmentOrderCompleteEmail(
+            installmentResult.order,
+            event,
+            fullTickets,
+          );
+        }
+      }
+      return;
+    }
 
     if (tx.issuedTickets.length > 0) {
       try {
@@ -901,12 +1346,31 @@ export class CheckoutService {
             .findOne({ where: { id: freshOrder.appliedCouponId } });
           couponCode = coupon?.code ?? null;
         }
+        const buyerUser = tx.order.userId
+          ? await this.dataSource.getRepository(User).findOne({
+              where: { id: tx.order.userId },
+            })
+          : null;
+        let accessUrl: string | undefined;
+        try {
+          if (buyerUser) {
+            accessUrl = await this.authService.buildCheckoutAccessUrl(
+              buyerUser.id,
+            );
+          }
+        } catch (linkErr) {
+          this.logger.warn(
+            `Checkout access link failed for order ${tx.order.id}: ${String(linkErr)}`,
+          );
+        }
         await this.sendOrderTicketEmail(tx.order, event, fullTickets, {
           subtotalCents,
           discountCents,
           totalCents: freshOrder?.amountCents ?? tx.order.amountCents,
           currency: freshOrder?.currency ?? tx.order.currency,
           couponCode,
+          accessUrl,
+          accountCreated: Boolean(buyerUser?.autoCreatedAt),
         });
         const payRepo = this.dataSource.getRepository(Payment);
         const p = await payRepo.findOne({ where: { intentId: tx.paymentIntentId } });
@@ -947,6 +1411,54 @@ export class CheckoutService {
     });
   }
 
+  private async sendInstallmentOrderCompleteEmail(
+    order: Order,
+    event: Event | null,
+    tickets: Ticket[],
+  ): Promise<void> {
+    const freshOrder = await this.dataSource.getRepository(Order).findOne({
+      where: { id: order.id },
+      relations: ['items'],
+    });
+    const discountCents = freshOrder?.discountCents ?? 0;
+    const subtotalCents =
+      (freshOrder?.items ?? []).reduce(
+        (acc, item) => acc + item.unitPriceCents * item.qty,
+        0,
+      ) || (freshOrder?.amountCents ?? order.amountCents) + discountCents;
+    let couponCode: string | null = null;
+    if (freshOrder?.appliedCouponId) {
+      const coupon = await this.dataSource
+        .getRepository(Coupon)
+        .findOne({ where: { id: freshOrder.appliedCouponId } });
+      couponCode = coupon?.code ?? null;
+    }
+    const buyerUser = order.userId
+      ? await this.dataSource.getRepository(User).findOne({
+          where: { id: order.userId },
+        })
+      : null;
+    let accessUrl: string | undefined;
+    try {
+      if (buyerUser) {
+        accessUrl = await this.authService.buildCheckoutAccessUrl(buyerUser.id);
+      }
+    } catch (linkErr) {
+      this.logger.warn(
+        `Checkout access link failed for order ${order.id}: ${String(linkErr)}`,
+      );
+    }
+    await this.sendOrderTicketEmail(order, event, tickets, {
+      subtotalCents,
+      discountCents,
+      totalCents: freshOrder?.amountCents ?? order.amountCents,
+      currency: freshOrder?.currency ?? order.currency,
+      couponCode,
+      accessUrl,
+      accountCreated: Boolean(buyerUser?.autoCreatedAt),
+    });
+  }
+
   private async sendOrderTicketEmail(
     order: Order,
     event: Event | null,
@@ -957,16 +1469,107 @@ export class CheckoutService {
       totalCents: number;
       currency: string;
       couponCode?: string | null;
+      accessUrl?: string;
+      accountCreated?: boolean;
     },
   ): Promise<void> {
-    await this.emailService.sendTicketEmail({
+    const notification = await this.notificationsService.enqueueTicketEmail({
       buyerName: this.extractBuyerName(order.notes),
       buyerEmail: order.email,
       eventTitle: event?.title ?? 'Event',
       event: eventToEmailContext(event, event?.organizer?.orgName),
       tickets: ticketsFromEntities(tickets, (t) => t.ticketType?.name ?? 'Ticket'),
-      summary,
+      summary: {
+        subtotalCents: summary.subtotalCents,
+        discountCents: summary.discountCents,
+        totalCents: summary.totalCents,
+        currency: summary.currency,
+        couponCode: summary.couponCode,
+      },
+      accessUrl: summary.accessUrl,
+      accountCreated: summary.accountCreated,
     });
+    await this.notificationsService.processNotification(notification.id);
+    await this.sendOrderTicketDeliverySms({
+      order,
+      eventTitle: event?.title ?? 'Event',
+      tickets,
+      accessUrl: summary.accessUrl,
+      buyerName: this.extractBuyerName(order.notes),
+    });
+    await this.sendOrderTicketWhatsApp({
+      order,
+      eventTitle: event?.title ?? 'Event',
+      tickets,
+      buyerName: this.extractBuyerName(order.notes),
+    });
+  }
+
+  private async sendOrderTicketWhatsApp(input: {
+    order: Order;
+    eventTitle: string;
+    tickets: Ticket[];
+    buyerName?: string;
+  }): Promise<void> {
+    const meta = parseOrderNotes(input.order.notes);
+    if (!shouldSendTicketWhatsApp(meta, input.order.phone)) {
+      return;
+    }
+
+    try {
+      const notification = await this.notificationsService.enqueueTicketWhatsApp({
+        phone: input.order.phone!,
+        buyerName: input.buyerName ?? meta.buyerName ?? '',
+        eventTitle: input.eventTitle,
+        tickets: input.tickets.map((t) => ({
+          id: t.id,
+          qrNonce: t.qrNonce,
+          qrSignature: t.qrSignature,
+        })),
+        orderId: input.order.id,
+      });
+      if (notification) {
+        await this.notificationsService.processNotification(notification.id);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Ticket delivery WhatsApp failed for order ${input.order.id}: ${String(error)}`,
+      );
+    }
+  }
+
+  private async sendOrderTicketDeliverySms(input: {
+    order: Order;
+    eventTitle: string;
+    tickets: Ticket[];
+    accessUrl?: string;
+    buyerName?: string;
+  }): Promise<void> {
+    const phone = input.order.phone?.trim();
+    if (!phone) return;
+
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL')?.trim() ||
+      'http://localhost:3000';
+    const deepLink =
+      input.accessUrl ??
+      (input.tickets.length === 1
+        ? `${frontendUrl}/tickets/${input.tickets[0].id}`
+        : `${frontendUrl}/tickets`);
+
+    try {
+      await this.notificationsService.sendTicketDeliverySms({
+        phone,
+        eventTitle: input.eventTitle,
+        deepLink,
+        buyerName: input.buyerName,
+        ticketCount: input.tickets.length,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Ticket delivery SMS failed for order ${input.order.id}: ${String(error)}`,
+      );
+    }
   }
 
   private extractBuyerName(notes: string | undefined): string {
@@ -1012,6 +1615,7 @@ export class CheckoutService {
       eventSlug: string;
       buyerName: string;
       buyerEmail: string;
+      guestCheckout: boolean;
       coupon: { code: string; discountCents: number } | null;
       lineItems: {
         ticketTypeId: string;
@@ -1030,13 +1634,8 @@ export class CheckoutService {
       throw new NotFoundException('Order not found');
     }
 
-    let buyerName = '';
-    try {
-      const meta = JSON.parse(order.notes || '{}') as { buyerName?: string };
-      buyerName = meta.buyerName ?? '';
-    } catch {
-      buyerName = '';
-    }
+    const notesMeta = parseOrderNotes(order.notes);
+    const buyerName = notesMeta.buyerName ?? '';
 
     const lineItems = (order.items ?? []).map((item) => ({
       ticketTypeId: item.ticketTypeId,
@@ -1072,6 +1671,7 @@ export class CheckoutService {
         eventSlug: order.event.slug,
         buyerName,
         buyerEmail: order.email,
+        guestCheckout: notesMeta.guestCheckout === true,
         coupon,
         lineItems,
       },

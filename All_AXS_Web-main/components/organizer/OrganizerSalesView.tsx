@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import {
+  downloadOrganizerAttendeesCsv,
   formatMoneyFromCents,
   formatShortDateTime,
   normalizeOrganizerSalesOrders,
@@ -15,6 +16,7 @@ import {
   type OrganizerSalesRollup,
 } from "@/lib/organizer-sales";
 import { organizerEventStatusChipClass } from "@/lib/organizer-event-status-chip";
+import { OrganizerAnalyticsSection } from "@/components/organizer/OrganizerAnalyticsSection";
 
 const PAGE_SIZE = 25;
 
@@ -53,6 +55,8 @@ export function OrganizerSalesContent(): ReactElement {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const loadSummary = useCallback(async () => {
     setError(null);
@@ -150,6 +154,19 @@ export function OrganizerSalesContent(): ReactElement {
   }, [filterEventId, eventRows]);
 
   const maxPage = Math.max(0, Math.ceil(ordersTotal / PAGE_SIZE) - 1);
+
+  const handleExportCsv = useCallback(async () => {
+    if (!filterEventId) return;
+    setExportError(null);
+    setExporting(true);
+    try {
+      await downloadOrganizerAttendeesCsv(filterEventId);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Could not export attendees.");
+    } finally {
+      setExporting(false);
+    }
+  }, [filterEventId]);
 
   if (loading) {
     return (
@@ -258,6 +275,11 @@ export function OrganizerSalesContent(): ReactElement {
         </section>
       ) : null}
 
+      <OrganizerAnalyticsSection
+        eventId={filterEventId || undefined}
+        eventLabel={filterEventId ? filterLabel : undefined}
+      />
+
       <section aria-labelledby="per-event-heading" className="space-y-4">
         <h2 id="per-event-heading" className="text-xs font-bold uppercase tracking-[0.14em] text-foreground/50">
           Per event
@@ -355,6 +377,7 @@ export function OrganizerSalesContent(): ReactElement {
                 const v = e.target.value;
                 setPage(0);
                 setFilterEventId(v);
+                setExportError(null);
                 if (v) {
                   router.replace(`/organizer/sales?event=${encodeURIComponent(v)}`);
                 } else {
@@ -369,11 +392,37 @@ export function OrganizerSalesContent(): ReactElement {
                 </option>
               ))}
             </select>
+            {filterEventId ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-auto shrink-0"
+                disabled={exporting}
+                onClick={() => void handleExportCsv()}
+              >
+                {exporting ? "Exporting…" : "Export CSV"}
+              </Button>
+            ) : null}
           </div>
         </div>
         <p className="text-xs text-muted">
           Showing orders for <span className="font-medium text-foreground">{filterLabel}</span>.
+          {filterEventId ? (
+            <>
+              {" "}
+              Export a door list with attendee name, email, tier, order reference, and check-in status.
+            </>
+          ) : null}
         </p>
+
+        {exportError ? (
+          <div
+            className="rounded-[var(--radius-panel)] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+            role="alert"
+          >
+            {exportError}
+          </div>
+        ) : null}
 
         {ordersError ? (
           <div

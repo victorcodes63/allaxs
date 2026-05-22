@@ -6,6 +6,9 @@ import {
   IsUrl,
   MaxLength,
   ValidateIf,
+  IsBoolean,
+  IsInt,
+  Min,
 } from 'class-validator';
 import { Exclude } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -56,4 +59,20 @@ export class UpdateEventDto {
   @IsOptional()
   @IsDateString()
   endsAt?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether event is featured on the homepage (admin only)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  isFeatured?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Featured rail sort order — lower values appear first (admin only)',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  featuredSortOrder?: number | null;
 }

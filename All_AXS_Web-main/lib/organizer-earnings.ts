@@ -30,8 +30,12 @@ export type PayoutBatchLineRow = {
   id: string;
   organizerId: string;
   orgName: string | null;
+  payoutMethod: string | null;
   amountCents: number;
   currency: string;
+  externalReference: string | null;
+  disbursementError: string | null;
+  disbursedAt: string | null;
 };
 
 export type PayoutBatchRow = {

@@ -12,6 +12,7 @@ import {
   type Coupon,
   type CouponLifecycle,
 } from "@/lib/coupons-api";
+import { PLATFORM_DEFAULT_CURRENCY } from "@/lib/currency";
 
 interface EventCouponsTabProps {
   eventId: string;
@@ -58,7 +59,7 @@ function formatRange(c: Coupon): string {
 
 export function EventCouponsTab({
   eventId,
-  defaultCurrency = "KES",
+  defaultCurrency = PLATFORM_DEFAULT_CURRENCY,
 }: EventCouponsTabProps) {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -232,7 +233,7 @@ export function EventCouponsTab({
             const minOrderLabel =
               typeof c.minOrderCents === "number" && c.minOrderCents > 0
                 ? `Min order ${(c.minOrderCents / 100).toFixed(0)} ${
-                    c.currency || "KES"
+                    c.currency || defaultCurrency
                   }`
                 : "No minimum";
             return (

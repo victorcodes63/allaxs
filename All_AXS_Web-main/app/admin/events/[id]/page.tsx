@@ -6,13 +6,19 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
-import { EventReviewActions } from "@/components/admin/EventReviewActions";
+import {
+  EventReviewActions,
+  type EventReviewResult,
+} from "@/components/admin/EventReviewActions";
+import { useAuth } from "@/lib/auth";
+import { EventFeaturedToggle } from "@/components/admin/EventFeaturedToggle";
 import { EventStatus } from "@/lib/validation/event";
 import {
   getEventBannerUrl,
   shouldUnoptimizeEventImage,
 } from "@/lib/utils/image";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
+import { normalizeCurrencyCode, resolveCurrencyFromTiers } from "@/lib/currency";
 
 interface AdminTicketType {
   id: string;
@@ -40,6 +46,8 @@ interface AdminEvent {
   endAt: string;
   status: string;
   bannerUrl?: string | null;
+  isFeatured?: boolean;
+  featuredSortOrder?: number | null;
   ticketTypes?: AdminTicketType[];
   createdAt: string;
   metadata?: {
@@ -344,11 +352,14 @@ function AuditEntryRow({ entry }: { entry: AuditEntry }) {
 export default function AdminEventInspectPage() {
   const params = useParams();
   const eventId = params.id as string;
+  const { user: currentAdmin } = useAuth();
   const [event, setEvent] = useState<AdminEvent | null>(null);
   const [orders, setOrders] = useState<OrdersSummary | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncMessage, setResyncMessage] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -387,6 +398,85 @@ export default function AdminEventInspectPage() {
     if (eventId) void load();
   }, [eventId, load]);
 
+  const handleReviewComplete = useCallback(
+    (result: EventReviewResult) => {
+      setEvent((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          status: result.event.status,
+          metadata:
+            result.action === "reject" &&
+            (result.event.rejectionReason || result.reason)
+              ? {
+                  ...current.metadata,
+                  rejectionReason:
+                    result.event.rejectionReason ?? result.reason,
+                }
+              : current.metadata,
+        };
+      });
+
+      const optimisticEntry: AuditEntry = {
+        id: `optimistic-${Date.now()}`,
+        action:
+          result.action === "approve" ? "APPROVE_EVENT" : "REJECT_EVENT",
+        status: "SUCCESS",
+        createdAt: new Date().toISOString(),
+        metadata: {
+          previousStatus: result.event.previousStatus,
+          newStatus: result.event.status,
+          ...(result.reason ? { reason: result.reason } : {}),
+        },
+        admin: currentAdmin
+          ? {
+              id: currentAdmin.id,
+              email: currentAdmin.email,
+              name: currentAdmin.name ?? null,
+            }
+          : null,
+      };
+
+      setAudit((current) => [optimisticEntry, ...current]);
+
+      void axios
+        .get<AuditEntry[]>(`/api/admin/events/${eventId}/audit`)
+        .then((response) => {
+          setAudit(response.data ?? []);
+        })
+        .catch(() => {
+          /* keep optimistic row if background sync fails */
+        });
+    },
+    [currentAdmin, eventId],
+  );
+
+  const handleResyncSoldCounts = async () => {
+    setResyncing(true);
+    setResyncMessage(null);
+    try {
+      const response = await axios.post<{
+        message: string;
+        tiersUpdated: number;
+        ticketTypes: AdminTicketType[];
+      }>(`/api/admin/events/${eventId}/resync-tier-sold-counts`);
+      setEvent((current) =>
+        current
+          ? { ...current, ticketTypes: response.data.ticketTypes }
+          : current,
+      );
+      setResyncMessage(response.data.message);
+    } catch (err) {
+      const message = isAxiosError(err)
+        ? (err.response?.data as { message?: string } | undefined)?.message ||
+          err.message
+        : "Failed to resync sold counts.";
+      setResyncMessage(message);
+    } finally {
+      setResyncing(false);
+    }
+  };
+
   if (loading) {
     return (
       <main
@@ -419,7 +509,9 @@ export default function AdminEventInspectPage() {
   const venueLine =
     [event.venue, event.city, event.country].filter(Boolean).join(" · ") || "—";
   const tiers = event.ticketTypes ?? [];
-  const currency = orders?.currency ?? tiers[0]?.currency ?? "KES";
+  const currency = normalizeCurrencyCode(
+    orders?.currency ?? resolveCurrencyFromTiers(tiers),
+  );
   const paidCount = orders?.paid.count ?? 0;
   const grossCents = orders?.paid.grossCents ?? 0;
   const netCents = orders?.paid.netCents ?? 0;
@@ -460,7 +552,7 @@ export default function AdminEventInspectPage() {
           {isPending ? (
             <EventReviewActions
               event={event}
-              onActionComplete={() => void load()}
+              onActionComplete={handleReviewComplete}
             />
           ) : null}
           {isLive ? (
@@ -545,14 +637,30 @@ export default function AdminEventInspectPage() {
       </section>
 
       <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 sm:p-5">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
-          <h2 className="font-display text-base font-semibold text-foreground sm:text-lg">
-            Ticket tiers
-          </h2>
-          <p className="text-xs text-muted sm:text-right">
-            {tiers.length} configured · sold figures from latest sync
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+          <div>
+            <h2 className="font-display text-base font-semibold text-foreground sm:text-lg">
+              Ticket tiers
+            </h2>
+            <p className="mt-1 text-xs text-muted">
+              {tiers.length} configured · sold figures from paid order rows
+            </p>
+          </div>
+          {tiers.length > 0 ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void handleResyncSoldCounts()}
+              disabled={resyncing}
+              className="w-full shrink-0 sm:w-auto"
+            >
+              {resyncing ? "Resyncing…" : "Resync sold counts"}
+            </Button>
+          ) : null}
         </div>
+        {resyncMessage ? (
+          <p className="mt-3 text-sm text-foreground/85">{resyncMessage}</p>
+        ) : null}
         {tiers.length === 0 ? (
           <p className="mt-4 text-sm text-muted">
             No tiers configured for this event yet.
@@ -617,6 +725,24 @@ export default function AdminEventInspectPage() {
           />
         </div>
       </section>
+
+      <EventFeaturedToggle
+        eventId={event.id}
+        initialIsFeatured={event.isFeatured ?? false}
+        initialFeaturedSortOrder={event.featuredSortOrder ?? null}
+        isPublished={event.status === EventStatus.PUBLISHED}
+        onUpdated={(next) => {
+          setEvent((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  isFeatured: next.isFeatured,
+                  featuredSortOrder: next.featuredSortOrder,
+                }
+              : prev,
+          );
+        }}
+      />
 
       <section className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 sm:p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-3">

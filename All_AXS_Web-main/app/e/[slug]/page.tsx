@@ -10,6 +10,8 @@ import {
   shouldUnoptimizeEventImage,
 } from "@/lib/utils/image";
 import { ArrowBackCtaLink, ArrowCtaLink } from "@/components/ui/ArrowCta";
+import { TierWaitlistJoin } from "@/components/events/TierWaitlistJoin";
+import { resolveCurrencyFromTiers } from "@/lib/currency";
 
 export const revalidate = 300;
 
@@ -140,11 +142,18 @@ function getEventAttendanceMode(type: string): string {
   }
 }
 
-function isTierAvailable(tier: NonNullable<PublicEvent["ticketTypes"]>[0]) {
-  if (tier.status && tier.status !== "ACTIVE") return false;
+function isTierOnDisplay(tier: NonNullable<PublicEvent["ticketTypes"]>[0]) {
+  if (!tier.status || tier.status === "ACTIVE" || tier.status === "SOLD_OUT") {
+    return true;
+  }
+  return false;
+}
+
+function isTierSoldOut(tier: NonNullable<PublicEvent["ticketTypes"]>[0]) {
+  if (tier.status === "SOLD_OUT") return true;
   const total = tier.quantityTotal ?? 0;
   const sold = tier.quantitySold ?? 0;
-  return total - sold > 0;
+  return total > 0 && total - sold <= 0;
 }
 
 export default async function EventDetailPage({ params }: EventDetailPageProps) {
@@ -168,10 +177,7 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     event.ticketTypes && event.ticketTypes.length > 0
       ? Math.min(...event.ticketTypes.map((t) => t.priceCents))
       : null;
-  const currency =
-    event.ticketTypes && event.ticketTypes.length > 0
-      ? event.ticketTypes[0].currency
-      : "KES";
+  const currency = resolveCurrencyFromTiers(event.ticketTypes);
 
   const eventUrl = `${SITE_BASE_URL}/e/${event.slug}`;
   const jsonLd = {
@@ -213,7 +219,8 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
     }),
   };
 
-  const activeTiers = event.ticketTypes?.filter(isTierAvailable) ?? [];
+  const displayTiers = event.ticketTypes?.filter(isTierOnDisplay) ?? [];
+  const hasAvailableTier = displayTiers.some((tier) => !isTierSoldOut(tier));
   const schedule = formatSchedule(event.startAt, event.endAt);
   const whereLine = formatWhereLine(event);
 
@@ -312,15 +319,17 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 </p>
               </div>
               <ul className="max-h-[min(50vh,360px)] divide-y divide-border overflow-y-auto overscroll-contain lg:max-h-[320px]">
-                {activeTiers.length === 0 ? (
+                {displayTiers.length === 0 ? (
                   <li className="p-6 text-sm leading-relaxed text-muted">
                     There are no passes on sale at the moment. Check back soon, or explore other dates on the
                     catalogue.
                   </li>
                 ) : (
-                  activeTiers.map((tier) => {
-                    const left =
-                      (tier.quantityTotal ?? 0) - (tier.quantitySold ?? 0);
+                  displayTiers.map((tier) => {
+                    const soldOut = isTierSoldOut(tier);
+                    const left = soldOut
+                      ? 0
+                      : (tier.quantityTotal ?? 0) - (tier.quantitySold ?? 0);
                     const total = tier.quantityTotal ?? 0;
                     const almostGone =
                       left > 0 &&
@@ -366,31 +375,46 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                                 : "text-xs tabular-nums text-muted"
                             }
                           >
-                            {left > 0
-                              ? almostGone
-                                ? `${left} left · selling fast`
-                                : `${left} left`
-                              : "Sold out"}
+                            {soldOut
+                              ? "Sold out"
+                              : left > 0
+                                ? almostGone
+                                  ? `${left} left · selling fast`
+                                  : `${left} left`
+                                : "Sold out"}
                           </span>
                         </div>
+                        {soldOut && tier.id && (
+                          <TierWaitlistJoin
+                            eventId={event.id}
+                            tierId={tier.id}
+                            tierName={tier.name}
+                          />
+                        )}
                       </li>
                     );
                   })
                 )}
               </ul>
               <div className="bg-background/60 p-6">
-                <ArrowCtaLink
-                  href={`/events/${event.id}/checkout`}
-                  variant="primary"
-                  fullWidth
-                  aria-label={`Buy tickets for ${event.title}`}
-                >
-                  Continue to checkout
-                </ArrowCtaLink>
+                {hasAvailableTier ? (
+                  <ArrowCtaLink
+                    href={`/events/${event.id}/checkout`}
+                    variant="primary"
+                    fullWidth
+                    aria-label={`Buy tickets for ${event.title}`}
+                  >
+                    Continue to checkout
+                  </ArrowCtaLink>
+                ) : (
+                  <p className="text-center text-sm leading-relaxed text-muted">
+                    All tiers are sold out. Join a waitlist above — we&apos;ll email you if a ticket
+                    opens up.
+                  </p>
+                )}
                 <p className="mt-3 px-1 text-center text-xs leading-relaxed text-muted">
-                  Sign in or create an account to complete checkout and save passes to My tickets. You can also continue
-                  with Google where enabled. Local demo mode can still issue browser-only passes when API checkout is
-                  off.
+                  No account needed — checkout collects your email and creates a ticket wallet automatically. Pay
+                  securely with Paystack when live checkout is enabled.
                 </p>
                 <div className="mt-4 flex justify-center">
                   <ArrowBackCtaLink href="/events" size="compact" aria-label="Back to all events">

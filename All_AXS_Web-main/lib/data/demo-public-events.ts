@@ -14,6 +14,9 @@
 
 import type { PublicEvent } from "@/lib/types/public-event";
 
+/** Kenya demo catalogue — explicit fixture currency for local preview. */
+const DEMO_EVENT_CURRENCY = "KES" as const;
+
 const DEMO_ORGANIZER = {
   id: "demo-organizer-seed-profile",
   orgName: "Demo Organizer",
@@ -43,6 +46,8 @@ const POSTER = {
 export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
   demo({
     id: "demo-evt-01",
+    isFeatured: true,
+    featuredSortOrder: 1,
     title: "Blueprint: Map Your Next Move",
     slug: "blueprint-map-your-next-move-2026",
     description:
@@ -61,7 +66,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         name: "General",
         description: "Live access + replay 7 days",
         priceCents: 24900,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 500,
         quantitySold: 0,
         minPerOrder: 1,
@@ -72,6 +77,8 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
   }),
   demo({
     id: "demo-evt-02",
+    isFeatured: true,
+    featuredSortOrder: 2,
     title: "Currency & Exchange Forum",
     slug: "currency-exchange-forum-2026",
     description:
@@ -89,7 +96,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-02a",
         name: "RSVP",
         priceCents: 14900,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 800,
         quantitySold: 12,
         minPerOrder: 1,
@@ -100,6 +107,8 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
   }),
   demo({
     id: "demo-evt-03",
+    isFeatured: true,
+    featuredSortOrder: 3,
     title: "Give to Gain: Community Roundtable",
     slug: "give-to-gain-community-2026",
     description:
@@ -117,7 +126,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-03a",
         name: "Live seat",
         priceCents: 22000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 1200,
         quantitySold: 140,
         minPerOrder: 1,
@@ -128,6 +137,8 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
   }),
   demo({
     id: "demo-evt-04",
+    isFeatured: true,
+    featuredSortOrder: 4,
     title: "State of Women in AI",
     slug: "state-of-women-in-ai-2026",
     description:
@@ -145,7 +156,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-04a",
         name: "In person",
         priceCents: 30000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 180,
         quantitySold: 42,
         minPerOrder: 1,
@@ -156,7 +167,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-04b",
         name: "Online",
         priceCents: 18000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 400,
         quantitySold: 58,
         minPerOrder: 1,
@@ -167,6 +178,8 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
   }),
   demo({
     id: "demo-evt-05",
+    isFeatured: true,
+    featuredSortOrder: 5,
     title: "Visioning Lab: Your 2026 North Star",
     slug: "visioning-lab-2026-north-star",
     description:
@@ -184,7 +197,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-05a",
         name: "Standard",
         priceCents: 20000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 600,
         quantitySold: 88,
         minPerOrder: 1,
@@ -195,6 +208,8 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
   }),
   demo({
     id: "demo-evt-06",
+    isFeatured: true,
+    featuredSortOrder: 6,
     title: "Wealth Blueprint Masterclass",
     slug: "wealth-blueprint-masterclass-2026",
     description:
@@ -212,7 +227,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-06a",
         name: "Participant",
         priceCents: 21000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 900,
         quantitySold: 0,
         status: "ACTIVE",
@@ -238,7 +253,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-07a",
         name: "Hall",
         priceCents: 20000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 220,
         quantitySold: 61,
         status: "ACTIVE",
@@ -247,7 +262,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-07b",
         name: "Stream",
         priceCents: 15000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 350,
         quantitySold: 20,
         status: "ACTIVE",
@@ -273,7 +288,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-08a",
         name: "General admission",
         priceCents: 25000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 500,
         quantitySold: 95,
         status: "ACTIVE",
@@ -299,7 +314,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-09a",
         name: "Full weekend",
         priceCents: 30000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 80,
         quantitySold: 23,
         minPerOrder: 1,
@@ -310,7 +325,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-09b",
         name: "Sunday only",
         priceCents: 22000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 40,
         quantitySold: 8,
         status: "ACTIVE",
@@ -336,7 +351,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-10a",
         name: "Early bird",
         priceCents: 16000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 200,
         quantitySold: 112,
         status: "ACTIVE",
@@ -345,7 +360,7 @@ export const DEMO_PUBLIC_EVENTS: PublicEvent[] = [
         id: "demo-tt-10b",
         name: "Standard",
         priceCents: 24000,
-        currency: "KES",
+        currency: DEMO_EVENT_CURRENCY,
         quantityTotal: 300,
         quantitySold: 14,
         status: "ACTIVE",

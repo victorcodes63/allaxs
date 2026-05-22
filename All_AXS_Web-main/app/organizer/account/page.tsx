@@ -238,6 +238,11 @@ export default function OrganizerAccountPage(): ReactElement {
           </div>
         </form>
         <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/organizer/team">
+            <Button variant="secondary" type="button" className="w-auto min-w-[10rem]">
+              Team &amp; invites
+            </Button>
+          </Link>
           <Link href="/dashboard">
             <Button variant="secondary" type="button" className="w-auto min-w-[10rem]">
               Fan account home

@@ -24,6 +24,57 @@ export class UsersService {
     return this.userRepository.findOne({ where: { id } });
   }
 
+  /**
+   * Resolve the buyer for public guest checkout. Creates an attendee
+   * account with `autoCreatedAt` when the email is new; otherwise
+   * updates missing profile fields on the existing row.
+   */
+  async findOrCreateForGuestCheckout(data: {
+    email: string;
+    name: string;
+    phone?: string;
+    passwordHash: string;
+  }): Promise<{ user: User; created: boolean }> {
+    const email = data.email.trim().toLowerCase();
+    const name = data.name.trim();
+    const phone = data.phone?.trim() || undefined;
+
+    const existing = await this.findByEmail(email);
+    if (existing) {
+      if (existing.status !== UserStatus.ACTIVE) {
+        throw new UnauthorizedException({
+          message: 'Account suspended. Please contact support.',
+          code: 'accountSuspended',
+        });
+      }
+      let dirty = false;
+      if (name && (!existing.name || !existing.name.trim())) {
+        existing.name = name;
+        dirty = true;
+      }
+      if (phone && !existing.phone) {
+        existing.phone = phone;
+        dirty = true;
+      }
+      if (dirty) {
+        await this.userRepository.save(existing);
+      }
+      return { user: existing, created: false };
+    }
+
+    const user = this.userRepository.create({
+      email,
+      name: name || email.split('@')[0] || 'Guest',
+      phone,
+      passwordHash: data.passwordHash,
+      roles: [Role.ATTENDEE],
+      status: UserStatus.ACTIVE,
+      autoCreatedAt: new Date(),
+    });
+    const saved = await this.userRepository.save(user);
+    return { user: saved, created: true };
+  }
+
   async createUser(data: {
     email: string;
     name: string;
@@ -56,6 +107,10 @@ export class UsersService {
 
   async updatePassword(userId: string, passwordHash: string): Promise<void> {
     await this.userRepository.update({ id: userId }, { passwordHash });
+  }
+
+  async clearAutoCreatedAt(userId: string): Promise<void> {
+    await this.userRepository.update({ id: userId }, { autoCreatedAt: null });
   }
 
   /**

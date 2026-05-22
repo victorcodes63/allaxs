@@ -100,6 +100,26 @@ export class EmailVerificationService {
   }
 
   /**
+   * Mark a user's email as verified (e.g. Google OAuth with pre-verified email).
+   */
+  async markEmailVerified(user: User): Promise<void> {
+    const existing = await this.emailVerificationRepository.findOne({
+      where: { userId: user.id, isUsed: true },
+    });
+    if (existing) return;
+
+    const verification = this.emailVerificationRepository.create({
+      userId: user.id,
+      email: user.email,
+      token: `verified-${crypto.randomBytes(16).toString('hex')}`,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      isUsed: true,
+      usedAt: new Date(),
+    });
+    await this.emailVerificationRepository.save(verification);
+  }
+
+  /**
    * Check if a user has verified their email (has at least one used token)
    */
   async isUserVerified(userId: string): Promise<boolean> {

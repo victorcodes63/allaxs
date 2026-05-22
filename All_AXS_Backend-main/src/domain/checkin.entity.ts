@@ -2,6 +2,7 @@ import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from './base.entity';
 import { Ticket } from './ticket.entity';
 import { User } from 'src/users/entities/user.entity';
+import { ScannerSession } from 'src/scanner/entities/scanner-session.entity';
 
 @Entity('checkins')
 export class CheckIn extends BaseEntity {
@@ -29,4 +30,12 @@ export class CheckIn extends BaseEntity {
 
   @Column({ type: 'timestamptz', default: () => 'now()' })
   occurredAt!: Date;
+
+  @Index()
+  @Column({ type: 'uuid', name: 'scanner_session_id', nullable: true })
+  scannerSessionId?: string | null;
+
+  @ManyToOne(() => ScannerSession, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'scanner_session_id' })
+  scannerSession?: ScannerSession | null;
 }

@@ -97,11 +97,22 @@ export class AdminPayoutBatchesController {
     return { batch: this.serializeBatch(batch) };
   }
 
+  @Post(':id/disburse')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Send M-Pesa B2C payouts via Daraja for approved batch lines (MPESA organizers)',
+  })
+  async disburse(@Param('id') id: string) {
+    const batch = await this.payoutBatchesService.disburse(id);
+    return { batch: this.serializeBatch(batch) };
+  }
+
   @Post(':id/mark-paid')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Post payout debits to organizer ledgers and close the batch (after bank run)',
+      'Post payout debits to organizer ledgers and close the batch (manual fallback after bank run)',
   })
   async markPaid(
     @Param('id') id: string,
@@ -127,8 +138,12 @@ export class AdminPayoutBatchesController {
       id: line.id,
       organizerId: line.organizerId,
       orgName: line.organizer?.orgName ?? null,
+      payoutMethod: line.organizer?.payoutMethod ?? null,
       amountCents: line.amountCents,
       currency: line.currency,
+      externalReference: line.externalReference ?? null,
+      disbursementError: line.disbursementError ?? null,
+      disbursedAt: line.disbursedAt?.toISOString() ?? null,
     }));
     const totalCents = lines.reduce((s, l) => s + l.amountCents, 0);
     return {

@@ -10,6 +10,7 @@ import {
 } from "@/lib/checkout-storage";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
+import { RefundRequestPanel } from "@/components/orders/RefundRequestPanel";
 
 function firstName(name: string): string {
   const t = name.trim();
@@ -37,6 +38,7 @@ function buildWhatsAppDemoLink(phone: string, message: string): string | null {
 
 export function OrderConfirmation({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<StoredOrder | null | undefined>(undefined);
+  const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
   const [resendInFlight, setResendInFlight] = useState(false);
@@ -87,6 +89,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
             eventSlug: string;
             buyerName: string;
             buyerEmail: string;
+            guestCheckout?: boolean;
             coupon?: { code: string; discountCents: number } | null;
             lineItems: {
               ticketTypeId: string;
@@ -99,6 +102,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         };
         if (cancelled) return;
         const o = data.order;
+        setOrderStatus(o.status);
         setOrder({
           orderId: o.id,
           createdAt: new Date().toISOString(),
@@ -122,6 +126,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
             ? { discountCents: o.discountCents }
             : {}),
           ...(o.coupon ? { coupon: o.coupon } : {}),
+          ...(o.guestCheckout === true ? { guestCheckout: true } : {}),
         });
       } catch {
         if (!cancelled) setOrder(null);
@@ -193,7 +198,6 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
   useEffect(() => {
     if (!order) return;
     if (!isApiCheckoutEnabled()) return;
-    if (order.guestCheckout === true) return;
     if (typeof window === "undefined") return;
 
     const sentKey = `ticket-email-sent:${order.orderId}`;
@@ -235,6 +239,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
   const apiCheckout = isApiCheckoutEnabled();
   const guest = order.guestCheckout === true;
   const delivery = order.ticketDelivery;
+  const forgotPasswordHref = `/forgot-password?email=${encodeURIComponent(order.buyerEmail)}`;
 
   return (
     <div className="max-w-2xl mx-auto space-y-10 pb-16">
@@ -249,7 +254,35 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         <p className="text-muted leading-relaxed">
           Order <span className="font-mono text-foreground text-sm">{order.orderId.slice(0, 8)}…</span>{" "}
           {apiCheckout ? "has been confirmed." : "is confirmed (demo—no real card / payment charge)."}
-          {guest ? (
+          {apiCheckout ? (
+            guest ? (
+              <>
+                We created an account for{" "}
+                <span className="text-foreground font-medium">{order.buyerEmail}</span> when you
+                purchased—your tickets are already linked. We&apos;ve emailed your tickets as a{" "}
+                <strong className="font-medium text-foreground">PDF attachment</strong> (QR codes are
+                not shown inline in the email body). Open{" "}
+                <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                  My tickets
+                </Link>{" "}
+                to view passes or download a PDF. Didn&apos;t receive the email? Use{" "}
+                <strong className="font-medium text-foreground">Resend ticket email</strong> below, or
+                use the secure link in that message to sign in on another device.
+              </>
+            ) : (
+              <>
+                We&apos;ve emailed your tickets to{" "}
+                <span className="text-foreground font-medium">{order.buyerEmail}</span>. Open the{" "}
+                <strong className="font-medium text-foreground">PDF attachment</strong> for entry QR
+                codes—they are not shown inline in the email body. You can also view passes in{" "}
+                <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                  My tickets
+                </Link>{" "}
+                or download a PDF from any pass. Didn&apos;t receive it? Use{" "}
+                <strong className="font-medium text-foreground">Resend ticket email</strong> below.
+              </>
+            )
+          ) : guest ? (
             <>
               {" "}
               {delivery === "email_and_whatsapp" && order.buyerPhone ? (
@@ -279,15 +312,6 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
               </Link>{" "}
               with the same email later to sync passes when that&apos;s enabled.
             </>
-          ) : apiCheckout ? (
-            <>
-              {" "}
-              Your payment has been verified and tickets were issued. Open{" "}
-              <Link href="/tickets" className="text-primary font-semibold hover:underline">
-                My tickets
-              </Link>{" "}
-              for QR codes, or request a resend below.
-            </>
           ) : (
             <>
               {" "}
@@ -301,7 +325,31 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         </p>
       </div>
 
-      {passes.length > 0 && (
+      {apiCheckout && guest ? (
+        <div className="rounded-[var(--radius-panel)] border border-primary/25 bg-wash p-6 md:p-8 space-y-4">
+          <h2 className="font-display text-lg font-semibold text-foreground">Your account is ready</h2>
+          <p className="text-sm text-muted leading-relaxed">
+            Set a password for quicker sign-in next time, or use the secure link from your ticket
+            email anytime.
+          </p>
+          <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+            <Link
+              href={forgotPasswordHref}
+              className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] bg-primary px-4 text-sm font-semibold text-white shadow-[var(--btn-shadow-primary)] transition-opacity hover:opacity-92"
+            >
+              Set a password
+            </Link>
+            <Link
+              href="/tickets"
+              className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/40"
+            >
+              My tickets
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {!apiCheckout && passes.length > 0 && (
         <div className="rounded-[var(--radius-panel)] border border-border bg-surface p-6 md:p-8 space-y-5">
           <div>
             <h2 className="font-display text-lg font-semibold text-foreground">Your passes (demo)</h2>
@@ -362,12 +410,33 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
 
       {passes.length === 0 && (
         <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-5 py-4 text-sm text-muted">
-          <p className="font-medium text-foreground">No passes found in this browser</p>
-          <p className="mt-1 leading-relaxed">
-            QR tickets are stored in session storage for the demo. Open this confirmation on the same device where you
-            paid, or go to <Link href="/tickets" className="text-primary font-semibold hover:underline">My tickets</Link>{" "}
-            there.
-          </p>
+          {apiCheckout ? (
+            <>
+              <p className="font-medium text-foreground">Check your email for the PDF</p>
+              <p className="mt-1 leading-relaxed">
+                Your tickets were sent to{" "}
+                <span className="text-foreground font-medium">{order.buyerEmail}</span> as a PDF attachment. Open{" "}
+                <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                  My tickets
+                </Link>{" "}
+                to view QR codes or download a PDF from each pass. Use{" "}
+                <strong className="font-medium text-foreground">Resend ticket email</strong> below if the message
+                hasn&apos;t arrived.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium text-foreground">No passes found in this browser</p>
+              <p className="mt-1 leading-relaxed">
+                QR tickets are stored in session storage for the demo. Open this confirmation on the same device where you
+                paid, or go to{" "}
+                <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                  My tickets
+                </Link>{" "}
+                there.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -415,7 +484,17 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
           ) : null}
         </ul>
         <p className="text-xs text-muted">
-          {guest ? (
+          {apiCheckout ? (
+            <>
+              Ticket PDF emailed to <span className="text-foreground">{order.buyerEmail}</span>
+              {guest && order.buyerPhone && delivery === "email_and_whatsapp" ? (
+                <>
+                  {" "}
+                  · WhatsApp delivery is not available yet
+                </>
+              ) : null}
+            </>
+          ) : guest ? (
             <>
               Ticket details (demo): <span className="text-foreground">{order.buyerEmail}</span>
               {order.buyerPhone && delivery === "email_and_whatsapp" ? (
@@ -432,6 +511,14 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
           )}
         </p>
       </div>
+
+      {apiCheckout && orderStatus === "PAID" ? (
+        <RefundRequestPanel
+          orderId={order.orderId}
+          orderStatus="PAID"
+          enabled
+        />
+      ) : null}
 
       <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center">
         {apiCheckout ? (
@@ -452,14 +539,23 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
                   : "Resend ticket email"}
           </button>
         ) : null}
-        {passes[0] ? (
+        {!apiCheckout && passes[0] ? (
           <ArrowCtaLink href={`/tickets/${passes[0].id}`} variant="primary" className="justify-center">
             Open first QR pass
           </ArrowCtaLink>
         ) : null}
-        <ArrowCtaLink href="/tickets" variant={passes[0] ? "outline" : "primary"} className="justify-center">
-          View all tickets
+        <ArrowCtaLink
+          href="/tickets"
+          variant={!apiCheckout && passes[0] ? "outline" : apiCheckout && guest ? "outline" : "primary"}
+          className="justify-center"
+        >
+          {apiCheckout ? "Open My tickets" : "View all tickets"}
         </ArrowCtaLink>
+        {apiCheckout && guest ? (
+          <ArrowCtaLink href={forgotPasswordHref} variant="primary" className="justify-center">
+            Set a password
+          </ArrowCtaLink>
+        ) : null}
         <ArrowCtaLink
           href={`/e/${order.eventSlug}`}
           variant="outline"

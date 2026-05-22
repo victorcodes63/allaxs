@@ -1,5 +1,20 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -7,6 +22,7 @@ import { GetUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role } from '../domain/enums';
 import { OrganizerSalesService } from './organizer-sales.service';
+import { OrganizerTicketsService } from './organizer-tickets.service';
 
 @ApiTags('organizers')
 @Controller('organizers')
@@ -14,7 +30,10 @@ import { OrganizerSalesService } from './organizer-sales.service';
 @Roles(Role.ORGANIZER)
 @ApiBearerAuth()
 export class OrganizerSalesController {
-  constructor(private readonly organizerSalesService: OrganizerSalesService) {}
+  constructor(
+    private readonly organizerSalesService: OrganizerSalesService,
+    private readonly organizerTicketsService: OrganizerTicketsService,
+  ) {}
 
   @Get('sales/summary')
   @ApiOperation({
@@ -45,5 +64,27 @@ export class OrganizerSalesController {
       limit,
       offset,
     });
+  }
+
+  @Get('sales/events/:eventId/attendees/export')
+  @Roles(Role.ORGANIZER, Role.ADMIN)
+  @ApiOperation({
+    summary: 'Export paid ticket holders for one event as CSV',
+  })
+  @ApiParam({ name: 'eventId', description: 'Event UUID' })
+  async exportAttendees(
+    @GetUser() user: CurrentUser,
+    @Param('eventId', new ParseUUIDPipe()) eventId: string,
+    @Res() res: Response,
+  ) {
+    const { csv, filename } =
+      await this.organizerTicketsService.exportAttendeesCsv(
+        user.id,
+        user.roles,
+        eventId,
+      );
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
   }
 }

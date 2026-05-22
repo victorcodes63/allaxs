@@ -19,6 +19,8 @@ import {
 import { OrganizerLedgerService } from '../domain/organizer-ledger.service';
 import { Event } from '../events/entities/event.entity';
 import { CouponsService } from '../events/coupons.service';
+import { WaitlistService } from '../events/waitlist.service';
+import { EmailService } from '../auth/services/email.service';
 
 type PaystackRefundResponse = {
   status?: boolean;
@@ -35,6 +37,8 @@ export class OrderRefundService {
     private readonly configService: ConfigService,
     private readonly organizerLedgerService: OrganizerLedgerService,
     private readonly couponsService: CouponsService,
+    private readonly emailService: EmailService,
+    private readonly waitlistService: WaitlistService,
   ) {}
 
   /**
@@ -195,6 +199,43 @@ export class OrderRefundService {
       }
     });
 
+    const freedTierIds = new Set(
+      (order.items ?? []).map((item) => item.ticketTypeId),
+    );
+    for (const tierId of freedTierIds) {
+      try {
+        await this.waitlistService.onInventoryFreed(tierId);
+      } catch (error) {
+        this.logger.warn(
+          `Waitlist notify failed after refund for tier ${tierId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    const eventTitle = order.event?.title?.trim() || 'your event';
+    const orderReference =
+      order.reference?.trim() ||
+      `#${order.id.slice(0, 8).toUpperCase()}`;
+
+    try {
+      await this.emailService.sendOrderRefundEmail({
+        buyerEmail: order.email,
+        buyerName: this.extractBuyerName(order.notes),
+        orderReference,
+        eventTitle,
+        refundAmountCents: refundAmount,
+        currency: order.currency,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Refund confirmation email failed for order ${order.id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+
     return {
       order: {
         id: order.id,
@@ -207,6 +248,16 @@ export class OrderRefundService {
         ...(paystackRefundId !== undefined ? { paystackRefundId } : {}),
       },
     };
+  }
+
+  private extractBuyerName(notes: string | undefined): string {
+    if (!notes) return '';
+    try {
+      const parsed = JSON.parse(notes) as { buyerName?: string };
+      return parsed.buyerName ?? '';
+    } catch {
+      return '';
+    }
   }
 
   private async callPaystackRefund(

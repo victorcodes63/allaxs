@@ -24,8 +24,19 @@ function filterDemoPublicEvents(options: {
   dateFrom?: string;
   dateTo?: string;
   city?: string;
+  featured?: boolean;
 }): PublicEventsResponse {
   let list = [...DEMO_PUBLIC_EVENTS];
+
+  if (options.featured) {
+    list = list.filter((e) => e.isFeatured);
+    list.sort((a, b) => {
+      const ao = a.featuredSortOrder ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.featuredSortOrder ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
+    });
+  }
 
   if (options.q?.trim()) {
     const q = options.q.trim().toLowerCase();
@@ -70,6 +81,7 @@ export async function fetchPublicEvents(options: {
   dateFrom?: string;
   dateTo?: string;
   city?: string;
+  featured?: boolean;
 }): Promise<PublicEventsResponse> {
   if (isDemoPublicEventsMode()) {
     return filterDemoPublicEvents(options);
@@ -83,6 +95,7 @@ export async function fetchPublicEvents(options: {
   if (options.dateFrom) params.append("dateFrom", options.dateFrom);
   if (options.dateTo) params.append("dateTo", options.dateTo);
   if (options.city) params.append("city", options.city);
+  if (options.featured) params.append("featured", "true");
 
   const url = `${API_BASE_URL}/events/public${params.toString() ? `?${params.toString()}` : ""}`;
 
@@ -126,6 +139,32 @@ export async function fetchEventBySlug(slug: string): Promise<PublicEvent> {
       throw new Error("Event not found");
     }
     throw new Error(`Failed to fetch event: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Resolve a hidden comp/VIP tier by event slug and secret token.
+ */
+export async function fetchCompLink(
+  slug: string,
+  token: string,
+): Promise<import("@/lib/types/comp-link").CompLinkPreview> {
+  const url = `${API_BASE_URL}/events/by-slug/${encodeURIComponent(slug)}/comp/${encodeURIComponent(token)}`;
+
+  const response = await fetch(url, {
+    next: { revalidate: 0 },
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Comp link not found");
+    }
+    throw new Error(`Failed to resolve comp link: ${response.statusText}`);
   }
 
   return response.json();

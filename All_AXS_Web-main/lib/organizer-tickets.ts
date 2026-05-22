@@ -1,3 +1,5 @@
+import { normalizeCurrencyCode } from "@/lib/currency";
+
 /** Shapes from `GET /organizers/tickets` (proxied as `/api/organizer/tickets`). */
 
 export type OrganizerTicketRow = {
@@ -62,7 +64,7 @@ export function normalizeOrganizerTickets(data: unknown): OrganizerTicketsPayloa
       orderStatus: str(row.orderStatus),
       tierId: str(row.tierId),
       tierName: str(row.tierName, "Ticket"),
-      currency: str(row.currency, "KES"),
+      currency: normalizeCurrencyCode(str(row.currency) || undefined),
       attendeeEmail: str(row.attendeeEmail),
       attendeeName: str(row.attendeeName),
       attendeePhone: str(row.attendeePhone),

@@ -102,7 +102,12 @@ describe('Register Page', () => {
     cy.contains('button', 'Sign Up').click();
 
     cy.wait('@registerRequest');
-    cy.contains('User with this email already exists').should('be.visible');
+    cy.contains('You may have purchased as a guest').should('be.visible');
+    cy.contains('a', 'Set a password').should(
+      'have.attr',
+      'href',
+      '/forgot-password?email=existing%40example.com',
+    );
   });
 
   it('should have link to login page', () => {
