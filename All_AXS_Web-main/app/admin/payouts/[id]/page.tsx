@@ -89,17 +89,19 @@ export default function AdminPayoutBatchDetailPage() {
     );
   }
 
-  const st = batch.status;
+  const payoutBatch = batch;
+
+  const st = payoutBatch.status;
   const canApprove = st === "DRAFT";
   const canExport = st === "APPROVED";
   const canDisburse =
     st === "APPROVED" &&
-    (batch.lines ?? []).some((line) => line.payoutMethod === "MPESA" && !line.externalReference);
+    (payoutBatch.lines ?? []).some((line) => line.payoutMethod === "MPESA" && !line.externalReference);
   const canMarkPaid = st === "APPROVED" || st === "EXPORTED";
   const canCancel = st === "DRAFT" || st === "APPROVED" || st === "EXPORTED";
 
   async function sendPayout() {
-    const mpesaCount = (batch.lines ?? []).filter((line) => line.payoutMethod === "MPESA").length;
+    const mpesaCount = (payoutBatch.lines ?? []).filter((line) => line.payoutMethod === "MPESA").length;
     const ok = window.confirm(
       `Send ${mpesaCount} M-Pesa payout${mpesaCount === 1 ? "" : "s"} via Daraja B2C? This initiates real transfers when Daraja is enabled in production.`,
     );
@@ -117,15 +119,15 @@ export default function AdminPayoutBatchDetailPage() {
 
       <header className="space-y-2">
         <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          Batch <span className="font-mono text-lg">{batch.id.slice(0, 8)}…</span>
+          Batch <span className="font-mono text-lg">{payoutBatch.id.slice(0, 8)}…</span>
         </h1>
         <p className="text-sm text-muted">
           Status: <span className="font-medium text-foreground">{st}</span>
-          {batch.externalReference ? (
+          {payoutBatch.externalReference ? (
             <>
               {" "}
               · Reference:{" "}
-              <span className="font-mono text-foreground">{batch.externalReference}</span>
+              <span className="font-mono text-foreground">{payoutBatch.externalReference}</span>
             </>
           ) : null}
         </p>
@@ -217,7 +219,7 @@ export default function AdminPayoutBatchDetailPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border bg-background/40">
-            {(batch.lines ?? []).map((line) => (
+            {(payoutBatch.lines ?? []).map((line) => (
               <tr key={line.id}>
                 <td className="px-4 py-3">
                   <div className="font-medium text-foreground">{line.orgName ?? "—"}</div>
