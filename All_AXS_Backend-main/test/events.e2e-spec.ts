@@ -710,4 +710,123 @@ describe('Events E2E', () => {
         .expect(403);
     });
   });
+
+  describe('DELETE /events/:id - Delete Event', () => {
+    it('should allow organizer to delete own draft event (204)', async () => {
+      const eventData = {
+        title: 'Event To Delete',
+        description: 'Delete me',
+        type: EventType.VIRTUAL,
+        startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      const created = await request(app.getHttpServer())
+        .post('/events')
+        .set('Authorization', `Bearer ${organizerAccessToken}`)
+        .send(eventData)
+        .expect(201);
+
+      const eventId = created.body.id as string;
+
+      await request(app.getHttpServer())
+        .delete(`/events/${eventId}`)
+        .set('Authorization', `Bearer ${organizerAccessToken}`)
+        .expect(204);
+
+      await request(app.getHttpServer())
+        .get(`/events/${eventId}`)
+        .set('Authorization', `Bearer ${organizerAccessToken}`)
+        .expect(404);
+    });
+
+    it('should reject organizer delete of published event (400)', async () => {
+      if (!organizerProfileRepository || !eventRepository) {
+        throw new Error('Repositories are not initialized');
+      }
+      const organizerProfile = await organizerProfileRepository.findOne({
+        where: { id: organizerProfileId },
+      });
+      if (!organizerProfile) {
+        throw new Error('Organizer profile not found');
+      }
+
+      const event = eventRepository.create({
+        organizer: organizerProfile,
+        title: 'Published Event Delete Block',
+        type: EventType.VIRTUAL,
+        startAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        endAt: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000),
+        status: EventStatus.PUBLISHED,
+        slug: `published-delete-block-${Date.now()}`,
+      });
+      const saved = await eventRepository.save(event);
+
+      await request(app.getHttpServer())
+        .delete(`/events/${saved.id}`)
+        .set('Authorization', `Bearer ${organizerAccessToken}`)
+        .expect(400);
+
+      await eventRepository.delete({ id: saved.id });
+    });
+
+    it('should allow admin to delete any event (204)', async () => {
+      if (!organizerProfileRepository || !eventRepository) {
+        throw new Error('Repositories are not initialized');
+      }
+      const organizerProfile = await organizerProfileRepository.findOne({
+        where: { id: organizerProfileId },
+      });
+      if (!organizerProfile) {
+        throw new Error('Organizer profile not found');
+      }
+
+      const event = eventRepository.create({
+        organizer: organizerProfile,
+        title: 'Admin Cleanup Target',
+        type: EventType.VIRTUAL,
+        startAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        endAt: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000),
+        status: EventStatus.PUBLISHED,
+        slug: `admin-cleanup-${Date.now()}`,
+      });
+      const saved = await eventRepository.save(event);
+
+      await request(app.getHttpServer())
+        .delete(`/events/${saved.id}`)
+        .set('Authorization', `Bearer ${adminAccessToken}`)
+        .expect(204);
+
+      const remaining = await eventRepository.findOne({
+        where: { id: saved.id },
+      });
+      expect(remaining).toBeNull();
+    });
+
+    it('should reject delete by non-owner organizer (403)', async () => {
+      const eventData = {
+        title: 'Other Organizer Event',
+        description: 'Not yours',
+        type: EventType.VIRTUAL,
+        startsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        endsAt: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      const created = await request(app.getHttpServer())
+        .post('/events')
+        .set('Authorization', `Bearer ${organizerAccessToken}`)
+        .send(eventData)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .delete(`/events/${created.body.id}`)
+        .set('Authorization', `Bearer ${attendeeAccessToken}`)
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .delete(`/events/${created.body.id}`)
+        .set('Authorization', `Bearer ${organizerAccessToken}`)
+        .expect(204);
+    });
+  });
 });

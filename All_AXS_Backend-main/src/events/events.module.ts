@@ -15,6 +15,7 @@ import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
 import { User } from '../users/entities/user.entity';
 import { StorageModule } from '../storage/storage.module';
 import { OrderItem } from '../domain/order-item.entity';
+import { Order } from '../domain/order.entity';
 import { CouponRedemption } from '../domain/coupon-redemption.entity';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
@@ -35,6 +36,7 @@ import { WaitlistService } from './waitlist.service';
       OrganizerProfile,
       User,
       OrderItem,
+      Order,
       AdminAuditLog,
       CouponRedemption,
       WaitlistEntry,

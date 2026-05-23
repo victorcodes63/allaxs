@@ -6,10 +6,16 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 import { Event } from './entities/event.entity';
 import { TicketType } from './entities/ticket-type.entity';
-import { EventStatus, EventType, Role, TicketTypeStatus } from 'src/domain/enums';
+import {
+  EventStatus,
+  EventType,
+  OrderStatus,
+  Role,
+  TicketTypeStatus,
+} from 'src/domain/enums';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { OrganizerProfile } from 'src/users/entities/organizer-profile.entity';
@@ -17,6 +23,7 @@ import { User } from 'src/users/entities/user.entity';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { AdminAuditLog } from 'src/admin/entities/admin-audit-log.entity';
 import { EmailService } from 'src/auth/services/email.service';
+import { Order } from 'src/domain/order.entity';
 
 @Injectable()
 export class EventsService {
@@ -35,6 +42,8 @@ export class EventsService {
     private readonly emailService: EmailService,
     @InjectRepository(AdminAuditLog)
     private readonly adminAuditLogRepository: Repository<AdminAuditLog>,
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
   ) {}
 
   /**
@@ -729,6 +738,11 @@ export class EventsService {
       queryBuilder.orderBy('event.startAt', 'ASC');
     }
 
+    // Hide ended events from open-ended catalogue queries.
+    if (!options.dateFrom && !options.dateTo) {
+      queryBuilder.andWhere('event.endAt >= :now', { now: new Date() });
+    }
+
     // Search query
     if (options.q) {
       queryBuilder.andWhere(
@@ -899,6 +913,70 @@ export class EventsService {
         createdAt: row.createdAt.toISOString(),
       })),
     };
+  }
+
+  /**
+   * Permanently delete an event. Organisers may delete their own events only
+   * while status is draft/pending/rejected and there are no paid orders.
+   * Admins may delete any event (including seeded listings) for platform cleanup.
+   */
+  async remove(
+    eventId: string,
+    userId: string,
+    userRoles?: Role[],
+  ): Promise<void> {
+    const event = await this.ensureOwnership(eventId, userId, userRoles);
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
+
+    if (!isAdmin && !this.canEdit(event.status)) {
+      throw new BadRequestException(
+        'Events can only be deleted when status is draft, pending review, or rejected',
+      );
+    }
+
+    if (!isAdmin) {
+      const paidCount = await this.orderRepository.count({
+        where: { eventId, status: OrderStatus.PAID },
+      });
+      if (paidCount > 0) {
+        throw new BadRequestException(
+          'Cannot delete an event that has paid orders. Contact support if you need this event removed.',
+        );
+      }
+    }
+
+    const auditSnapshot = {
+      organizerUserId: event.organizer.userId,
+      title: event.title,
+      slug: event.slug,
+      status: event.status,
+    };
+
+    try {
+      await this.eventRepository.remove(event);
+
+      if (isAdmin) {
+        await this.recordAdminAction(
+          userId,
+          'ADMIN_DELETE_EVENT',
+          eventId,
+          auditSnapshot,
+        );
+      }
+    } catch (error) {
+      if (error instanceof QueryFailedError) {
+        const message = error.message;
+        if (
+          message.includes('foreign key constraint') ||
+          message.includes('violates foreign key')
+        ) {
+          throw new BadRequestException(
+            'Cannot delete event: it is still referenced by orders, tickets, or payouts. Try again after related records are cleared, or contact support.',
+          );
+        }
+      }
+      throw error;
+    }
   }
 
   /**

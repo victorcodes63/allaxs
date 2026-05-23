@@ -176,6 +176,36 @@ describe('EmailService', () => {
     });
   });
 
+  describe('sendPaymentReceiptEmail', () => {
+    it('sends Paystack-style receipt with reference and amount', async () => {
+      await service.sendPaymentReceiptEmail({
+        buyerEmail: 'buyer@example.com',
+        buyerName: 'Buyer User',
+        organizerName: 'Raven Tech Group',
+        organizerSupportEmail: 'support@example.com',
+        eventTitle: 'Summer Fest',
+        paymentReference: 'pay_abc123',
+        orderReference: 'pay_abc123',
+        paidAt: new Date('2026-05-23T09:35:00Z'),
+        amountCents: 24900,
+        currency: 'KES',
+        paymentMethodLabel: 'M-PESA ···· X519',
+        orderConfirmationUrl: 'https://www.axs.africa/orders/abc/confirmation',
+        ticketsPending: true,
+      });
+
+      expect(mockResendSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: 'buyer@example.com',
+          subject: 'Receipt from Raven Tech Group [pay_abc123]',
+          html: expect.stringMatching(
+            /Raven Tech Group received your payment of[\s\S]*249\.00 KES[\s\S]*pay_abc123[\s\S]*M-PESA ···· X519[\s\S]*ticket PDFs with QR codes will arrive in a separate email/,
+          ),
+        }),
+      );
+    });
+  });
+
   describe('sendOrderRefundEmail', () => {
     it('sends refund confirmation with tickets and support links', async () => {
       await service.sendOrderRefundEmail({

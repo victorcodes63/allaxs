@@ -1107,6 +1107,163 @@ export class EmailService {
   }
 
   /**
+   * Paystack-style payment receipt sent immediately after a successful charge.
+   * Ticket PDFs are delivered in a separate email when tickets are issued.
+   */
+  async sendPaymentReceiptEmail(input: {
+    buyerEmail: string;
+    buyerName?: string | null;
+    organizerName: string;
+    organizerSupportEmail?: string | null;
+    eventTitle: string;
+    paymentReference: string;
+    orderReference?: string | null;
+    paidAt: Date;
+    amountCents: number;
+    currency: string;
+    paymentMethodLabel?: string | null;
+    orderConfirmationUrl?: string;
+    ticketsPending?: boolean;
+    installmentNote?: string | null;
+  }): Promise<void> {
+    const context = 'sendPaymentReceiptEmail';
+    if (!this.resend || !this.resendFrom) {
+      this.logger.warn(
+        `[${context}] Email provider unavailable, skipping receipt for ${input.buyerEmail}`,
+      );
+      return;
+    }
+
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+    const frontendUrl = (this.frontendUrl || 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    const supportEmail =
+      input.organizerSupportEmail?.trim() || 'hello@allaxs.com';
+    const supportUrl = `mailto:${supportEmail}`;
+    const amountLabel = this.formatMoney(input.amountCents, input.currency);
+    const paidAtLabel = input.paidAt.toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const confirmationUrl =
+      input.orderConfirmationUrl ?? `${frontendUrl}/tickets`;
+    const paymentMethodRow = input.paymentMethodLabel
+      ? `
+        <tr>
+          <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Payment method</td>
+          <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;font-weight:600;padding:4px 0;">${input.paymentMethodLabel}</td>
+        </tr>
+      `
+      : '';
+    const installmentRow = input.installmentNote
+      ? `
+        <tr>
+          <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Payment plan</td>
+          <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">${input.installmentNote}</td>
+        </tr>
+      `
+      : '';
+    const orderRefRow = input.orderReference
+      ? `
+        <tr>
+          <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Order reference</td>
+          <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;font-weight:600;padding:4px 0;">${input.orderReference}</td>
+        </tr>
+      `
+      : '';
+    const ticketsNote = input.ticketsPending
+      ? 'Your ticket PDFs with QR codes will arrive in a separate email shortly.'
+      : 'Keep this email for your records.';
+
+    const bodyHtml = `
+      <tr>
+        <td style="padding:8px 24px 0 24px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-radius:14px;overflow:hidden;background:#0f172a;">
+            <tr>
+              <td align="center" style="padding:28px 24px;text-align:center;font-family:Arial,Helvetica,sans-serif;">
+                <p style="margin:0 0 8px 0;font-size:15px;line-height:22px;color:#cbd5e1;">
+                  ${input.organizerName} received your payment of
+                </p>
+                <p style="margin:0;font-size:34px;line-height:40px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">
+                  ${amountLabel}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:20px 24px 0 24px;">
+          <p style="margin:0 0 8px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#111827;">
+            Transaction details
+          </p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;">
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Reference</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;font-weight:600;padding:4px 0;word-break:break-all;">${input.paymentReference}</td>
+            </tr>
+            ${orderRefRow}
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Date</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">${paidAtLabel}</td>
+            </tr>
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Event</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">${input.eventTitle}</td>
+            </tr>
+            ${paymentMethodRow}
+            ${installmentRow}
+            <tr>
+              <td style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#111827;font-weight:700;padding:10px 0 0 0;border-top:1px solid #e5e7eb;">Amount paid</td>
+              <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#111827;font-weight:700;padding:10px 0 0 0;border-top:1px solid #e5e7eb;">${amountLabel}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td align="center" style="padding:16px 24px 0 24px;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#64748b;">
+          ${ticketsNote}
+          <br /><br />
+          Questions about this payment? Reply to this email or contact
+          <a href="${supportUrl}" style="color:#0b5fff;text-decoration:none;font-weight:700;">${supportEmail}</a>.
+        </td>
+      </tr>
+    `;
+
+    const subject = `Receipt from ${input.organizerName} [${input.paymentReference}]`;
+    const greeting = input.buyerName?.trim()
+      ? `Hello ${input.buyerName.trim()},`
+      : 'Hello,';
+
+    const html = this.renderEmailShell({
+      preheader: `${input.organizerName} received ${amountLabel} for ${input.eventTitle}.`,
+      title: 'Payment successful',
+      intro: `${greeting} thank you for your purchase on ${appName}.`,
+      bodyHtml,
+      actionLabel: 'View your order',
+      actionUrl: confirmationUrl,
+      footer: `${input.organizerName} · Sent by ${appName}`,
+    });
+
+    const result = await this.resend.emails.send({
+      from: this.resendFrom,
+      to: input.buyerEmail,
+      subject,
+      html,
+    });
+    const resendId = this.assertResendSendOk(result, context);
+    this.logger.log(
+      `[${context}] Sent to ${input.buyerEmail} (Resend ID: ${resendId})`,
+    );
+  }
+
+  /**
    * Notifies the buyer after a successful order refund (full or partial).
    */
   async sendOrderRefundEmail(input: {

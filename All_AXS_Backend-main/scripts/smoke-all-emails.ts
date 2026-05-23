@@ -61,6 +61,10 @@ async function main() {
   );
   const user = mockUser(to);
   const demoToken = 'smoke-test-token-' + Date.now();
+  const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(
+    /\/$/,
+    '',
+  );
 
   const steps: { label: string; run: () => Promise<void> }[] = [
     {
@@ -112,7 +116,26 @@ async function main() {
         }),
     },
     {
-      label: '8/9 Ticket / order confirmation',
+      label: '8/10 Payment receipt',
+      run: () =>
+        emailService.sendPaymentReceiptEmail({
+          buyerEmail: to,
+          buyerName: user.name ?? 'Guest',
+          organizerName: 'All AXS Demo',
+          organizerSupportEmail: 'hello@allaxs.com',
+          eventTitle: 'Smoke Test Concert',
+          paymentReference: 'pay_smoke_receipt_001',
+          orderReference: 'pay_smoke_receipt_001',
+          paidAt: new Date(),
+          amountCents: 200000,
+          currency: 'KES',
+          paymentMethodLabel: 'M-PESA ···· X519',
+          orderConfirmationUrl: `${frontendUrl}/orders/smoke-order/confirmation`,
+          ticketsPending: true,
+        }),
+    },
+    {
+      label: '9/10 Ticket / order confirmation',
       run: () =>
         emailService.sendTicketEmail({
           buyerName: user.name ?? 'Guest',
@@ -148,7 +171,7 @@ async function main() {
         }),
     },
     {
-      label: '9/9 Order refund confirmation',
+      label: '10/10 Order refund confirmation',
       run: () =>
         emailService.sendOrderRefundEmail({
           buyerEmail: to,

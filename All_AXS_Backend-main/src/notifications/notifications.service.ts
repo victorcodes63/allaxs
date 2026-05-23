@@ -55,6 +55,23 @@ export type TicketEmailNotificationInput = {
   accountCreated?: boolean;
 };
 
+export type PaymentReceiptNotificationInput = {
+  buyerEmail: string;
+  buyerName?: string | null;
+  organizerName: string;
+  organizerSupportEmail?: string | null;
+  eventTitle: string;
+  paymentReference: string;
+  orderReference?: string | null;
+  paidAt: Date;
+  amountCents: number;
+  currency: string;
+  paymentMethodLabel?: string | null;
+  orderConfirmationUrl?: string;
+  ticketsPending?: boolean;
+  installmentNote?: string | null;
+};
+
 export type TicketWhatsAppNotificationInput = {
   phone: string;
   buyerName: string;
@@ -202,6 +219,29 @@ export class NotificationsService {
     input: TicketEmailNotificationInput,
   ): Promise<Notification> {
     const notification = await this.enqueueTicketEmail(input);
+    await this.processNotification(notification.id);
+    return (
+      (await this.notificationRepository.findOne({
+        where: { id: notification.id },
+      })) ?? notification
+    );
+  }
+
+  async enqueuePaymentReceiptEmail(
+    input: PaymentReceiptNotificationInput,
+  ): Promise<Notification> {
+    return this.enqueueNotification({
+      channel: NotifyChannel.EMAIL,
+      to: input.buyerEmail,
+      template: 'payment_receipt',
+      payload: this.serializePaymentReceiptPayload(input),
+    });
+  }
+
+  async dispatchPaymentReceiptEmail(
+    input: PaymentReceiptNotificationInput,
+  ): Promise<Notification> {
+    const notification = await this.enqueuePaymentReceiptEmail(input);
     await this.processNotification(notification.id);
     return (
       (await this.notificationRepository.findOne({
@@ -387,6 +427,11 @@ export class NotificationsService {
       case 'ticket_delivery':
         await this.emailService.sendTicketEmail(
           this.deserializeTicketEmailPayload(payload),
+        );
+        return;
+      case 'payment_receipt':
+        await this.emailService.sendPaymentReceiptEmail(
+          this.deserializePaymentReceiptPayload(payload),
         );
         return;
       default:
@@ -582,6 +627,84 @@ export class NotificationsService {
         typeof payload.accountCreated === 'boolean'
           ? payload.accountCreated
           : undefined,
+    };
+  }
+
+  private serializePaymentReceiptPayload(
+    input: PaymentReceiptNotificationInput,
+  ): NotificationPayload {
+    return {
+      buyerEmail: input.buyerEmail,
+      buyerName: input.buyerName ?? null,
+      organizerName: input.organizerName,
+      organizerSupportEmail: input.organizerSupportEmail ?? null,
+      eventTitle: input.eventTitle,
+      paymentReference: input.paymentReference,
+      orderReference: input.orderReference ?? null,
+      paidAt: input.paidAt.toISOString(),
+      amountCents: input.amountCents,
+      currency: input.currency,
+      paymentMethodLabel: input.paymentMethodLabel ?? null,
+      orderConfirmationUrl: input.orderConfirmationUrl ?? null,
+      ticketsPending: input.ticketsPending ?? false,
+      installmentNote: input.installmentNote ?? null,
+    };
+  }
+
+  private deserializePaymentReceiptPayload(
+    payload: NotificationPayload,
+  ): Parameters<EmailService['sendPaymentReceiptEmail']>[0] {
+    return {
+      buyerEmail:
+        typeof payload.buyerEmail === 'string'
+          ? payload.buyerEmail
+          : typeof payload.to === 'string'
+            ? payload.to
+            : '',
+      buyerName:
+        typeof payload.buyerName === 'string' ? payload.buyerName : null,
+      organizerName:
+        typeof payload.organizerName === 'string'
+          ? payload.organizerName
+          : 'Organizer',
+      organizerSupportEmail:
+        typeof payload.organizerSupportEmail === 'string'
+          ? payload.organizerSupportEmail
+          : null,
+      eventTitle:
+        typeof payload.eventTitle === 'string' ? payload.eventTitle : 'Event',
+      paymentReference:
+        typeof payload.paymentReference === 'string'
+          ? payload.paymentReference
+          : '',
+      orderReference:
+        typeof payload.orderReference === 'string'
+          ? payload.orderReference
+          : null,
+      paidAt:
+        typeof payload.paidAt === 'string'
+          ? new Date(payload.paidAt)
+          : new Date(),
+      amountCents:
+        typeof payload.amountCents === 'number' ? payload.amountCents : 0,
+      currency:
+        typeof payload.currency === 'string' ? payload.currency : 'KES',
+      paymentMethodLabel:
+        typeof payload.paymentMethodLabel === 'string'
+          ? payload.paymentMethodLabel
+          : null,
+      orderConfirmationUrl:
+        typeof payload.orderConfirmationUrl === 'string'
+          ? payload.orderConfirmationUrl
+          : undefined,
+      ticketsPending:
+        typeof payload.ticketsPending === 'boolean'
+          ? payload.ticketsPending
+          : false,
+      installmentNote:
+        typeof payload.installmentNote === 'string'
+          ? payload.installmentNote
+          : null,
     };
   }
 

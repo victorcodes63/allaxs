@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -262,6 +263,21 @@ export class EventsController {
     @Body() dto: UpdateEventDto,
   ) {
     return this.eventsService.update(id, user.id, dto, user.roles);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ORGANIZER, Role.ADMIN)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete event' })
+  @ApiParam({ name: 'id', description: 'Event ID' })
+  @ApiResponse({ status: 204, description: 'Event deleted' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async remove(@Param('id') id: string, @GetUser() user: CurrentUser) {
+    await this.eventsService.remove(id, user.id, user.roles);
   }
 
   @Post(':id/submit')

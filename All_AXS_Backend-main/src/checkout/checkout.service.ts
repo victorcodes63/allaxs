@@ -17,6 +17,7 @@ import { Ticket } from '../domain/ticket.entity';
 import { Payment } from '../domain/payment.entity';
 import {
   EventStatus,
+  NotifyStatus,
   OrderStatus,
   PaymentGateway,
   PaymentStatus,
@@ -1080,6 +1081,45 @@ export class CheckoutService {
         .findOne({ where: { id: order.appliedCouponId } });
       couponCode = coupon?.code ?? null;
     }
+    const payment = await this.dataSource.getRepository(Payment).findOne({
+      where: { orderId: order.id, status: PaymentStatus.SUCCESS },
+      order: { createdAt: 'DESC' },
+    });
+    const rawPayload = (payment?.rawPayload ?? {}) as {
+      receiptEmailSentAt?: string;
+    };
+    if (payment && !rawPayload.receiptEmailSentAt) {
+      const frontendUrl =
+        this.configService.get<string>('FRONTEND_URL')?.trim() ||
+        'http://localhost:3000';
+      await this.sendOrderPaymentReceiptEmail(order, order.event ?? null, {
+        paymentReference: payment.intentId,
+        paidAt: this.resolveGatewayPaidAt(
+          (payment.rawPayload?.gatewayPayload as Record<string, unknown>) ??
+            payment.rawPayload ??
+            {},
+        ),
+        amountCents: payment.amountCents,
+        currency: payment.currency,
+        paymentMethodLabel: this.resolveGatewayPaymentMethodLabel(
+          (payment.rawPayload?.gatewayPayload as Record<string, unknown>) ??
+            payment.rawPayload ??
+            {},
+        ),
+        orderConfirmationUrl: `${frontendUrl.replace(/\/$/, '')}/orders/${order.id}/confirmation`,
+        ticketsPending: false,
+        organizerName:
+          order.event?.organizer?.orgName ??
+          this.configService.get<string>('APP_NAME', 'All AXS'),
+        organizerSupportEmail: order.event?.organizer?.supportEmail ?? null,
+      });
+      payment.rawPayload = {
+        ...(payment.rawPayload ?? {}),
+        receiptEmailSentAt: new Date().toISOString(),
+      };
+      await this.dataSource.getRepository(Payment).save(payment);
+    }
+
     await this.sendOrderTicketEmail(order, order.event ?? null, order.tickets, {
       subtotalCents,
       discountCents,
@@ -1113,20 +1153,13 @@ export class CheckoutService {
     source: 'webhook' | 'confirm' | 'free_order',
   ) {
     const tx = await this.dataSource.transaction(async (manager) => {
+      // Lock payment + order rows only. PostgreSQL rejects FOR UPDATE on
+      // LEFT JOINed relations ("nullable side of an outer join").
       const payment = await manager.findOne(Payment, {
         where: { intentId: reference },
-        relations: [
-          'order',
-          'order.items',
-          'order.items.ticketType',
-          'order.event',
-          'order.event.organizer',
-          'order.paymentPlans',
-          'order.paymentPlans.installments',
-        ],
         lock: { mode: 'pessimistic_write' },
       });
-      if (!payment || !payment.order) {
+      if (!payment) {
         throw new NotFoundException('Payment not found');
       }
 
@@ -1135,7 +1168,21 @@ export class CheckoutService {
         lock: { mode: 'pessimistic_write' },
       });
 
-      const order = payment.order;
+      const order = await manager.findOne(Order, {
+        where: { id: payment.orderId },
+        relations: [
+          'items',
+          'items.ticketType',
+          'event',
+          'event.organizer',
+          'paymentPlans',
+          'paymentPlans.installments',
+        ],
+      });
+      if (!order) {
+        throw new NotFoundException('Order not found');
+      }
+      payment.order = order;
       if (order.status === OrderStatus.PAID && payment.status === PaymentStatus.SUCCESS) {
         return {
           order,
@@ -1287,11 +1334,11 @@ export class CheckoutService {
         tx.order.id,
         tx.installmentSequence,
       );
+      const event = await this.dataSource.getRepository(Event).findOne({
+        where: { id: installmentResult.order.eventId },
+        relations: ['organizer'],
+      });
       if (installmentResult.order.status === OrderStatus.PAID) {
-        const event = await this.dataSource.getRepository(Event).findOne({
-          where: { id: installmentResult.order.eventId },
-          relations: ['organizer'],
-        });
         const organizerId =
           event?.organizer?.id ??
           (event as Event & { organizerId?: string })?.organizerId;
@@ -1304,17 +1351,28 @@ export class CheckoutService {
             ),
           );
         }
-        const fullTickets = await this.dataSource.getRepository(Ticket).find({
-          where: { orderId: installmentResult.order.id },
-          relations: ['ticketType'],
+      }
+      const fullTickets = await this.dataSource.getRepository(Ticket).find({
+        where: { orderId: installmentResult.order.id },
+        relations: ['ticketType'],
+      });
+      const allPaid = installmentResult.order.status === OrderStatus.PAID;
+      try {
+        await this.deliverPaidOrderEmails({
+          order: installmentResult.order,
+          event,
+          tickets: allPaid ? fullTickets : [],
+          paymentIntentId: tx.paymentIntentId,
+          gatewayPayload,
+          sendTickets: allPaid && fullTickets.length > 0,
+          installmentNote: allPaid
+            ? null
+            : `Installment ${tx.installmentSequence} received`,
         });
-        if (fullTickets.length > 0) {
-          await this.sendInstallmentOrderCompleteEmail(
-            installmentResult.order,
-            event,
-            fullTickets,
-          );
-        }
+      } catch (error) {
+        this.logger.error(
+          `Post-payment emails failed for order ${installmentResult.order.id}: ${String(error)}`,
+        );
       }
       return;
     }
@@ -1329,61 +1387,17 @@ export class CheckoutService {
           where: { orderId: tx.order.id },
           relations: ['ticketType'],
         });
-        const freshOrder = await this.dataSource.getRepository(Order).findOne({
-          where: { id: tx.order.id },
-          relations: ['items'],
+        await this.deliverPaidOrderEmails({
+          order: tx.order,
+          event,
+          tickets: fullTickets,
+          paymentIntentId: tx.paymentIntentId,
+          gatewayPayload,
+          sendTickets: fullTickets.length > 0,
         });
-        const discountCents = freshOrder?.discountCents ?? 0;
-        const subtotalCents =
-          (freshOrder?.items ?? []).reduce(
-            (acc, item) => acc + item.unitPriceCents * item.qty,
-            0,
-          ) || (freshOrder?.amountCents ?? tx.order.amountCents) + discountCents;
-        let couponCode: string | null = null;
-        if (freshOrder?.appliedCouponId) {
-          const coupon = await this.dataSource
-            .getRepository(Coupon)
-            .findOne({ where: { id: freshOrder.appliedCouponId } });
-          couponCode = coupon?.code ?? null;
-        }
-        const buyerUser = tx.order.userId
-          ? await this.dataSource.getRepository(User).findOne({
-              where: { id: tx.order.userId },
-            })
-          : null;
-        let accessUrl: string | undefined;
-        try {
-          if (buyerUser) {
-            accessUrl = await this.authService.buildCheckoutAccessUrl(
-              buyerUser.id,
-            );
-          }
-        } catch (linkErr) {
-          this.logger.warn(
-            `Checkout access link failed for order ${tx.order.id}: ${String(linkErr)}`,
-          );
-        }
-        await this.sendOrderTicketEmail(tx.order, event, fullTickets, {
-          subtotalCents,
-          discountCents,
-          totalCents: freshOrder?.amountCents ?? tx.order.amountCents,
-          currency: freshOrder?.currency ?? tx.order.currency,
-          couponCode,
-          accessUrl,
-          accountCreated: Boolean(buyerUser?.autoCreatedAt),
-        });
-        const payRepo = this.dataSource.getRepository(Payment);
-        const p = await payRepo.findOne({ where: { intentId: tx.paymentIntentId } });
-        if (p) {
-          p.rawPayload = {
-            ...(p.rawPayload ?? {}),
-            ticketEmailSentAt: new Date().toISOString(),
-          };
-          await payRepo.save(p);
-        }
       } catch (error) {
         this.logger.error(
-          `Ticket email send failed for order ${tx.order.id}: ${String(error)}`,
+          `Post-payment emails failed for order ${tx.order.id}: ${String(error)}`,
         );
       }
     }
@@ -1411,52 +1425,225 @@ export class CheckoutService {
     });
   }
 
-  private async sendInstallmentOrderCompleteEmail(
-    order: Order,
-    event: Event | null,
-    tickets: Ticket[],
-  ): Promise<void> {
+  private async deliverPaidOrderEmails(input: {
+    order: Order;
+    event: Event | null;
+    tickets: Ticket[];
+    paymentIntentId: string;
+    gatewayPayload: Record<string, unknown>;
+    sendTickets: boolean;
+    installmentNote?: string | null;
+  }): Promise<void> {
+    const payment = await this.dataSource.getRepository(Payment).findOne({
+      where: { intentId: input.paymentIntentId },
+    });
+    const rawPayload = (payment?.rawPayload ?? {}) as {
+      receiptEmailSentAt?: string;
+      ticketEmailSentAt?: string;
+    };
+
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL')?.trim() ||
+      'http://localhost:3000';
+    const orderConfirmationUrl = `${frontendUrl.replace(/\/$/, '')}/orders/${input.order.id}/confirmation`;
+    const organizerName =
+      input.event?.organizer?.orgName ??
+      this.configService.get<string>('APP_NAME', 'All AXS');
+    const organizerSupportEmail = input.event?.organizer?.supportEmail ?? null;
+
+    if (!rawPayload.receiptEmailSentAt) {
+      await this.sendOrderPaymentReceiptEmail(input.order, input.event, {
+        paymentReference: input.paymentIntentId,
+        paidAt: this.resolveGatewayPaidAt(input.gatewayPayload),
+        amountCents: payment?.amountCents ?? input.order.amountCents,
+        currency: payment?.currency ?? input.order.currency,
+        paymentMethodLabel: this.resolveGatewayPaymentMethodLabel(
+          input.gatewayPayload,
+        ),
+        orderConfirmationUrl,
+        ticketsPending: input.sendTickets && input.tickets.length > 0,
+        installmentNote: input.installmentNote,
+        organizerName,
+        organizerSupportEmail,
+      });
+    }
+
+    if (input.sendTickets && input.tickets.length > 0 && !rawPayload.ticketEmailSentAt) {
+      const summary = await this.resolveOrderEmailSummary(input.order.id);
+      const accessUrl = await this.resolveBuyerAccessUrl(input.order);
+      await this.sendOrderTicketEmail(input.order, input.event, input.tickets, {
+        ...summary,
+        accessUrl,
+        accountCreated: summary.accountCreated,
+      });
+    }
+
+    if (payment) {
+      payment.rawPayload = {
+        ...(payment.rawPayload ?? {}),
+        ...(!rawPayload.receiptEmailSentAt
+          ? { receiptEmailSentAt: new Date().toISOString() }
+          : {}),
+        ...(input.sendTickets &&
+        input.tickets.length > 0 &&
+        !rawPayload.ticketEmailSentAt
+          ? { ticketEmailSentAt: new Date().toISOString() }
+          : {}),
+      };
+      await this.dataSource.getRepository(Payment).save(payment);
+    }
+  }
+
+  private async resolveOrderEmailSummary(orderId: string): Promise<{
+    subtotalCents: number;
+    discountCents: number;
+    totalCents: number;
+    currency: string;
+    couponCode: string | null;
+    accountCreated: boolean;
+  }> {
     const freshOrder = await this.dataSource.getRepository(Order).findOne({
-      where: { id: order.id },
+      where: { id: orderId },
       relations: ['items'],
     });
-    const discountCents = freshOrder?.discountCents ?? 0;
+    if (!freshOrder) {
+      throw new NotFoundException('Order not found');
+    }
+    const discountCents = freshOrder.discountCents ?? 0;
     const subtotalCents =
-      (freshOrder?.items ?? []).reduce(
+      (freshOrder.items ?? []).reduce(
         (acc, item) => acc + item.unitPriceCents * item.qty,
         0,
-      ) || (freshOrder?.amountCents ?? order.amountCents) + discountCents;
+      ) || freshOrder.amountCents + discountCents;
     let couponCode: string | null = null;
-    if (freshOrder?.appliedCouponId) {
+    if (freshOrder.appliedCouponId) {
       const coupon = await this.dataSource
         .getRepository(Coupon)
         .findOne({ where: { id: freshOrder.appliedCouponId } });
       couponCode = coupon?.code ?? null;
     }
-    const buyerUser = order.userId
+    const buyerUser = freshOrder.userId
       ? await this.dataSource.getRepository(User).findOne({
-          where: { id: order.userId },
+          where: { id: freshOrder.userId },
         })
       : null;
-    let accessUrl: string | undefined;
+
+    return {
+      subtotalCents,
+      discountCents,
+      totalCents: freshOrder.amountCents,
+      currency: freshOrder.currency,
+      couponCode,
+      accountCreated: Boolean(buyerUser?.autoCreatedAt),
+    };
+  }
+
+  private async resolveBuyerAccessUrl(order: Order): Promise<string | undefined> {
+    if (!order.userId) return undefined;
     try {
-      if (buyerUser) {
-        accessUrl = await this.authService.buildCheckoutAccessUrl(buyerUser.id);
-      }
+      return await this.authService.buildCheckoutAccessUrl(order.userId);
     } catch (linkErr) {
       this.logger.warn(
         `Checkout access link failed for order ${order.id}: ${String(linkErr)}`,
       );
+      return undefined;
     }
-    await this.sendOrderTicketEmail(order, event, tickets, {
-      subtotalCents,
-      discountCents,
-      totalCents: freshOrder?.amountCents ?? order.amountCents,
-      currency: freshOrder?.currency ?? order.currency,
-      couponCode,
-      accessUrl,
-      accountCreated: Boolean(buyerUser?.autoCreatedAt),
-    });
+  }
+
+  private resolveGatewayPaidAt(
+    gatewayPayload: Record<string, unknown>,
+  ): Date {
+    const raw =
+      gatewayPayload.paid_at ??
+      gatewayPayload.paidAt ??
+      gatewayPayload.transaction_date;
+    if (typeof raw === 'string' || typeof raw === 'number') {
+      const parsed = new Date(raw);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    return new Date();
+  }
+
+  private resolveGatewayPaymentMethodLabel(
+    gatewayPayload: Record<string, unknown>,
+  ): string | null {
+    const channel =
+      typeof gatewayPayload.channel === 'string'
+        ? gatewayPayload.channel.toLowerCase()
+        : null;
+    const authorization =
+      gatewayPayload.authorization &&
+      typeof gatewayPayload.authorization === 'object'
+        ? (gatewayPayload.authorization as Record<string, unknown>)
+        : undefined;
+    const last4 =
+      typeof authorization?.last4 === 'string'
+        ? authorization.last4
+        : typeof authorization?.last_4 === 'string'
+          ? authorization.last_4
+          : null;
+    const brand =
+      typeof authorization?.brand === 'string'
+        ? authorization.brand
+        : typeof authorization?.card_type === 'string'
+          ? authorization.card_type
+          : null;
+
+    if (channel === 'mobile_money' || channel === 'mpesa') {
+      return last4 ? `M-PESA ···· ${last4}` : 'M-PESA';
+    }
+    if (channel === 'card') {
+      if (brand && last4) {
+        return `${brand.toUpperCase()} ···· ${last4}`;
+      }
+      return 'Card';
+    }
+    if (channel) {
+      return channel.replace(/_/g, ' ');
+    }
+    return null;
+  }
+
+  private async sendOrderPaymentReceiptEmail(
+    order: Order,
+    event: Event | null,
+    input: {
+      paymentReference: string;
+      paidAt: Date;
+      amountCents: number;
+      currency: string;
+      paymentMethodLabel: string | null;
+      orderConfirmationUrl: string;
+      ticketsPending: boolean;
+      installmentNote?: string | null;
+      organizerName: string;
+      organizerSupportEmail: string | null;
+    },
+  ): Promise<void> {
+    const notification =
+      await this.notificationsService.dispatchPaymentReceiptEmail({
+        buyerEmail: order.email,
+        buyerName: this.extractBuyerName(order.notes),
+        organizerName: input.organizerName,
+        organizerSupportEmail: input.organizerSupportEmail,
+        eventTitle: event?.title ?? 'Event',
+        paymentReference: input.paymentReference,
+        orderReference: order.reference ?? order.id,
+        paidAt: input.paidAt,
+        amountCents: input.amountCents,
+        currency: input.currency,
+        paymentMethodLabel: input.paymentMethodLabel,
+        orderConfirmationUrl: input.orderConfirmationUrl,
+        ticketsPending: input.ticketsPending,
+        installmentNote: input.installmentNote,
+      });
+    if (notification.status === NotifyStatus.FAILED) {
+      throw new Error(
+        notification.error ?? 'Payment receipt email dispatch failed',
+      );
+    }
   }
 
   private async sendOrderTicketEmail(
