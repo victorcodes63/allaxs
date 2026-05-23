@@ -2,6 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Figtree } from "next/font/google";
 import { AppChrome } from "@/components/layout/AppChrome";
 import { AuthProvider } from "@/lib/auth-context";
+import { AnalyticsLoader } from "@/components/consent/AnalyticsLoader";
+import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
+import { buildPageMetadata } from "@/lib/seo/metadata";
+import { SITE_BASE_URL } from "@/lib/seo/site-url";
 import "./globals.css";
 
 /** Site-wide: Figtree (300–700), same weight range as before. */
@@ -11,10 +15,24 @@ const figtree = Figtree({
   weight: ["300", "400", "500", "600", "700"],
 });
 
+const ROOT_TITLE = "All AXS | Events & ticketing";
+const ROOT_DESCRIPTION =
+  "Discover live experiences and get tickets in seconds—built for fans and organizers across Africa.";
+
+const rootPageMetadata = buildPageMetadata({
+  title: ROOT_TITLE,
+  description: ROOT_DESCRIPTION,
+  path: "/",
+});
+
 export const metadata: Metadata = {
-  title: "All AXS | Events & ticketing",
-  description:
-    "Discover live experiences and get tickets in seconds—built for fans and organizers across Africa.",
+  metadataBase: new URL(SITE_BASE_URL),
+  title: {
+    default: ROOT_TITLE,
+    template: "%s | All AXS",
+  },
+  description: ROOT_DESCRIPTION,
+  applicationName: "All AXS",
   manifest: "/favicons/site.webmanifest",
   icons: {
     icon: [
@@ -25,6 +43,8 @@ export const metadata: Metadata = {
     apple: [{ url: "/favicons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     shortcut: ["/favicons/favicon-32x32.png"],
   },
+  openGraph: rootPageMetadata.openGraph,
+  twitter: rootPageMetadata.twitter,
 };
 
 export const viewport: Viewport = {
@@ -46,6 +66,8 @@ export default function RootLayout({
         <AuthProvider>
           <AppChrome>{children}</AppChrome>
         </AuthProvider>
+        <CookieConsentBanner />
+        <AnalyticsLoader />
       </body>
     </html>
   );

@@ -25,6 +25,7 @@ import { EmailVerificationService } from './services/email-verification.service'
 import { PasswordResetService } from './services/password-reset.service';
 import { EmailService } from './services/email.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateNotificationPrefsDto } from './dto/update-notification-prefs.dto';
 import { CloseAccountDto } from './dto/close-account.dto';
 
 export interface AuthTokens {
@@ -679,6 +680,30 @@ export class AuthService {
       user: await this.getAccountProfile(userId),
       tokens,
     };
+  }
+
+  async getNotificationPreferences(userId: string) {
+    const preferences =
+      await this.usersService.getNotificationPrefs(userId);
+    return { preferences };
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    dto: UpdateNotificationPrefsDto,
+  ) {
+    if (
+      dto.ordersEmail === undefined &&
+      dto.marketingEmail === undefined &&
+      dto.reminders === undefined
+    ) {
+      throw new BadRequestException('No notification preferences to update');
+    }
+    const preferences = await this.usersService.updateNotificationPrefs(
+      userId,
+      dto,
+    );
+    return { preferences };
   }
 
   async closeAccount(userId: string, dto: CloseAccountDto) {

@@ -31,6 +31,9 @@ export class User extends BaseEntity {
   @Column({ type: 'timestamptz', nullable: true })
   autoCreatedAt?: Date | null;
 
+  @Column({ type: 'jsonb', nullable: true, name: 'notification_prefs' })
+  notificationPrefs?: Record<string, unknown> | null;
+
   @OneToOne(() => OrganizerProfile, (o) => o.user)
   organizer?: OrganizerProfile;
 

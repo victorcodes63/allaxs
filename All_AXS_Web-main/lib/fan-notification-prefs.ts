@@ -4,50 +4,54 @@ export type NotificationPrefs = {
   reminders: boolean;
 };
 
-const STORAGE_PREFIX = "allaxs-notification-prefs-";
-
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   ordersEmail: true,
   marketingEmail: false,
   reminders: true,
 };
 
-function storageKey(userId: string): string {
-  return `${STORAGE_PREFIX}${userId.trim()}`;
+function normalizePartial(raw: Partial<NotificationPrefs>): NotificationPrefs {
+  return {
+    ordersEmail:
+      typeof raw.ordersEmail === "boolean"
+        ? raw.ordersEmail
+        : DEFAULT_NOTIFICATION_PREFS.ordersEmail,
+    marketingEmail:
+      typeof raw.marketingEmail === "boolean"
+        ? raw.marketingEmail
+        : DEFAULT_NOTIFICATION_PREFS.marketingEmail,
+    reminders:
+      typeof raw.reminders === "boolean"
+        ? raw.reminders
+        : DEFAULT_NOTIFICATION_PREFS.reminders,
+  };
 }
 
-export function getNotificationPrefs(userId: string): NotificationPrefs {
-  if (typeof window === "undefined" || !userId.trim()) {
-    return { ...DEFAULT_NOTIFICATION_PREFS };
+export async function fetchNotificationPrefs(): Promise<NotificationPrefs> {
+  const res = await fetch("/api/auth/notification-preferences", {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error("Unable to load notification preferences");
   }
-  try {
-    const raw = localStorage.getItem(storageKey(userId));
-    if (!raw) return { ...DEFAULT_NOTIFICATION_PREFS };
-    const parsed = JSON.parse(raw) as Partial<NotificationPrefs>;
-    return {
-      ordersEmail:
-        typeof parsed.ordersEmail === "boolean"
-          ? parsed.ordersEmail
-          : DEFAULT_NOTIFICATION_PREFS.ordersEmail,
-      marketingEmail:
-        typeof parsed.marketingEmail === "boolean"
-          ? parsed.marketingEmail
-          : DEFAULT_NOTIFICATION_PREFS.marketingEmail,
-      reminders:
-        typeof parsed.reminders === "boolean"
-          ? parsed.reminders
-          : DEFAULT_NOTIFICATION_PREFS.reminders,
-    };
-  } catch {
-    return { ...DEFAULT_NOTIFICATION_PREFS };
-  }
+  const data = (await res.json()) as { preferences?: Partial<NotificationPrefs> };
+  return normalizePartial(data.preferences ?? {});
 }
 
-export function saveNotificationPrefs(userId: string, prefs: NotificationPrefs): void {
-  if (typeof window === "undefined" || !userId.trim()) return;
-  try {
-    localStorage.setItem(storageKey(userId), JSON.stringify(prefs));
-  } catch {
-    /* quota / private mode */
+export async function saveNotificationPrefs(
+  patch: Partial<NotificationPrefs>,
+): Promise<NotificationPrefs> {
+  const res = await fetch("/api/auth/notification-preferences", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    preferences?: Partial<NotificationPrefs>;
+    message?: string;
+  };
+  if (!res.ok) {
+    throw new Error(data.message || "Unable to save notification preferences");
   }
+  return normalizePartial(data.preferences ?? patch);
 }

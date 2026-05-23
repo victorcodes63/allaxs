@@ -7,9 +7,17 @@ export function organizerPageTitle(pathname: string): string {
 
   if (pathname === "/organizer/dashboard") return "Overview";
   if (pathname === "/organizer/sales") return "Sales & orders";
+  if (pathname === "/organizer/customers") return "Customers";
+  if (pathname === "/organizer/refunds") return "Refunds";
+  if (pathname === "/organizer/waitlist") return "Waitlist";
   if (pathname === "/organizer/earnings") return "Earnings & payouts";
   if (pathname === "/organizer/tickets") return "Tickets";
   if (pathname === "/organizer/tickets/scan") return "Door scan";
+  if (pathname === "/organizer/calendar") return "Calendar";
+  if (pathname === "/organizer/marketing") return "Marketing";
+  if (pathname === "/organizer/affiliates") return "Affiliates";
+  if (pathname === "/organizer/store") return "Store";
+  if (pathname === "/organizer/support") return "Help & support";
   if (pathname === "/organizer/account") return "Account";
   if (pathname === "/organizer/team") return "Team";
   if (pathname === "/organizer/team/join") return "Team invite";
@@ -33,8 +41,32 @@ export function organizerNavActive(href: string, pathname: string): boolean {
   if (href === "/organizer/sales") {
     return pathname === "/organizer/sales";
   }
+  if (href === "/organizer/customers") {
+    return pathname === "/organizer/customers";
+  }
+  if (href === "/organizer/refunds") {
+    return pathname === "/organizer/refunds";
+  }
+  if (href === "/organizer/waitlist") {
+    return pathname === "/organizer/waitlist";
+  }
   if (href === "/organizer/earnings") {
     return pathname === "/organizer/earnings";
+  }
+  if (href === "/organizer/calendar") {
+    return pathname === "/organizer/calendar";
+  }
+  if (href === "/organizer/marketing") {
+    return pathname === "/organizer/marketing";
+  }
+  if (href === "/organizer/affiliates") {
+    return pathname === "/organizer/affiliates";
+  }
+  if (href === "/organizer/store") {
+    return pathname === "/organizer/store";
+  }
+  if (href === "/organizer/support") {
+    return pathname === "/organizer/support";
   }
   if (href === "/organizer/tickets") {
     return pathname === "/organizer/tickets";

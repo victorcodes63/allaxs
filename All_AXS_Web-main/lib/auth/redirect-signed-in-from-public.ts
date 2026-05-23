@@ -4,7 +4,10 @@ import {
   accessTokenIsExpired,
   decodeAccessTokenPayload,
 } from "@/lib/auth/jwt-payload";
-import { resolveGuestOnlyPublicRedirect } from "@/lib/auth/guest-only-public-routes";
+import {
+  isPublicBrowseActive,
+  resolveGuestOnlyPublicRedirect,
+} from "@/lib/auth/guest-only-public-routes";
 
 /**
  * Server Components on guest-only marketing routes call this before rendering
@@ -17,6 +20,7 @@ export async function redirectSignedInFromGuestPublicPath(
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("accessToken")?.value;
   if (!accessToken) return;
+  if (isPublicBrowseActive(search, cookieStore)) return;
 
   const decoded = decodeAccessTokenPayload(accessToken);
   if (!decoded?.email || accessTokenIsExpired(decoded)) return;

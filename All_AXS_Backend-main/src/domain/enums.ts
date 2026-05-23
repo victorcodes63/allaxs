@@ -108,3 +108,19 @@ export enum RefundRequestStatus {
   APPROVED = 'APPROVED',
   DENIED = 'DENIED',
 }
+
+/**
+ * Lifecycle for self-serve organizer withdrawals.
+ * PENDING  -> organizer just submitted the request, awaiting admin review
+ * APPROVED -> admin approved; ready to be rolled into a payout batch
+ * PAID     -> a payout batch covering the request has been MARKED_PAID
+ * REJECTED -> admin rejected with an explanatory note
+ * CANCELLED -> organizer cancelled their own PENDING request
+ */
+export enum PayoutWithdrawRequestStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  PAID = 'PAID',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+}

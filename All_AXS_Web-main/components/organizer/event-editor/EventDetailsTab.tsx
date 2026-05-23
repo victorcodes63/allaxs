@@ -49,6 +49,7 @@ export function EventDetailsTab({
 }: EventDetailsTabProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -168,6 +169,45 @@ export function EventDetailsTab({
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePublishToggle = async (action: "publish" | "unpublish") => {
+    setError(null);
+    setSuccess(null);
+    setIsPublishing(true);
+
+    try {
+      const response = await axios.post(`/api/events/${event.id}/${action}`);
+      onEventUpdate(response.data);
+      setSuccess(
+        action === "publish"
+          ? "Event published — it is now live on discovery."
+          : "Event unpublished — it is no longer listed publicly.",
+      );
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      const axiosError = err as {
+        response?: { status?: number; data?: { message?: string } };
+      };
+      if (axiosError.response?.status === 403) {
+        setError(
+          action === "publish"
+            ? "You do not have permission to publish this event"
+            : "You do not have permission to unpublish this event",
+        );
+      } else if (axiosError.response?.status === 404) {
+        setError("Event not found");
+      } else {
+        const message =
+          axiosError.response?.data?.message ||
+          (action === "publish"
+            ? "Failed to publish event"
+            : "Failed to unpublish event");
+        setError(message);
+      }
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -316,11 +356,11 @@ export function EventDetailsTab({
           disabled={!isEditable}
         />
 
-        <div className="flex gap-3 pt-4">
+        <div className="flex flex-wrap gap-3 pt-4">
           <Button
             type="submit"
             disabled={!isEditable || isSaving}
-            className="flex-1"
+            className="flex-1 min-w-[10rem]"
           >
             {isSaving ? "Saving..." : "Save Changes"}
           </Button>
@@ -330,13 +370,34 @@ export function EventDetailsTab({
               variant="secondary"
               onClick={handleSubmitForReview}
               disabled={isSubmitting}
-              className="flex-1"
+              className="flex-1 min-w-[10rem]"
             >
               {isSubmitting
                 ? "Submitting..."
                 : event.status === EventStatus.REJECTED
                   ? "Resubmit for Review"
                   : "Submit for Review"}
+            </Button>
+          )}
+          {!canEditOverride && event.status === EventStatus.APPROVED && (
+            <Button
+              type="button"
+              onClick={() => void handlePublishToggle("publish")}
+              disabled={isPublishing}
+              className="flex-1 min-w-[10rem]"
+            >
+              {isPublishing ? "Publishing..." : "Publish event"}
+            </Button>
+          )}
+          {!canEditOverride && event.status === EventStatus.PUBLISHED && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void handlePublishToggle("unpublish")}
+              disabled={isPublishing}
+              className="flex-1 min-w-[10rem]"
+            >
+              {isPublishing ? "Unpublishing..." : "Unpublish event"}
             </Button>
           )}
         </div>

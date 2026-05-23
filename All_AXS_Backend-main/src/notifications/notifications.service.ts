@@ -6,6 +6,7 @@ import { Notification } from '../domain/notification.entity';
 import { NotifyChannel, NotifyStatus } from '../domain/enums';
 import type { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { EmailService } from '../auth/services/email.service';
+import { UsersService } from '../users/users.service';
 import type {
   TicketEmailEventInput,
   TicketEmailTicketInput,
@@ -89,6 +90,19 @@ export type TicketDeliverySmsInput = {
   ticketCount?: number;
 };
 
+export type InstallmentDueReminderNotificationInput = {
+  buyerEmail: string;
+  buyerName?: string | null;
+  eventTitle: string;
+  amountCents: number;
+  currency: string;
+  dueAt: Date;
+  sequence: number;
+  isOverdue: boolean;
+  orderId: string;
+  orderUrl: string;
+};
+
 export type NotificationListItem = {
   id: string;
   title: string;
@@ -125,6 +139,7 @@ export class NotificationsService {
     @InjectRepository(Notification)
     private readonly notificationRepository: Repository<Notification>,
     private readonly emailService: EmailService,
+    private readonly usersService: UsersService,
     private readonly smsAdapter: AfricasTalkingSmsAdapter,
     private readonly whatsAppAdapter: TwilioWhatsAppAdapter,
     private readonly configService: ConfigService,
@@ -206,7 +221,13 @@ export class NotificationsService {
 
   async enqueueTicketEmail(
     input: TicketEmailNotificationInput,
-  ): Promise<Notification> {
+  ): Promise<Notification | null> {
+    if (!(await this.usersService.shouldSendOrdersEmail(input.buyerEmail))) {
+      this.logger.log(
+        `Skipping ticket email to ${input.buyerEmail} (ordersEmail preference off)`,
+      );
+      return null;
+    }
     return this.enqueueNotification({
       channel: NotifyChannel.EMAIL,
       to: input.buyerEmail,
@@ -217,8 +238,9 @@ export class NotificationsService {
 
   async dispatchTicketEmail(
     input: TicketEmailNotificationInput,
-  ): Promise<Notification> {
+  ): Promise<Notification | null> {
     const notification = await this.enqueueTicketEmail(input);
+    if (!notification) return null;
     await this.processNotification(notification.id);
     return (
       (await this.notificationRepository.findOne({
@@ -229,7 +251,13 @@ export class NotificationsService {
 
   async enqueuePaymentReceiptEmail(
     input: PaymentReceiptNotificationInput,
-  ): Promise<Notification> {
+  ): Promise<Notification | null> {
+    if (!(await this.usersService.shouldSendOrdersEmail(input.buyerEmail))) {
+      this.logger.log(
+        `Skipping payment receipt to ${input.buyerEmail} (ordersEmail preference off)`,
+      );
+      return null;
+    }
     return this.enqueueNotification({
       channel: NotifyChannel.EMAIL,
       to: input.buyerEmail,
@@ -240,14 +268,54 @@ export class NotificationsService {
 
   async dispatchPaymentReceiptEmail(
     input: PaymentReceiptNotificationInput,
-  ): Promise<Notification> {
+  ): Promise<Notification | null> {
     const notification = await this.enqueuePaymentReceiptEmail(input);
+    if (!notification) return null;
     await this.processNotification(notification.id);
     return (
       (await this.notificationRepository.findOne({
         where: { id: notification.id },
       })) ?? notification
     );
+  }
+
+  async dispatchInstallmentDueReminder(
+    input: InstallmentDueReminderNotificationInput,
+  ): Promise<void> {
+    const amountLabel = `${(input.amountCents / 100).toFixed(2)} ${input.currency}`;
+    const dueLabel = input.dueAt.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const title = input.isOverdue
+      ? 'Installment payment overdue'
+      : 'Installment payment due soon';
+    const body = input.isOverdue
+      ? `Pay ${amountLabel} for ${input.eventTitle} — due ${dueLabel}.`
+      : `${amountLabel} for ${input.eventTitle} is due ${dueLabel}.`;
+
+    await this.createInAppNotification({
+      to: input.buyerEmail,
+      title,
+      body,
+      link: input.orderUrl,
+      category: 'orders',
+      template: 'installment_due_reminder',
+      payload: {
+        orderId: input.orderId,
+        sequence: input.sequence,
+        isOverdue: input.isOverdue,
+      },
+    });
+
+    const notification = await this.enqueueNotification({
+      channel: NotifyChannel.EMAIL,
+      to: input.buyerEmail,
+      template: 'installment_due_reminder',
+      payload: this.serializeInstallmentDueReminderPayload(input),
+    });
+    await this.processNotification(notification.id);
   }
 
   async enqueueTicketWhatsApp(
@@ -432,6 +500,11 @@ export class NotificationsService {
       case 'payment_receipt':
         await this.emailService.sendPaymentReceiptEmail(
           this.deserializePaymentReceiptPayload(payload),
+        );
+        return;
+      case 'installment_due_reminder':
+        await this.emailService.sendInstallmentDueReminderEmail(
+          this.deserializeInstallmentDueReminderPayload(payload),
         );
         return;
       default:
@@ -705,6 +778,53 @@ export class NotificationsService {
         typeof payload.installmentNote === 'string'
           ? payload.installmentNote
           : null,
+    };
+  }
+
+  private serializeInstallmentDueReminderPayload(
+    input: InstallmentDueReminderNotificationInput,
+  ): NotificationPayload {
+    return {
+      buyerEmail: input.buyerEmail,
+      buyerName: input.buyerName ?? null,
+      eventTitle: input.eventTitle,
+      amountCents: input.amountCents,
+      currency: input.currency,
+      dueAt: input.dueAt.toISOString(),
+      sequence: input.sequence,
+      isOverdue: input.isOverdue,
+      orderId: input.orderId,
+      orderUrl: input.orderUrl,
+    };
+  }
+
+  private deserializeInstallmentDueReminderPayload(
+    payload: NotificationPayload,
+  ): Parameters<EmailService['sendInstallmentDueReminderEmail']>[0] {
+    return {
+      buyerEmail:
+        typeof payload.buyerEmail === 'string'
+          ? payload.buyerEmail
+          : typeof payload.to === 'string'
+            ? payload.to
+            : '',
+      buyerName:
+        typeof payload.buyerName === 'string' ? payload.buyerName : null,
+      eventTitle:
+        typeof payload.eventTitle === 'string' ? payload.eventTitle : 'Event',
+      amountCents:
+        typeof payload.amountCents === 'number' ? payload.amountCents : 0,
+      currency:
+        typeof payload.currency === 'string' ? payload.currency : 'KES',
+      dueAt:
+        typeof payload.dueAt === 'string'
+          ? new Date(payload.dueAt)
+          : new Date(),
+      sequence: typeof payload.sequence === 'number' ? payload.sequence : 1,
+      isOverdue:
+        typeof payload.isOverdue === 'boolean' ? payload.isOverdue : false,
+      orderUrl:
+        typeof payload.orderUrl === 'string' ? payload.orderUrl : '',
     };
   }
 

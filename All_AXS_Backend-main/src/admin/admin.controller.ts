@@ -691,11 +691,14 @@ export class AdminController {
 
   @Post('events/:id/approve')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Approve event for publication' })
+  @ApiOperation({
+    summary:
+      'Approve event for publication. The organiser must still publish it from their dashboard.',
+  })
   @ApiParam({ name: 'id', description: 'Event ID' })
   @ApiResponse({
     status: 200,
-    description: 'Event approved and published',
+    description: 'Event approved; awaiting organiser publish',
     schema: {
       type: 'object',
       properties: {
@@ -754,7 +757,8 @@ export class AdminController {
     });
 
     return {
-      message: 'Event approved and published successfully',
+      message:
+        'Event approved — the organiser can now publish it when they are ready.',
       event: {
         id: event.id,
         title: event.title,

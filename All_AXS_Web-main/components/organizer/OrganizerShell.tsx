@@ -32,6 +32,21 @@ export function OrganizerShell({
             match: (p) => p === "/organizer/sales",
           },
           {
+            href: "/organizer/customers",
+            label: "Customers",
+            match: (p) => p === "/organizer/customers",
+          },
+          {
+            href: "/organizer/refunds",
+            label: "Refunds",
+            match: (p) => p === "/organizer/refunds",
+          },
+          {
+            href: "/organizer/waitlist",
+            label: "Waitlist",
+            match: (p) => p === "/organizer/waitlist",
+          },
+          {
             href: "/organizer/earnings",
             label: "Earnings",
             match: (p) => p === "/organizer/earnings",
@@ -59,6 +74,26 @@ export function OrganizerShell({
             match: (p) => p === "/organizer/events/new",
           },
           {
+            href: "/organizer/calendar",
+            label: "Calendar",
+            match: (p) => p === "/organizer/calendar",
+          },
+          {
+            href: "/organizer/marketing",
+            label: "Marketing",
+            match: (p) => p === "/organizer/marketing",
+          },
+          {
+            href: "/organizer/affiliates",
+            label: "Affiliates",
+            match: (p) => p === "/organizer/affiliates",
+          },
+          {
+            href: "/organizer/store",
+            label: "Store",
+            match: (p) => p === "/organizer/store",
+          },
+          {
             href: "/organizer/team",
             label: "Team",
             match: (p) => p === "/organizer/team" || p.startsWith("/organizer/team/"),
@@ -67,6 +102,11 @@ export function OrganizerShell({
             href: "/organizer/account",
             label: "Account",
             match: (p) => p === "/organizer/account",
+          },
+          {
+            href: "/organizer/support",
+            label: "Support",
+            match: (p) => p === "/organizer/support",
           },
         ],
       },

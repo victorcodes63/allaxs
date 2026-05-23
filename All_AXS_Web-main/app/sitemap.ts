@@ -1,14 +1,10 @@
 import { MetadataRoute } from "next";
+import { SITE_BASE_URL } from "@/lib/seo/site-url";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:8080";
-
-const SITE_BASE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  process.env.NEXT_PUBLIC_BASE_URL ||
-  "http://localhost:3000";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Fetch published events for sitemap
@@ -37,25 +33,68 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Continue with empty events array
   }
 
-  // Static routes
+  const now = new Date();
+
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: `${SITE_BASE_URL}`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: "daily",
       priority: 1,
     },
     {
       url: `${SITE_BASE_URL}/events`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: "hourly",
       priority: 0.9,
     },
     {
       url: `${SITE_BASE_URL}/organizers`,
-      lastModified: new Date(),
+      lastModified: now,
       changeFrequency: "monthly",
       priority: 0.75,
+    },
+    {
+      url: `${SITE_BASE_URL}/pricing`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${SITE_BASE_URL}/contact`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${SITE_BASE_URL}/help`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${SITE_BASE_URL}/terms`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${SITE_BASE_URL}/privacy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${SITE_BASE_URL}/refund-policy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
+      url: `${SITE_BASE_URL}/payout-policy`,
+      lastModified: now,
+      changeFrequency: "yearly",
+      priority: 0.3,
     },
   ];
 

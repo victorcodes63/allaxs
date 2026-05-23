@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { usePathname, useSelectedLayoutSegments } from "next/navigation";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
+import { SkipToContent } from "@/components/layout/SkipToContent";
 import { LoggedInBrowseChrome } from "@/components/layout/LoggedInBrowseChrome";
 import { useAuth } from "@/lib/auth";
 import { useGuestOnlyPublicRedirect } from "@/lib/auth/use-guest-only-public-redirect";
@@ -96,13 +97,25 @@ function isLegalPath(pathname: string | null): boolean {
   return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
+/**
+ * Marketing info pages (help, pricing, contact) — always use full marketing
+ * chrome + footer for both guests and signed-in users so the surfaces stay
+ * consistently linkable from any context.
+ */
+function isMarketingInfoPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const paths = ["/help", "/pricing", "/contact"] as const;
+  return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 function usesFullMarketingChrome(pathname: string | null): boolean {
   return (
     isPublicAuthPath(pathname) ||
     isPublicHomePath(pathname) ||
     isPublicEventsCatalogPath(pathname) ||
     isOrganizersMarketingPath(pathname) ||
-    isLegalPath(pathname)
+    isLegalPath(pathname) ||
+    isMarketingInfoPath(pathname)
   );
 }
 
@@ -124,9 +137,12 @@ function AppChromeInner({ children }: { children: React.ReactNode }) {
 
   if (isHubPath(pathname, layoutSegments, !!user)) {
     return (
-      <div className="flex h-dvh max-h-dvh min-h-0 flex-1 w-full flex-col overflow-hidden bg-background text-foreground">
-        {children}
-      </div>
+      <>
+        <SkipToContent />
+        <div className="flex h-dvh max-h-dvh min-h-0 flex-1 w-full flex-col overflow-hidden bg-background text-foreground">
+          {children}
+        </div>
+      </>
     );
   }
 
@@ -134,60 +150,97 @@ function AppChromeInner({ children }: { children: React.ReactNode }) {
     const fullBleedAuthMain = isPublicAuthPath(pathname);
     const headlessAuth = isSignInSignUpPath(pathname);
     return (
-      <div
-        className={
-          fullBleedAuthMain
-            ? "flex min-h-dvh flex-1 w-full flex-col bg-transparent text-foreground"
-            : "flex min-h-dvh flex-1 w-full flex-col bg-background text-foreground"
-        }
-      >
-        {!headlessAuth ? <SiteHeader /> : null}
-        <main
+      <>
+        <SkipToContent />
+        <div
           className={
             fullBleedAuthMain
-              ? "relative flex flex-1 flex-col bg-transparent px-0 py-0"
-              : "flex-1 axs-page-shell py-8 md:py-10"
+              ? "flex min-h-dvh flex-1 w-full flex-col bg-transparent text-foreground"
+              : "flex min-h-dvh flex-1 w-full flex-col bg-background text-foreground"
           }
         >
-          {children}
-        </main>
-        <SiteFooter authContinuation={fullBleedAuthMain} />
-      </div>
+          {!headlessAuth ? <SiteHeader /> : null}
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className={
+              fullBleedAuthMain
+                ? "relative flex flex-1 flex-col bg-transparent px-0 py-0"
+                : "flex-1 axs-page-shell py-8 md:py-10"
+            }
+          >
+            {children}
+          </main>
+          <SiteFooter authContinuation={fullBleedAuthMain} />
+        </div>
+      </>
     );
   }
 
   if (user) {
     return (
-      <div className={shellClass}>
-        <LoggedInBrowseChrome />
-        <main className="min-h-0 flex-1 axs-page-shell py-8 md:py-10">{children}</main>
-      </div>
+      <>
+        <SkipToContent />
+        <div className={shellClass}>
+          <LoggedInBrowseChrome />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="min-h-0 flex-1 axs-page-shell py-8 md:py-10"
+          >
+            {children}
+          </main>
+        </div>
+      </>
     );
   }
 
   if (loading) {
     return (
-      <div className={shellClass}>
-        <SiteHeader />
-        <main className="flex-1 axs-page-shell py-8 md:py-10">{children}</main>
-        <SiteFooter />
-      </div>
+      <>
+        <SkipToContent />
+        <div className={shellClass}>
+          <SiteHeader />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="flex-1 axs-page-shell py-8 md:py-10"
+          >
+            {children}
+          </main>
+          <SiteFooter />
+        </div>
+      </>
     );
   }
 
   return (
-    <div className={shellClass}>
-      <SiteHeader />
-      <main className="flex-1 axs-page-shell py-8 md:py-10">{children}</main>
-      <SiteFooter />
-    </div>
+    <>
+      <SkipToContent />
+      <div className={shellClass}>
+        <SiteHeader />
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex-1 axs-page-shell py-8 md:py-10"
+        >
+          {children}
+        </main>
+        <SiteFooter />
+      </div>
+    </>
   );
 }
 
 function AppChromeFallback({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-1 w-full flex-col bg-background text-foreground">
-      <main className="flex-1 axs-page-shell py-8 md:py-10" aria-busy="true">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="flex-1 axs-page-shell py-8 md:py-10"
+        aria-busy="true"
+      >
         {children}
       </main>
     </div>

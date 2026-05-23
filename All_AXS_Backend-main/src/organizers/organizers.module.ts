@@ -28,6 +28,11 @@ import { OrganizationAccessService } from './organization-access.service';
 import { OrganizationTeamService } from './organization-team.service';
 import { OrganizationTeamController } from './organization-team.controller';
 import { UsersModule } from '../users/users.module';
+import { OrganizerCustomersController } from './organizer-customers.controller';
+import { OrganizerCustomersService } from './organizer-customers.service';
+import { OrganizerPayoutRequestsController } from './organizer-payout-requests.controller';
+import { OrganizerPayoutRequestsService } from './organizer-payout-requests.service';
+import { PayoutWithdrawRequest } from './entities/payout-withdraw-request.entity';
 
 @Module({
   imports: [
@@ -41,6 +46,7 @@ import { UsersModule } from '../users/users.module';
       AdminAuditLog,
       OrganizationMember,
       OrganizationInvite,
+      PayoutWithdrawRequest,
     ]),
     AuthModule,
     ScanModule,
@@ -55,6 +61,8 @@ import { UsersModule } from '../users/users.module';
     OrganizerAnalyticsController,
     OrganizerEventAnnouncementsController,
     OrganizationTeamController,
+    OrganizerCustomersController,
+    OrganizerPayoutRequestsController,
   ],
   providers: [
     OrganizerProfilesService,
@@ -65,6 +73,8 @@ import { UsersModule } from '../users/users.module';
     OrganizerEventAnnouncementsService,
     OrganizationAccessService,
     OrganizationTeamService,
+    OrganizerCustomersService,
+    OrganizerPayoutRequestsService,
   ],
   exports: [
     OrganizerProfilesService,

@@ -1736,6 +1736,7 @@ export class CheckoutService {
         ticketsPending: input.ticketsPending,
         installmentNote: input.installmentNote,
       });
+    if (!notification) return;
     if (notification.status === NotifyStatus.FAILED) {
       throw new Error(
         notification.error ?? 'Payment receipt email dispatch failed',
@@ -1773,7 +1774,9 @@ export class CheckoutService {
       accessUrl: summary.accessUrl,
       accountCreated: summary.accountCreated,
     });
-    await this.notificationsService.processNotification(notification.id);
+    if (notification) {
+      await this.notificationsService.processNotification(notification.id);
+    }
     await this.sendOrderTicketDeliverySms({
       order,
       eventTitle: event?.title ?? 'Event',

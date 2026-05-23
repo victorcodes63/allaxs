@@ -1264,6 +1264,91 @@ export class EmailService {
   }
 
   /**
+   * Reminds buyers to pay an upcoming or overdue installment on a payment plan.
+   */
+  async sendInstallmentDueReminderEmail(input: {
+    buyerEmail: string;
+    buyerName?: string | null;
+    eventTitle: string;
+    amountCents: number;
+    currency: string;
+    dueAt: Date;
+    sequence: number;
+    isOverdue: boolean;
+    orderUrl: string;
+  }): Promise<void> {
+    const context = 'sendInstallmentDueReminderEmail';
+    if (!this.resend || !this.resendFrom) {
+      this.logger.warn(
+        `[${context}] Email provider unavailable, skipping reminder for ${input.buyerEmail}`,
+      );
+      return;
+    }
+
+    const appName = this.configService.get<string>('APP_NAME', 'All AXS');
+    const amountLabel = this.formatMoney(input.amountCents, input.currency);
+    const dueLabel = input.dueAt.toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    const headline = input.isOverdue
+      ? 'Installment payment overdue'
+      : 'Installment payment due soon';
+    const intro = input.isOverdue
+      ? `Your installment ${input.sequence} for <strong>${input.eventTitle}</strong> was due on ${dueLabel}. Pay now to keep your tickets reserved.`
+      : `Installment ${input.sequence} for <strong>${input.eventTitle}</strong> is due on ${dueLabel}.`;
+
+    const greeting = input.buyerName?.trim()
+      ? `Hello ${input.buyerName.trim()},`
+      : 'Hello,';
+
+    const html = this.renderEmailShell({
+      preheader: `${amountLabel} due for ${input.eventTitle}.`,
+      title: headline,
+      intro: `${greeting} ${intro}`,
+      bodyHtml: `
+        <tr>
+          <td style="padding:8px 24px 0 24px;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;">
+              <tr>
+                <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Amount due</td>
+                <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#111827;font-weight:700;padding:4px 0;">${amountLabel}</td>
+              </tr>
+              <tr>
+                <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Due date</td>
+                <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">${dueLabel}</td>
+              </tr>
+              <tr>
+                <td style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#6b7280;padding:4px 0;">Installment</td>
+                <td align="right" style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#111827;padding:4px 0;">#${input.sequence}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      `,
+      actionLabel: 'Pay installment',
+      actionUrl: input.orderUrl,
+      footer: `Sent by ${appName}.`,
+    });
+
+    const subject = input.isOverdue
+      ? `Overdue: pay ${amountLabel} for ${input.eventTitle}`
+      : `Reminder: ${amountLabel} due for ${input.eventTitle}`;
+
+    const result = await this.resend.emails.send({
+      from: this.resendFrom,
+      to: input.buyerEmail,
+      subject,
+      html,
+    });
+    const resendId = this.assertResendSendOk(result, context);
+    this.logger.log(
+      `[${context}] Sent to ${input.buyerEmail} (Resend ID: ${resendId})`,
+    );
+  }
+
+  /**
    * Notifies the buyer after a successful order refund (full or partial).
    */
   async sendOrderRefundEmail(input: {

@@ -19,7 +19,7 @@ import { userInitials } from "@/lib/hub-user";
 import { userHasRole } from "@/lib/auth/hub-routing";
 import {
   DEFAULT_NOTIFICATION_PREFS,
-  getNotificationPrefs,
+  fetchNotificationPrefs,
   saveNotificationPrefs,
   type NotificationPrefs,
 } from "@/lib/fan-notification-prefs";
@@ -57,7 +57,9 @@ export default function FanAccountPage(): ReactElement {
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPrefs>(
     DEFAULT_NOTIFICATION_PREFS,
   );
-  const [prefsMounted, setPrefsMounted] = useState(false);
+  const [prefsLoading, setPrefsLoading] = useState(true);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [prefsSaving, setPrefsSaving] = useState(false);
 
   const {
     register: registerProfile,
@@ -87,22 +89,51 @@ export default function FanAccountPage(): ReactElement {
   }, [user, resetProfileForm]);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setPrefsMounted(true), 0);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    if (!prefsMounted || !user?.id) return;
-    setNotificationPrefs(getNotificationPrefs(user.id));
-  }, [prefsMounted, user?.id]);
-
-  const onToggleNotificationPref = (key: keyof NotificationPrefs) => {
     if (!user?.id) return;
-    setNotificationPrefs((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      saveNotificationPrefs(user.id, next);
-      return next;
-    });
+    let cancelled = false;
+    setPrefsLoading(true);
+    setPrefsError(null);
+    fetchNotificationPrefs()
+      .then((prefs) => {
+        if (!cancelled) setNotificationPrefs(prefs);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setPrefsError(
+            err instanceof Error
+              ? err.message
+              : "Could not load notification preferences",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPrefsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const onToggleNotificationPref = async (key: keyof NotificationPrefs) => {
+    if (!user?.id || prefsLoading || prefsSaving) return;
+    const previous = notificationPrefs;
+    const next = { ...previous, [key]: !previous[key] };
+    setNotificationPrefs(next);
+    setPrefsError(null);
+    setPrefsSaving(true);
+    try {
+      const saved = await saveNotificationPrefs({ [key]: next[key] });
+      setNotificationPrefs(saved);
+    } catch (err: unknown) {
+      setNotificationPrefs(previous);
+      setPrefsError(
+        err instanceof Error
+          ? err.message
+          : "Could not save notification preferences",
+      );
+    } finally {
+      setPrefsSaving(false);
+    }
   };
 
   const onSaveProfile = async (values: UpdateProfileInput) => {
@@ -429,10 +460,15 @@ export default function FanAccountPage(): ReactElement {
               Notification preferences
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
-              Choose which emails you want from All AXS. These settings are saved on this device.
-              When our backend supports preference-aware delivery, transactional email will respect
-              your choices here.
+              Choose which emails you want from All AXS. Preferences are saved to
+              your account and apply across devices. Transactional messages respect
+              your order and reminder settings.
             </p>
+            {prefsError ? (
+              <p className="mt-3 text-sm text-red-400" role="alert">
+                {prefsError}
+              </p>
+            ) : null}
             <ul className="mt-6 divide-y divide-border/70">
               {(
                 [
@@ -443,8 +479,8 @@ export default function FanAccountPage(): ReactElement {
                   },
                   {
                     key: "reminders" as const,
-                    label: "Event reminders",
-                    hint: "Friendly nudges before shows you have tickets for.",
+                    label: "Event & payment reminders",
+                    hint: "Installment due dates and friendly nudges before shows you have tickets for.",
                   },
                   {
                     key: "marketingEmail" as const,
@@ -466,7 +502,8 @@ export default function FanAccountPage(): ReactElement {
                     role="switch"
                     aria-checked={notificationPrefs[item.key]}
                     aria-label={`${item.label}: ${notificationPrefs[item.key] ? "on" : "off"}`}
-                    onClick={() => onToggleNotificationPref(item.key)}
+                    disabled={prefsLoading || prefsSaving}
+                    onClick={() => void onToggleNotificationPref(item.key)}
                     className={[
                       "relative inline-flex h-8 w-14 shrink-0 items-center rounded-full border transition-colors",
                       notificationPrefs[item.key]

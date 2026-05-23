@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import axios, { isAxiosError } from "axios";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { DuplicateEventButton } from "@/components/events/DuplicateEventButton";
 import { normalizeOrganizerEventsListPayload } from "@/lib/organizer-events-list";
 import { organizerEventStatusChipClass } from "@/lib/organizer-event-status-chip";
 import { getEventBannerUrl, shouldUnoptimizeEventImage } from "@/lib/utils/image";
@@ -465,11 +466,17 @@ function EventsListPageContent() {
                           ? "Poster ready for public surfaces."
                           : "Poster still needed before this listing looks complete."}
                       </p>
-                      <Link href={`/organizer/events/${event.id}/edit`} className="shrink-0">
-                        <Button variant="secondary" className="w-full sm:w-auto">
-                          Open editor
-                        </Button>
-                      </Link>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <DuplicateEventButton
+                          eventId={event.id}
+                          eventTitle={event.title}
+                        />
+                        <Link href={`/organizer/events/${event.id}/edit`}>
+                          <Button variant="secondary" className="w-full sm:w-auto">
+                            Open editor
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>

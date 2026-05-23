@@ -5,6 +5,8 @@ import {
 } from "@/lib/auth/jwt-payload";
 import {
   isGuestOnlyPublicPath,
+  isPublicBrowseActive,
+  PUBLIC_BROWSE_COOKIE,
   resolveGuestOnlyPublicRedirect,
 } from "@/lib/auth/guest-only-public-routes";
 
@@ -105,6 +107,20 @@ async function tryRefreshAndContinue(request: NextRequest): Promise<NextResponse
   return res;
 }
 
+function attachPublicBrowseCookie(response: NextResponse): NextResponse {
+  response.cookies.set(PUBLIC_BROWSE_COOKIE, "1", {
+    path: "/",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 4,
+  });
+  return response;
+}
+
+function clearPublicBrowseCookie(response: NextResponse): NextResponse {
+  response.cookies.delete(PUBLIC_BROWSE_COOKIE);
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const accessToken = request.cookies.get("accessToken")?.value;
@@ -127,6 +143,10 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isGuestOnlyPublicPath(pathname)) {
+    if (isPublicBrowseActive(request.nextUrl.searchParams, request.cookies)) {
+      return attachPublicBrowseCookie(NextResponse.next());
+    }
+
     if (accessToken && !accessTokenNeedsRotation(accessToken)) {
       return redirectSignedInFromGuestPublic(request, pathname, accessToken);
     }
@@ -141,25 +161,31 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isProtectedAppPath(pathname) && accessTokenNeedsRotation(accessToken)) {
-    const renewed = await tryRefreshAndContinue(request);
-    if (renewed) return renewed;
+  if (isProtectedAppPath(pathname)) {
+    if (accessTokenNeedsRotation(accessToken)) {
+      const renewed = await tryRefreshAndContinue(request);
+      if (renewed) {
+        return clearPublicBrowseCookie(renewed);
+      }
 
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    if (pathname.startsWith("/organizer")) {
-      loginUrl.searchParams.set("intent", "host");
-    } else if (
-      pathname === "/dashboard" ||
-      pathname.startsWith("/dashboard/") ||
-      pathname === "/tickets" ||
-      pathname.startsWith("/tickets/") ||
-      pathname === "/notifications" ||
-      pathname.startsWith("/notifications/")
-    ) {
-      loginUrl.searchParams.set("intent", "attend");
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      if (pathname.startsWith("/organizer")) {
+        loginUrl.searchParams.set("intent", "host");
+      } else if (
+        pathname === "/dashboard" ||
+        pathname.startsWith("/dashboard/") ||
+        pathname === "/tickets" ||
+        pathname.startsWith("/tickets/") ||
+        pathname === "/notifications" ||
+        pathname.startsWith("/notifications/")
+      ) {
+        loginUrl.searchParams.set("intent", "attend");
+      }
+      return clearPublicBrowseCookie(NextResponse.redirect(loginUrl));
     }
-    return NextResponse.redirect(loginUrl);
+
+    return clearPublicBrowseCookie(NextResponse.next());
   }
 
   return NextResponse.next();

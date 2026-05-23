@@ -589,13 +589,15 @@ describe('Events E2E', () => {
       }
     });
 
-    it('should approve event from pending to published (200)', async () => {
+    it('should approve event from pending to approved (200)', async () => {
       const response = await request(app.getHttpServer())
         .post(`/admin/events/${eventId}/approve`)
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      expect(response.body.event.status).toBe(EventStatus.PUBLISHED);
+      // Admin approval now stops at APPROVED — the organiser is responsible
+      // for the final transition to PUBLISHED via POST /events/:id/publish.
+      expect(response.body.event.status).toBe(EventStatus.APPROVED);
       expect(response.body.event.previousStatus).toBe(
         EventStatus.PENDING_REVIEW,
       );

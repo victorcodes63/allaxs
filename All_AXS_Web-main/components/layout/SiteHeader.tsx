@@ -63,7 +63,7 @@ function MainLink({
   );
 }
 
-/** Core catalogue links (Terms / Privacy / Sell tickets live in footer or body CTAs). */
+/** Core catalogue links (Pricing / Help / Contact live in footer). */
 const NAV_LINKS = [
   ["/", "Home"],
   ["/events", "Events"],

@@ -35,6 +35,18 @@ git config core.hooksPath .githooks
 
 Pushes to the `backend` remote are skipped by the hook (stdin is drained first so nested `git push backend` from the subtree script never hangs).
 
+## Deploy web (Vercel)
+
+The **allaxs** Vercel project uses **Root Directory** = `All_AXS_Web-main`. Always deploy from **this monorepo root**, not from inside `All_AXS_Web-main/` (nested deploys fail with a double-path error).
+
+```bash
+cd "/Users/victorchumo/Desktop/Raven Tech Group/AllAXS"
+./scripts/deploy-web.sh          # production
+./scripts/deploy-web.sh --preview # preview URL
+```
+
+Requires the [Vercel CLI](https://vercel.com/docs/cli) and `.vercel/project.json` at the repo root (`vercel link` once from here). See [All_AXS_Web-main/DEPLOY.md](All_AXS_Web-main/DEPLOY.md) and [All_AXS_Web-main/docs/VERCEL.md](All_AXS_Web-main/docs/VERCEL.md).
+
 ## Local development
 
 - **Web:** `cd All_AXS_Web-main && npm install && npm run dev`

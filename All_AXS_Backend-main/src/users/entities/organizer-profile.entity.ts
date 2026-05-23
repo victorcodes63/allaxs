@@ -93,6 +93,26 @@ export class OrganizerProfile extends BaseEntity {
   @Column({ type: 'boolean', default: false })
   verified!: boolean;
 
+  // ─── Branded public storefront (`/o/:slug`) ─────────────────────────────
+  // `storeSlug` is unique only when set; profiles without a slug remain
+  // private until the organizer picks one. The remaining fields populate
+  // the marketing surface for the public organizer page.
+  @Index({ unique: true, where: '"store_slug" IS NOT NULL' })
+  @Column({ type: 'varchar', length: 120, nullable: true, name: 'store_slug' })
+  storeSlug?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  bio?: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true, name: 'logo_url' })
+  logoUrl?: string | null;
+
+  @Column({ type: 'varchar', length: 16, nullable: true, name: 'brand_color' })
+  brandColor?: string | null;
+
+  @Column({ type: 'boolean', default: true, name: 'store_public' })
+  storePublic!: boolean;
+
   @OneToMany(() => Event, (e) => e.organizer)
   events!: Event[];
 }

@@ -7,8 +7,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
+import * as crypto from 'crypto';
 import { Event } from './entities/event.entity';
 import { TicketType } from './entities/ticket-type.entity';
+import { Coupon } from './entities/coupon.entity';
 import {
   EventStatus,
   EventType,
@@ -44,6 +46,8 @@ export class EventsService {
     private readonly adminAuditLogRepository: Repository<AdminAuditLog>,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    @InjectRepository(Coupon)
+    private readonly couponRepository: Repository<Coupon>,
   ) {}
 
   /**
@@ -271,14 +275,14 @@ export class EventsService {
     const approved = decision === 'approved';
     await this.notificationsService.createInAppNotification({
       to: organizerEmail,
-      title: approved ? 'Event approved' : 'Event needs changes',
+      title: approved ? 'Event approved — publish when ready' : 'Event needs changes',
       body: approved
-        ? `${event.title} is now live on All AXS.`
+        ? `${event.title} has been approved by admins. Publish it from the organizer dashboard when you're ready to go live.`
         : reason
           ? `${event.title} was rejected: ${reason}`
           : `${event.title} was rejected. Open the editor to update and resubmit.`,
       link: approved
-        ? `/events/${event.slug}`
+        ? `/organizer/events/${event.id}/edit`
         : `/organizer/events/${event.id}/edit`,
       category: 'hosting',
       template: approved ? 'event_review_approved' : 'event_review_rejected',
@@ -289,6 +293,50 @@ export class EventsService {
         rejectionReason: reason,
       },
     });
+  }
+
+  /**
+   * In-app notification for organiser self-serve publish/unpublish actions.
+   * Best-effort — we never fail the underlying state transition because the
+   * notification couldn't be persisted.
+   */
+  private async notifyOrganizerPublishAction(
+    eventId: string,
+    action: 'published' | 'unpublished',
+  ): Promise<void> {
+    const event = await this.eventRepository.findOne({
+      where: { id: eventId },
+      relations: ['organizer', 'organizer.user'],
+    });
+
+    const organizerEmail = event?.organizer?.user?.email;
+    if (!event || !organizerEmail) return;
+
+    const published = action === 'published';
+    try {
+      await this.notificationsService.createInAppNotification({
+        to: organizerEmail,
+        title: published ? 'Event published' : 'Event unpublished',
+        body: published
+          ? `${event.title} is now live on All AXS. Share the link to start selling tickets.`
+          : `${event.title} has been unpublished and archived. Buyers can no longer purchase tickets.`,
+        link: published
+          ? `/events/${event.slug}`
+          : `/organizer/events/${event.id}/edit`,
+        category: 'hosting',
+        template: published ? 'event_published' : 'event_unpublished',
+        payload: {
+          eventId: event.id,
+          eventTitle: event.title,
+          eventStatus: event.status,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to notify organiser for ${action} on event ${event.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
   }
 
   /**
@@ -573,7 +621,11 @@ export class EventsService {
   }
 
   /**
-   * Approve event (pending -> published) - Admin only
+   * Approve event (pending -> approved) - Admin only.
+   *
+   * Moderation now stops at APPROVED; the organiser is responsible for the
+   * final PUBLISHED transition via `publish()` so they can stage the listing
+   * and decide exactly when buyers can see it.
    */
   async approve(eventId: string): Promise<Event> {
     const event = await this.eventRepository.findOne({
@@ -590,11 +642,296 @@ export class EventsService {
       );
     }
 
-    event.status = EventStatus.PUBLISHED;
+    event.status = EventStatus.APPROVED;
     const savedEvent = await this.eventRepository.save(event);
     await this.notifyOrganizerReviewDecision(savedEvent.id, 'approved');
 
     // Reload with organizer relation to ensure it's available for serialization
+    return this.eventRepository.findOne({
+      where: { id: savedEvent.id },
+      relations: ['organizer'],
+    }) as Promise<Event>;
+  }
+
+  /**
+   * Organiser self-serve publish (APPROVED -> PUBLISHED).
+   *
+   * Requires admin approval first and at least one ticket tier so we don't
+   * accidentally publish a listing that has nothing to sell. Admins may
+   * bypass the ownership check (same pattern as `update`/`remove`).
+   */
+  async publish(
+    eventId: string,
+    userId: string,
+    userRoles?: Role[],
+  ): Promise<Event> {
+    const event = await this.ensureOwnership(eventId, userId, userRoles);
+
+    if (event.status !== EventStatus.APPROVED) {
+      throw new BadRequestException(
+        'Event can only be published from APPROVED status. Submit it for review first.',
+      );
+    }
+
+    const ticketTierCount = await this.ticketTypeRepository.count({
+      where: { eventId: event.id },
+    });
+    if (ticketTierCount === 0) {
+      throw new BadRequestException(
+        'Add at least one ticket tier before publishing the event.',
+      );
+    }
+
+    event.status = EventStatus.PUBLISHED;
+    const savedEvent = await this.eventRepository.save(event);
+    await this.notifyOrganizerPublishAction(savedEvent.id, 'published');
+
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
+    if (isAdmin && event.organizer.userId !== userId) {
+      await this.recordAdminAction(userId, 'ADMIN_PUBLISH_EVENT', eventId, {
+        organizerUserId: event.organizer.userId,
+        previousStatus: EventStatus.APPROVED,
+      });
+    }
+
+    return this.eventRepository.findOne({
+      where: { id: savedEvent.id },
+      relations: ['organizer'],
+    }) as Promise<Event>;
+  }
+
+  /**
+   * Organiser self-serve unpublish (PUBLISHED -> ARCHIVED).
+   *
+   * Allowed even when paid orders exist so an organiser can stop new sales
+   * (e.g. cancellation, postponement) without going through support. Buyers
+   * keep their tickets; the caller receives a `warning` in the response
+   * metadata if paid orders exist so the UI can show a confirmation toast.
+   */
+  async unpublish(
+    eventId: string,
+    userId: string,
+    userRoles?: Role[],
+  ): Promise<{ event: Event; warning?: string; paidOrderCount: number }> {
+    const event = await this.ensureOwnership(eventId, userId, userRoles);
+
+    if (event.status !== EventStatus.PUBLISHED) {
+      throw new BadRequestException(
+        'Only PUBLISHED events can be unpublished.',
+      );
+    }
+
+    const paidOrderCount = await this.orderRepository.count({
+      where: { eventId, status: OrderStatus.PAID },
+    });
+
+    event.status = EventStatus.ARCHIVED;
+    const savedEvent = await this.eventRepository.save(event);
+    await this.notifyOrganizerPublishAction(savedEvent.id, 'unpublished');
+
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
+    if (isAdmin && event.organizer.userId !== userId) {
+      await this.recordAdminAction(userId, 'ADMIN_UNPUBLISH_EVENT', eventId, {
+        organizerUserId: event.organizer.userId,
+        previousStatus: EventStatus.PUBLISHED,
+        paidOrderCount,
+      });
+    }
+
+    const reloaded = (await this.eventRepository.findOne({
+      where: { id: savedEvent.id },
+      relations: ['organizer'],
+    })) as Event;
+
+    return {
+      event: reloaded,
+      paidOrderCount,
+      warning:
+        paidOrderCount > 0
+          ? `This event has ${paidOrderCount} paid order(s). Existing tickets remain valid; contact support if you need refunds.`
+          : undefined,
+    };
+  }
+
+  /**
+   * Duplicate an event into a new DRAFT owned by the same organiser.
+   *
+   * Copies the editorial fields plus every ticket tier (sold counts reset)
+   * and every coupon (redemption counters reset). The new event always
+   * starts in DRAFT regardless of the source status so the organiser can
+   * adjust it before submitting for review.
+   */
+  async duplicate(
+    eventId: string,
+    userId: string,
+    userRoles?: Role[],
+  ): Promise<Event> {
+    const source = await this.ensureOwnership(eventId, userId, userRoles);
+
+    const sourceTiers = await this.ticketTypeRepository.find({
+      where: { eventId: source.id },
+      order: { createdAt: 'ASC' },
+    });
+
+    const sourceCoupons = await this.couponRepository.find({
+      where: { eventId: source.id },
+    });
+
+    const newTitle = `${source.title} (Copy)`;
+    const baseSlug = this.slugify(newTitle);
+    const newSlug = await this.generateUniqueSlug(baseSlug);
+
+    const duplicate = this.eventRepository.create({
+      organizer: source.organizer,
+      title: newTitle,
+      description: source.description,
+      type: source.type,
+      venue: source.venue,
+      city: source.city,
+      country: source.country,
+      startAt: source.startAt,
+      endAt: source.endAt,
+      category: source.category,
+      isPublic: source.isPublic,
+      // Featured flag is admin-only; never carry it over to the copy.
+      isFeatured: false,
+      featuredSortOrder: null,
+      status: EventStatus.DRAFT,
+      slug: newSlug,
+      // Reset the moderation timestamp on the copy.
+      submittedAt: null,
+      // Banner intentionally not cloned — banners are stored under the
+      // source event's key so the copy must upload its own.
+      bannerUrl: null,
+      metadata: source.metadata
+        ? {
+            ...source.metadata,
+            duplicatedFromEventId: source.id,
+            // Strip moderation metadata that doesn't apply to a fresh draft.
+            rejectionReason: undefined,
+            idemKey: undefined,
+          }
+        : { duplicatedFromEventId: source.id },
+    });
+
+    const savedDuplicate = await this.eventRepository.save(duplicate);
+
+    if (sourceTiers.length > 0) {
+      const newTiers = sourceTiers.map((tier) =>
+        this.ticketTypeRepository.create({
+          eventId: savedDuplicate.id,
+          name: tier.name,
+          description: tier.description,
+          priceCents: tier.priceCents,
+          currency: tier.currency,
+          quantityTotal: tier.quantityTotal,
+          quantitySold: 0,
+          minPerOrder: tier.minPerOrder,
+          maxPerOrder: tier.maxPerOrder,
+          salesStart: tier.salesStart,
+          salesEnd: tier.salesEnd,
+          status: tier.status,
+          allowInstallments: tier.allowInstallments,
+          installmentConfig: tier.installmentConfig ?? null,
+          // Hidden / comp-link tiers get a brand-new token on the copy so
+          // the source listing's secret URL isn't accidentally exposed.
+          isHidden: tier.isHidden,
+          compLinkToken: tier.isHidden
+            ? crypto.randomBytes(24).toString('base64url')
+            : null,
+        }),
+      );
+      await this.ticketTypeRepository.save(newTiers);
+    }
+
+    if (sourceCoupons.length > 0) {
+      const newCoupons = sourceCoupons.map((coupon) =>
+        this.couponRepository.create({
+          // Append a short suffix so the duplicated coupon doesn't collide
+          // with the source code (codes are globally unique). Organisers can
+          // rename them after duplication.
+          code: `${coupon.code}-copy-${Math.random()
+            .toString(36)
+            .slice(2, 6)}`,
+          kind: coupon.kind,
+          valueCents: coupon.valueCents,
+          percentOff: coupon.percentOff,
+          startAt: coupon.startAt,
+          endAt: coupon.endAt,
+          usageLimit: coupon.usageLimit,
+          usedCount: 0,
+          perUserLimit: coupon.perUserLimit,
+          minOrderCents: coupon.minOrderCents,
+          currency: coupon.currency,
+          eventId: savedDuplicate.id,
+          active: coupon.active,
+        }),
+      );
+      await this.couponRepository.save(newCoupons);
+    }
+
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
+    if (isAdmin && source.organizer.userId !== userId) {
+      await this.recordAdminAction(
+        userId,
+        'ADMIN_DUPLICATE_EVENT',
+        savedDuplicate.id,
+        {
+          sourceEventId: source.id,
+          organizerUserId: source.organizer.userId,
+        },
+      );
+    }
+
+    return this.eventRepository.findOne({
+      where: { id: savedDuplicate.id },
+      relations: ['organizer'],
+    }) as Promise<Event>;
+  }
+
+  /**
+   * Clear the banner image on an event. Organisers can wipe the banner
+   * while the event is still in DRAFT, PENDING_REVIEW, REJECTED, or
+   * APPROVED (i.e. anything before it goes live). Admins may clear it on
+   * any status to remove inappropriate imagery.
+   */
+  async removeBanner(
+    eventId: string,
+    userId: string,
+    userRoles?: Role[],
+  ): Promise<Event> {
+    const event = await this.ensureOwnership(eventId, userId, userRoles);
+    const isAdmin = userRoles?.includes(Role.ADMIN) ?? false;
+
+    const organizerEditableStatuses: EventStatus[] = [
+      EventStatus.DRAFT,
+      EventStatus.PENDING_REVIEW,
+      EventStatus.REJECTED,
+      EventStatus.APPROVED,
+    ];
+
+    if (!isAdmin && !organizerEditableStatuses.includes(event.status)) {
+      throw new BadRequestException(
+        'Banner can only be removed while the event is DRAFT, PENDING_REVIEW, REJECTED, or APPROVED. Contact support for published events.',
+      );
+    }
+
+    const previousBannerUrl = event.bannerUrl;
+    event.bannerUrl = null;
+    const savedEvent = await this.eventRepository.save(event);
+
+    if (isAdmin && event.organizer.userId !== userId) {
+      await this.recordAdminAction(
+        userId,
+        'ADMIN_REMOVE_EVENT_BANNER',
+        eventId,
+        {
+          organizerUserId: event.organizer.userId,
+          previousBannerUrl,
+        },
+      );
+    }
+
     return this.eventRepository.findOne({
       where: { id: savedEvent.id },
       relations: ['organizer'],

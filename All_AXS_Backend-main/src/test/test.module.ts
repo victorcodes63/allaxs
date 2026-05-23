@@ -6,6 +6,7 @@ import { User } from '../users/entities/user.entity';
 import { EmailVerification } from '../auth/entities/email-verification.entity';
 import { PasswordReset } from '../auth/entities/password-reset.entity';
 import { AdminAuditLog } from '../admin/entities/admin-audit-log.entity';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 /**
  * Test module - only loaded in test environment or when ENABLE_TEST_ROUTES=true
@@ -19,6 +20,7 @@ import { AdminAuditLog } from '../admin/entities/admin-audit-log.entity';
       PasswordReset,
       AdminAuditLog,
     ]),
+    NotificationsModule,
   ],
   controllers: [TestController],
   providers: [TestService],

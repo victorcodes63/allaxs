@@ -89,6 +89,26 @@ export class Order extends BaseEntity {
   @Column({ type: 'varchar', length: 16, nullable: true, name: 'refund_mode' })
   refundMode?: string | null;
 
+  // ─── Attribution (utm + referrer + affiliate code) ──────────────────────
+  // All nullable so legacy orders + clients that don't pass attribution
+  // continue to work unchanged.
+  @Index()
+  @Column({ type: 'varchar', length: 120, nullable: true, name: 'utm_source' })
+  utmSource?: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true, name: 'utm_medium' })
+  utmMedium?: string | null;
+
+  @Column({ type: 'varchar', length: 180, nullable: true, name: 'utm_campaign' })
+  utmCampaign?: string | null;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  referrer?: string | null;
+
+  @Index()
+  @Column({ type: 'varchar', length: 80, nullable: true, name: 'affiliate_code' })
+  affiliateCode?: string | null;
+
   @OneToMany(() => OrderItem, (i) => i.order)
   items!: OrderItem[];
 

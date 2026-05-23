@@ -29,3 +29,16 @@ export async function sendEventAnnouncement(
   );
   return res.data;
 }
+
+export type SendSmsAnnouncementResult = SendAnnouncementResult;
+
+export async function sendEventSmsAnnouncement(
+  eventId: string,
+  payload: { body: string },
+): Promise<SendSmsAnnouncementResult> {
+  const res = await apiClient.post<SendSmsAnnouncementResult>(
+    `/organizer/events/${eventId}/announcements/sms`,
+    payload,
+  );
+  return res.data;
+}

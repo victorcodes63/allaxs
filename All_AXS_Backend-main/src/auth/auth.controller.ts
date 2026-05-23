@@ -24,6 +24,7 @@ import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateNotificationPrefsDto } from './dto/update-notification-prefs.dto';
 import { CloseAccountDto } from './dto/close-account.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from './decorators/current-user.decorator';
@@ -111,6 +112,22 @@ export class AuthController {
       dto,
       this.extractMetadata(req),
     );
+  }
+
+  @Get('notification-preferences')
+  @UseGuards(JwtAuthGuard)
+  async getNotificationPreferences(@GetUser() user: CurrentUser) {
+    return this.authService.getNotificationPreferences(user.id);
+  }
+
+  @Patch('notification-preferences')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateNotificationPreferences(
+    @GetUser() user: CurrentUser,
+    @Body() dto: UpdateNotificationPrefsDto,
+  ) {
+    return this.authService.updateNotificationPreferences(user.id, dto);
   }
 
   @Post('close-account')

@@ -11,12 +11,15 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "typecheck": "tsc --noEmit",
     "cypress": "cypress open",
-    "cypress:run": "cypress run"
+    "cypress:run": "cypress run",
+    "deploy:prod": "node -e \"console.error('\\nDeploy from monorepo root: cd .. && ./scripts/deploy-web.sh\\nSee DEPLOY.md\\n'); process.exit(1)\"",
+    "deploy:preview": "node -e \"console.error('\\nDeploy from monorepo root: cd .. && ./scripts/deploy-web.sh --preview\\nSee DEPLOY.md\\n'); process.exit(1)\""
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@react-oauth/google": "^0.12.2",
     "@sentry/nextjs": "^10.53.1",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/blob": "^2.3.3",
     "axios": "^1.13.2",
     "framer-motion": "^12.38.0",

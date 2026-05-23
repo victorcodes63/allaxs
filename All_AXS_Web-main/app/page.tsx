@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   buildQuickFilterLinks,
   deriveHomeEventsLists,
@@ -6,12 +7,27 @@ import {
 import { isDemoPublicEventsMode } from "@/lib/public-events-mode";
 import { fetchPublicEvents } from "@/lib/utils/api-server";
 import { HomeView } from "@/components/home/HomeView";
+import { HomeJsonLd } from "@/components/seo/HomeJsonLd";
+import { buildPageMetadata } from "@/lib/seo/metadata";
 import { redirectSignedInFromGuestPublicPath } from "@/lib/auth/redirect-signed-in-from-public";
+import { redirectSearchFromPageParams } from "@/lib/auth/guest-only-public-routes";
 
 export const revalidate = 60;
 
-export default async function Home() {
-  await redirectSignedInFromGuestPublicPath("/");
+export const metadata: Metadata = buildPageMetadata({
+  title: "All AXS | Events & ticketing",
+  description:
+    "Discover live experiences and get tickets in seconds—built for fans and organizers across Africa.",
+  path: "/",
+});
+
+type HomePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function Home({ searchParams }: HomePageProps) {
+  const params = await searchParams;
+  await redirectSignedInFromGuestPublicPath("/", redirectSearchFromPageParams(params));
   let featuredEvents: Awaited<
     ReturnType<typeof deriveHomeEventsLists>
   >["featuredEvents"] = [];
@@ -44,11 +60,14 @@ export default async function Home() {
   const quickFilterLinks = buildQuickFilterLinks();
 
   return (
-    <HomeView
-      featuredEvents={featuredEvents}
-      startingSoonEvents={startingSoonEvents}
-      quickFilterLinks={quickFilterLinks}
-      genreLinks={HOME_GENRE_LINKS}
-    />
+    <>
+      <HomeJsonLd />
+      <HomeView
+        featuredEvents={featuredEvents}
+        startingSoonEvents={startingSoonEvents}
+        quickFilterLinks={quickFilterLinks}
+        genreLinks={HOME_GENRE_LINKS}
+      />
+    </>
   );
 }

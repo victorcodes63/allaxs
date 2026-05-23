@@ -231,27 +231,38 @@ export function EventMediaTab({
 
     if (
       !confirm(
-        "Are you sure you want to remove the banner? This action cannot be undone."
+        "Are you sure you want to remove the banner? This action cannot be undone.",
       )
     ) {
       return;
     }
 
     setError(null);
+    setSuccess(null);
+    setUploading(true);
 
     try {
-      // Note: The backend doesn't currently support removing banners via PATCH
-      // (bannerUrl is excluded from UpdateEventDto). This would require
-      // a backend endpoint to delete/remove banners, or we could upload
-      // a placeholder image. For now, we'll show a message.
-      setError(
-        "Banner removal is not yet supported. Please upload a new banner to replace the current one."
-      );
+      const res = await axios.delete(`/api/events/${event.id}/banner`);
+      // The backend returns the updated event after banner removal.
+      onEventUpdate(res.data);
+      setPreviewUrl(null);
+      setSuccess("Banner removed.");
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
-      const message =
-        (err as { response?: { data?: { message?: string } } }).response?.data
-          ?.message || "Failed to remove banner";
-      setError(message);
+      const axiosError = err as {
+        response?: { status?: number; data?: { message?: string } };
+      };
+      const status = axiosError.response?.status;
+      const message = axiosError.response?.data?.message;
+      if (status === 403) {
+        setError("You do not have permission to remove the banner.");
+      } else if (status === 404) {
+        setError("Event not found.");
+      } else {
+        setError(message || "Failed to remove banner. Please try again.");
+      }
+    } finally {
+      setUploading(false);
     }
   };
 

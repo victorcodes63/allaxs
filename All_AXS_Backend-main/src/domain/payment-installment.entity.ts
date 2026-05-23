@@ -43,4 +43,7 @@ export class PaymentInstallment extends BaseEntity {
     default: PaymentInstallmentStatus.PENDING,
   })
   status!: PaymentInstallmentStatus;
+
+  @Column({ type: 'timestamptz', nullable: true, name: 'last_reminder_sent_at' })
+  lastReminderSentAt?: Date | null;
 }

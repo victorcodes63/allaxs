@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -9,6 +9,12 @@ import { userInitials } from "@/lib/hub-user";
 import { HubTopBar, type HubKind } from "@/components/layout/hub/HubTopBar";
 import { HubLegalLinks } from "@/components/legal/HubLegalLinks";
 import { useAuth } from "@/lib/auth";
+import { useHubSidebarPins } from "@/lib/hooks/use-hub-sidebar-pins";
+import {
+  MAX_HUB_SIDEBAR_PINS,
+  hubNavItemId,
+  organizeHubNavSections,
+} from "@/lib/hub-sidebar-pins";
 
 export type HubNavItem = {
   href: string;
@@ -89,6 +95,26 @@ function navItemIcon(label: string, href: string): React.ReactNode {
   );
 }
 
+function PinIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden>
+      {filled ? (
+        <path
+          d="M14.5 3.5 16 5l-1.2 1.2 1.8 1.8 1.2-1.2L19 8.5 12.5 15l-3-3L14.5 3.5ZM8.8 12.2l3 3L5 22l-1-1 6.8-6.8Z"
+          fill="currentColor"
+        />
+      ) : (
+        <path
+          d="M14.5 3.5 16 5l-1.2 1.2 1.8 1.8 1.2-1.2L19 8.5 12.5 15l-3-3L14.5 3.5ZM8.8 12.2l3 3L5 22l-1-1 6.8-6.8Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+      )}
+    </svg>
+  );
+}
+
 type HubAppShellProps = {
   brandHome: string;
   hubEyebrow: string;
@@ -123,7 +149,20 @@ export function HubAppShell({
 }: HubAppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { setUser, user: authUser } = useAuth();
+  const sidebarUserId = authUser?.id || authUser?.email || user.email;
+  const { pinnedIds, togglePin, isPinned, pinLimitReached } = useHubSidebarPins(
+    hubKind,
+    sidebarUserId,
+    sections,
+  );
+  const navSections = useMemo(() => {
+    const { pinnedSection, sections: remaining } = organizeHubNavSections(
+      sections,
+      pinnedIds,
+    );
+    return pinnedSection ? [pinnedSection, ...remaining] : remaining;
+  }, [sections, pinnedIds]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -203,7 +242,7 @@ export function HubAppShell({
     collapsed?: boolean;
   }) => (
     <nav className="px-2" aria-label="Hub">
-      {sections.map((section, sectionIndex) => (
+      {navSections.map((section, sectionIndex) => (
         <div
           key={section.title}
           className={[
@@ -218,33 +257,100 @@ export function HubAppShell({
           )}
           <div className="flex flex-col gap-0.5">
             {section.items.map((item) => {
+              const itemId = hubNavItemId(item);
               const active = hubItemActive(item, pathname);
+              const pinned = isPinned(itemId);
+              const canPin = !pinned && pinLimitReached;
+
               return (
-                <Link
-                  key={item.href + item.label}
-                  href={item.href}
-                  onClick={onNavigate}
-                  aria-current={active ? "page" : undefined}
+                <div
+                  key={itemId}
                   className={[
-                    "relative mx-1 rounded-[10px] px-3 py-2.5 text-sm font-medium transition-[color,background-color,box-shadow] duration-200",
-                    collapsed ? "flex items-center justify-center px-2" : "",
-                    active
-                      ? "bg-primary/[0.12] text-foreground shadow-[inset_3px_0_0_0_var(--primary)]"
-                      : "text-foreground/65 hover:bg-wash hover:text-foreground",
+                    "group/nav-item relative mx-1",
+                    collapsed ? "" : "pr-1",
                   ].join(" ")}
-                  title={collapsed ? item.label : undefined}
                 >
-                  {collapsed ? (
-                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-surface text-foreground/80">
-                      {navItemIcon(item.label, item.href)}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2.5">
-                      <span className="text-foreground/75">{navItemIcon(item.label, item.href)}</span>
-                      <span>{item.label}</span>
-                    </span>
+                  <Link
+                    href={item.href}
+                    onClick={onNavigate}
+                    aria-current={active ? "page" : undefined}
+                    className={[
+                      "relative block rounded-[10px] px-3 py-2.5 text-sm font-medium transition-[color,background-color,box-shadow] duration-200",
+                      collapsed ? "flex items-center justify-center px-2" : "pr-9",
+                      active
+                        ? "bg-primary/[0.12] text-foreground shadow-[inset_3px_0_0_0_var(--primary)]"
+                        : "text-foreground/65 hover:bg-wash hover:text-foreground",
+                    ].join(" ")}
+                    title={
+                      collapsed
+                        ? pinned
+                          ? `${item.label} (pinned)`
+                          : item.label
+                        : undefined
+                    }
+                  >
+                    {collapsed ? (
+                      <span
+                        className={[
+                          "relative inline-flex h-8 w-8 items-center justify-center rounded-md border bg-surface text-foreground/80",
+                          pinned
+                            ? "border-primary/35 ring-1 ring-primary/20"
+                            : "border-border/70",
+                        ].join(" ")}
+                      >
+                        {navItemIcon(item.label, item.href)}
+                        {pinned ? (
+                          <span
+                            className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary"
+                            aria-hidden
+                          />
+                        ) : null}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2.5">
+                        <span className="text-foreground/75">
+                          {navItemIcon(item.label, item.href)}
+                        </span>
+                        <span className="min-w-0 truncate">{item.label}</span>
+                      </span>
+                    )}
+                  </Link>
+                  {collapsed ? null : (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        togglePin(itemId);
+                      }}
+                      disabled={canPin}
+                      aria-pressed={pinned}
+                      aria-label={
+                        pinned
+                          ? `Unpin ${item.label}`
+                          : canPin
+                            ? `Pin limit reached (${MAX_HUB_SIDEBAR_PINS} items)`
+                            : `Pin ${item.label} to top`
+                      }
+                      title={
+                        pinned
+                          ? "Unpin"
+                          : canPin
+                            ? `Maximum ${MAX_HUB_SIDEBAR_PINS} pinned items`
+                            : "Pin to top"
+                      }
+                      className={[
+                        "absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-muted transition-[opacity,color,background-color,border-color]",
+                        pinned
+                          ? "opacity-100 text-primary"
+                          : "opacity-0 group-hover/nav-item:opacity-100 group-focus-within/nav-item:opacity-100 hover:border-border/70 hover:bg-wash hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                        canPin ? "cursor-not-allowed opacity-40" : "",
+                      ].join(" ")}
+                    >
+                      <PinIcon filled={pinned} />
+                    </button>
                   )}
-                </Link>
+                </div>
               );
             })}
           </div>

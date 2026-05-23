@@ -11,6 +11,7 @@ import { EventsSearchSubmitButton } from "@/components/events/EventsSearchSubmit
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { buildEventsCatalogQueryString } from "@/lib/events/build-events-catalog-query";
 import { redirectSignedInFromGuestPublicPath } from "@/lib/auth/redirect-signed-in-from-public";
+import { redirectSearchFromPageParams } from "@/lib/auth/guest-only-public-routes";
 
 export const revalidate = 60;
 
@@ -23,6 +24,7 @@ interface EventsPageProps {
     dateFrom?: string;
     dateTo?: string;
     city?: string;
+    public?: string;
   }>;
 }
 
@@ -66,7 +68,10 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
   );
   await redirectSignedInFromGuestPublicPath(
     "/events",
-    catalogSearch ? `?${catalogSearch}` : "",
+    redirectSearchFromPageParams(
+      params,
+      catalogSearch ? `?${catalogSearch}` : "",
+    ),
   );
 
   const page = parseInt(params.page || "1", 10);

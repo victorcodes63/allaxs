@@ -3,13 +3,16 @@ import Link from "next/link";
 import { CtaArrow } from "@/components/ui/CtaArrow";
 import { FooterBackToTop } from "@/components/layout/FooterBackToTop";
 import { FooterStayInTheLoop } from "@/components/layout/FooterStayInTheLoop";
-import { AuthFooterDemoLogins } from "@/components/auth/AuthFooterDemoLogins";
 import { FooterLegalLinks } from "@/components/legal/FooterLegalLinks";
+import { withPublicBrowseIntent } from "@/lib/auth/guest-only-public-routes";
 
 const FOOTER_NAV = [
   ["/", "Home"],
   ["/events", "Events"],
   ["/organizers", "For organizers"],
+  ["/pricing", "Pricing"],
+  ["/help", "Help"],
+  ["/contact", "Contact"],
   ["/register", "Sign up"],
   ["/login", "Sign in"],
 ] as const;
@@ -19,6 +22,7 @@ const AUTH_COMPACT_NAV = [
   ["/", "Home"],
   ["/events", "Events"],
   ["/organizers", "Organizers"],
+  ["/help", "Help"],
 ] as const;
 
 const CONTACT_EMAIL = "hello@allaxs.com";
@@ -65,15 +69,14 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
             aria-label="Footer"
           >
             {AUTH_COMPACT_NAV.map(([href, label]) => (
-              <Link
+              <a
                 key={href + label}
-                href={href}
+                href={withPublicBrowseIntent(href)}
                 className="text-white/65 transition-colors hover:text-primary"
               >
                 {label}
-              </Link>
+              </a>
             ))}
-            <AuthFooterDemoLogins />
           </nav>
         </div>
         <div className="border-t border-white/10 bg-[#050506] text-white">

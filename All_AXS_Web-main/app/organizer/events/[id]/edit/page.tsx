@@ -17,8 +17,11 @@ import { EventTicketTiersTab } from "@/components/organizer/event-editor/EventTi
 import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab";
 import { EventCouponsTab } from "@/components/organizer/event-editor/EventCouponsTab";
 import { EventScannerTab } from "@/components/organizer/event-editor/EventScannerTab";
+import { EventInsightsTab } from "@/components/organizer/event-editor/EventInsightsTab";
+import { EventCompsPanel } from "@/components/organizer/event-editor/EventCompsPanel";
 import { OrganizerAdminEditBanner } from "@/components/organizer/event-editor/OrganizerAdminEditBanner";
 import { DeleteEventButton } from "@/components/events/DeleteEventButton";
+import { DuplicateEventButton } from "@/components/events/DuplicateEventButton";
 import { resolveCurrencyFromTiers } from "@/lib/currency";
 import { EventStatus } from "@/lib/validation/event";
 
@@ -58,6 +61,8 @@ const EDITOR_TAB_IDS = [
   "ticket-tiers",
   "coupons",
   "sales",
+  "insights",
+  "comps",
   "scanner",
 ] as const;
 type EditorTabId = (typeof EDITOR_TAB_IDS)[number];
@@ -219,6 +224,25 @@ export default function EventEditorPage() {
       content: <EventSalesTab eventId={event.id} eventTitle={event.title} />,
     },
     {
+      id: "insights",
+      label: "Insights",
+      content: <EventInsightsTab eventId={event.id} eventTitle={event.title} />,
+    },
+    {
+      id: "comps",
+      label: "Comps",
+      content: (
+        <EventCompsPanel
+          eventId={event.id}
+          eventTitle={event.title}
+          ticketTypes={(event.ticketTypes ?? []).map((tt) => ({
+            id: tt.id,
+            name: tt.name,
+          }))}
+        />
+      ),
+    },
+    {
       id: "scanner",
       label: "Scanner Links",
       content: (
@@ -229,19 +253,22 @@ export default function EventEditorPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted">
             Editing
           </p>
           <p className="text-lg font-semibold text-foreground">{event.title}</p>
         </div>
-        <Link
-          href="/organizer/events"
-          className="shrink-0 text-sm font-medium text-primary hover:underline"
-        >
-          ← Back to events
-        </Link>
+        <div className="flex shrink-0 items-center gap-3">
+          <DuplicateEventButton eventId={event.id} eventTitle={event.title} />
+          <Link
+            href="/organizer/events"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            ← Back to events
+          </Link>
+        </div>
       </div>
 
       <OrganizerAdminEditBanner eventId={event.id} />

@@ -11,11 +11,13 @@ import type { SeedUserDto } from './test.service';
 import { AdminAuditLog } from '../admin/entities/admin-audit-log.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InstallmentReminderTask } from '../notifications/installment-reminder.task';
 
 @Controller('__test__')
 export class TestController {
   constructor(
     private readonly testService: TestService,
+    private readonly installmentReminderTask: InstallmentReminderTask,
     @InjectRepository(AdminAuditLog)
     private readonly adminAuditLogRepository: Repository<AdminAuditLog>,
   ) {
@@ -73,5 +75,10 @@ export class TestController {
       status: latest.status,
       createdAt: latest.createdAt,
     };
+  }
+
+  @Post('run-installment-reminders')
+  async runInstallmentReminders() {
+    return this.installmentReminderTask.triggerReminders();
   }
 }

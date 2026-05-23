@@ -129,13 +129,27 @@ async function main() {
           sequence: 2,
           amount: secondAmount,
           pct: 60,
-          dueAt: new Date(now.getTime() + 14 * 86400000),
+          dueAt: new Date(now.getTime() + 2 * 86400000),
           status: PaymentInstallmentStatus.PENDING,
         },
       ].map((row) => AppDataSource.getRepository(PaymentInstallment).create(row)));
       console.log(`Created payment plan on order ${pendingOrder.id} (2nd installment pending)`);
     } else {
       console.log(`Payment plan already on order ${pendingOrder.id}`);
+      const pendingInstallment = existingPlan.installments?.find(
+        (i) => i.status === PaymentInstallmentStatus.PENDING,
+      );
+      if (pendingInstallment) {
+        const dueSoon = new Date(Date.now() + 2 * 86400000);
+        pendingInstallment.dueAt = dueSoon;
+        pendingInstallment.lastReminderSentAt = null;
+        await AppDataSource.getRepository(PaymentInstallment).save(
+          pendingInstallment,
+        );
+        console.log(
+          `Refreshed pending installment #${pendingInstallment.sequence} due ${dueSoon.toISOString()}`,
+        );
+      }
     }
   } else {
     console.log('No pending order with items — installment fixture skipped');

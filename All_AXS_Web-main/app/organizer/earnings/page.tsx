@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
+import { OrganizerWithdrawPanel } from "@/components/organizer/OrganizerWithdrawPanel";
 import { hubLegalHref } from "@/lib/legal/hub-paths";
 import { formatMoneyFromCents } from "@/lib/organizer-sales";
 import { normalizeCurrencyCode } from "@/lib/currency";
@@ -144,6 +145,8 @@ export default function OrganizerEarningsPage() {
           </button>
         </div>
       ) : null}
+
+      <OrganizerWithdrawPanel />
 
       {summary ? (
         <section aria-labelledby="earnings-balance-heading">

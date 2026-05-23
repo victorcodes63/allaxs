@@ -9,6 +9,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Role, UserStatus } from 'src/domain/enums';
+import {
+  DEFAULT_USER_NOTIFICATION_PREFS,
+  mergeNotificationPrefs,
+  normalizeNotificationPrefs,
+  type UserNotificationPrefs,
+} from './user-notification-prefs.types';
 
 @Injectable()
 export class UsersService {
@@ -188,6 +194,51 @@ export class UsersService {
       status: UserStatus.ACTIVE,
     });
     return this.userRepository.save(created);
+  }
+
+  getNotificationPrefsForUser(user: User): UserNotificationPrefs {
+    return normalizeNotificationPrefs(user.notificationPrefs);
+  }
+
+  async getNotificationPrefs(userId: string): Promise<UserNotificationPrefs> {
+    const user = await this.findByIdOrFail(userId);
+    return this.getNotificationPrefsForUser(user);
+  }
+
+  async getNotificationPrefsByEmail(
+    email: string,
+  ): Promise<UserNotificationPrefs> {
+    const user = await this.findByEmail(email.trim().toLowerCase());
+    if (!user) {
+      return { ...DEFAULT_USER_NOTIFICATION_PREFS };
+    }
+    return this.getNotificationPrefsForUser(user);
+  }
+
+  async updateNotificationPrefs(
+    userId: string,
+    patch: Partial<UserNotificationPrefs>,
+  ): Promise<UserNotificationPrefs> {
+    const user = await this.findByIdOrFail(userId);
+    const current = this.getNotificationPrefsForUser(user);
+    const next = mergeNotificationPrefs(current, patch);
+    user.notificationPrefs = next;
+    await this.userRepository.save(user);
+    return next;
+  }
+
+  /** Transactional order emails; default on when no account exists (guest checkout). */
+  async shouldSendOrdersEmail(email: string): Promise<boolean> {
+    const user = await this.findByEmail(email.trim().toLowerCase());
+    if (!user) return true;
+    return this.getNotificationPrefsForUser(user).ordersEmail;
+  }
+
+  /** Installment and event reminders. */
+  async shouldSendReminders(email: string): Promise<boolean> {
+    const user = await this.findByEmail(email.trim().toLowerCase());
+    if (!user) return true;
+    return this.getNotificationPrefsForUser(user).reminders;
   }
 
   async addOrganizerRole(userId: string): Promise<User> {

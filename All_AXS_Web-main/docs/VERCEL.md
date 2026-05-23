@@ -1,5 +1,19 @@
 # Deploy the web app on Vercel
 
+## Monorepo CLI deploy (local clone)
+
+If your workspace is the **AllAXS** monorepo (web lives in `All_AXS_Web-main/`), the Vercel project **Root Directory** must stay `All_AXS_Web-main`. Deploy from the **monorepo root**, not from this folder:
+
+```bash
+cd "/path/to/AllAXS"
+./scripts/deploy-web.sh          # production (--prod)
+./scripts/deploy-web.sh --preview
+```
+
+Running `vercel deploy` inside `All_AXS_Web-main/` fails because Vercel appends the root directory again (`All_AXS_Web-main/All_AXS_Web-main`). Keep `.vercel/project.json` at the monorepo root. See [DEPLOY.md](../DEPLOY.md).
+
+---
+
 Use a **dedicated Vercel project** for this Next.js app. The Nest API lives in a **separate** GitHub repository and should be its **own** Vercel project:
 
 **Backend:** [github.com/victorcodes63/All_AXS_Backend-main](https://github.com/victorcodes63/All_AXS_Backend-main) — see that repo’s `docs/VERCEL.md` for API env vars, `api/[[...segments]].ts`, and production checks.

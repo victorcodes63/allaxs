@@ -216,6 +216,57 @@ async function main() {
     );
   }
 
+  // Notification preferences (server-backed)
+  const prefsGetRes = await fetch(`${API}/auth/notification-preferences`, {
+    headers: auth,
+  });
+  const prefsGetData = await json(prefsGetRes);
+  if (!prefsGetRes.ok) {
+    fail('GET /auth/notification-preferences', prefsGetData.message || prefsGetRes.status);
+  } else {
+    const p = prefsGetData.preferences ?? {};
+    pass(
+      'GET /auth/notification-preferences',
+      `orders=${p.ordersEmail !== false}, reminders=${p.reminders !== false}`,
+    );
+  }
+
+  const prefsPatchRes = await fetch(`${API}/auth/notification-preferences`, {
+    method: 'PATCH',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ marketingEmail: false }),
+  });
+  const prefsPatchData = await json(prefsPatchRes);
+  if (!prefsPatchRes.ok) {
+    fail('PATCH /auth/notification-preferences', prefsPatchData.message || prefsPatchRes.status);
+  } else {
+    pass(
+      'PATCH /auth/notification-preferences',
+      `marketing=${prefsPatchData.preferences?.marketingEmail === false}`,
+    );
+  }
+
+  // Installment due reminders (test route when API started with ENABLE_TEST_ROUTES=true)
+  if (process.env.ENABLE_TEST_ROUTES === 'true') {
+    const reminderRes = await fetch(`${API}/__test__/run-installment-reminders`, {
+      method: 'POST',
+    });
+    const reminderData = await json(reminderRes);
+    if (!reminderRes.ok) {
+      fail('POST /__test__/run-installment-reminders', reminderData.message || reminderRes.status);
+    } else {
+      pass(
+        'POST /__test__/run-installment-reminders',
+        `sent=${reminderData.sent ?? 0}, skipped=${reminderData.skipped ?? 0}`,
+      );
+    }
+  } else {
+    pass(
+      'Installment reminder task',
+      'skipped — use npm run run:installment-reminders locally',
+    );
+  }
+
   console.log('\n--- Summary ---');
   const failed = results.filter((r) => !r.ok);
   console.log(`${results.length - failed.length}/${results.length} passed`);
