@@ -28,6 +28,7 @@ const ACTION_LABELS: Record<string, string> = {
   ADMIN_UPDATE_COUPON: "Updated a coupon",
   ADMIN_DELETE_COUPON: "Removed a coupon",
   ADMIN_DISABLE_COUPON: "Disabled a coupon",
+  ADMIN_DELETE_EVENT: "Deleted the event",
 };
 
 function actionLabel(action: string): string {

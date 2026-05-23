@@ -83,10 +83,10 @@ function VerifyEmailContent() {
 
           {status === "success" && (
             <>
-              <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 text-sm">
+              <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-200">
                 {message}
               </div>
-              <p className="text-sm text-black/60 text-center">Redirecting…</p>
+              <p className="text-center text-sm text-muted">Redirecting…</p>
               <Link href="/dashboard">
                 <Button variant="primary" className="w-full">
                   Continue

@@ -32,9 +32,11 @@ function formatPrice(cents: number, currency: string): string {
 export function CompCheckoutExperience({
   preview,
   compToken,
+  context = "public",
 }: {
   preview: CompLinkPreview;
   compToken: string;
+  context?: "public" | "dashboard";
 }) {
   const router = useRouter();
   const { event, tier, quantity } = preview;
@@ -134,7 +136,11 @@ export function CompCheckoutExperience({
       saveOrderForSession(paid);
       saveOrderSnapshot(paid);
       clearCheckoutDraft();
-      router.push(`/orders/${data.orderId}/confirmation`);
+      router.push(
+        context === "dashboard"
+          ? `/dashboard/orders/${data.orderId}/confirmation`
+          : `/orders/${data.orderId}/confirmation`,
+      );
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -251,8 +257,15 @@ export function CompCheckoutExperience({
       </div>
 
       <p className="text-center text-sm text-muted">
-        <Link href={`/e/${event.slug}`} className="font-medium text-primary hover:underline">
-          View public event page
+        <Link
+          href={
+            context === "dashboard"
+              ? `/dashboard/events/${event.slug}`
+              : `/e/${event.slug}`
+          }
+          className="font-medium text-primary hover:underline"
+        >
+          {context === "dashboard" ? "Back to event" : "View public event page"}
         </Link>
       </p>
     </div>

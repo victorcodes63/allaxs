@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
+import { hubLegalHref } from "@/lib/legal/hub-paths";
 import { formatMoneyFromCents } from "@/lib/organizer-sales";
 import { normalizeCurrencyCode } from "@/lib/currency";
 import type {
@@ -103,6 +104,11 @@ export default function OrganizerEarningsPage() {
               <Link href="/organizer/account">
                 <Button variant="secondary" className="w-auto min-w-[8.5rem]">
                   Payout profile
+                </Button>
+              </Link>
+              <Link href={hubLegalHref("/organizer", "payout-policy")}>
+                <Button variant="secondary" className="w-auto min-w-[8.5rem]">
+                  Payout policy
                 </Button>
               </Link>
             </div>

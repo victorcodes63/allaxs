@@ -24,6 +24,8 @@ import {
 import { EmailVerificationService } from './services/email-verification.service';
 import { PasswordResetService } from './services/password-reset.service';
 import { EmailService } from './services/email.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { CloseAccountDto } from './dto/close-account.dto';
 
 export interface AuthTokens {
   accessToken: string;
@@ -639,5 +641,66 @@ export class AuthService {
     return {
       message: 'Email verified successfully.',
     };
+  }
+
+  async getAccountProfile(userId: string) {
+    const user = await this.usersService.findByIdOrFail(userId);
+    const emailVerified =
+      await this.emailVerificationService.isUserVerified(userId);
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name ?? '',
+      phone: user.phone ?? null,
+      roles: user.roles,
+      status: user.status,
+      emailVerified,
+      hasPassword: Boolean(user.passwordHash),
+      autoCreatedAt: user.autoCreatedAt?.toISOString() ?? null,
+      createdAt: user.createdAt.toISOString(),
+    };
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+    metadata?: TokenMetadata,
+  ) {
+    if (dto.name === undefined && dto.phone === undefined) {
+      throw new BadRequestException('No profile fields to update');
+    }
+    await this.usersService.updateProfile(userId, {
+      name: dto.name,
+      phone: dto.phone,
+    });
+    const user = await this.usersService.findByIdOrFail(userId);
+    const tokens = await this.issueTokensForUser(user, metadata);
+    return {
+      user: await this.getAccountProfile(userId),
+      tokens,
+    };
+  }
+
+  async closeAccount(userId: string, dto: CloseAccountDto) {
+    const user = await this.usersService.findByIdOrFail(userId);
+    if (user.roles.includes(Role.ORGANIZER)) {
+      throw new BadRequestException(
+        'Organizer accounts must contact support to close. You can sign out anytime and stop using the platform.',
+      );
+    }
+    if (user.passwordHash) {
+      if (!dto.password?.trim()) {
+        throw new BadRequestException(
+          'Enter your current password to close this account.',
+        );
+      }
+      const ok = await bcrypt.compare(dto.password, user.passwordHash);
+      if (!ok) {
+        throw new UnauthorizedException('Password is incorrect');
+      }
+    }
+    await this.forceSignOutUser(userId, 'Account closed by user');
+    await this.usersService.closeAccount(userId);
+    return { closed: true };
   }
 }

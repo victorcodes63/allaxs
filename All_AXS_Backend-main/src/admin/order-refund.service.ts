@@ -21,6 +21,11 @@ import { Event } from '../events/entities/event.entity';
 import { CouponsService } from '../events/coupons.service';
 import { WaitlistService } from '../events/waitlist.service';
 import { EmailService } from '../auth/services/email.service';
+import {
+  normalizeRefundMode,
+  resolveRefundAmountCents,
+  type RefundMode,
+} from '../domain/refund-policy';
 
 type PaystackRefundResponse = {
   status?: boolean;
@@ -47,7 +52,11 @@ export class OrderRefundService {
    */
   async refundPaidOrder(
     orderId: string,
-    body: { reason?: string },
+    body: {
+      reason?: string;
+      refundMode?: RefundMode | string;
+      amountCents?: number;
+    },
   ): Promise<{
     order: {
       id: string;
@@ -55,6 +64,9 @@ export class OrderRefundService {
       previousStatus: OrderStatus;
       refundAmountCents: number;
       originalAmountCents: number;
+      retainedCents: number;
+      refundMode: RefundMode;
+      isPartialRefund: boolean;
       currency: string;
       paystackRefundSkipped?: boolean;
       paystackRefundId?: number;
@@ -74,7 +86,13 @@ export class OrderRefundService {
       throw new BadRequestException('Only paid orders can be refunded');
     }
 
-    const refundAmount = order.amountCents;
+    const refundMode = normalizeRefundMode(body.refundMode);
+    const resolved = resolveRefundAmountCents(
+      order.amountCents,
+      refundMode,
+      body.amountCents,
+    );
+    const refundAmount = resolved.refundAmountCents;
 
     const tickets = order.tickets ?? [];
     const checkedIn = tickets.some((t) => t.status === TicketStatus.CHECKED_IN);
@@ -118,7 +136,11 @@ export class OrderRefundService {
         throw new BadRequestException('Missing Paystack transaction reference on order');
       }
 
-      const refundResult = await this.callPaystackRefund(secret, transaction);
+      const refundResult = await this.callPaystackRefund(
+        secret,
+        transaction,
+        refundAmount,
+      );
       paystackRefundId = refundResult.refundId;
     } else {
       paystackRefundSkipped = true;
@@ -154,6 +176,8 @@ export class OrderRefundService {
       }
 
       fresh.status = OrderStatus.REFUNDED;
+      fresh.refundedAmountCents = refundAmount;
+      fresh.refundMode = resolved.refundMode;
       await manager.save(fresh);
 
       for (const p of fresh.payments ?? []) {
@@ -163,6 +187,9 @@ export class OrderRefundService {
             ...(p.rawPayload ?? {}),
             adminRefundAt: new Date().toISOString(),
             adminRefundReason: body.reason ?? null,
+            refundMode: resolved.refundMode,
+            refundAmountCents: refundAmount,
+            retainedCents: resolved.retainedCents,
             ...(paystackRefundId !== undefined
               ? { paystackRefundId }
               : {}),
@@ -179,6 +206,7 @@ export class OrderRefundService {
           manager,
           fresh,
           organizerId,
+          refundAmount,
         );
       }
 
@@ -227,6 +255,7 @@ export class OrderRefundService {
         eventTitle,
         refundAmountCents: refundAmount,
         currency: order.currency,
+        isPartialRefund: resolved.isPartialRefund,
       });
     } catch (error) {
       this.logger.warn(
@@ -243,6 +272,9 @@ export class OrderRefundService {
         previousStatus,
         refundAmountCents: refundAmount,
         originalAmountCents: order.amountCents,
+        retainedCents: resolved.retainedCents,
+        refundMode: resolved.refundMode,
+        isPartialRefund: resolved.isPartialRefund,
         currency: order.currency,
         ...(paystackRefundSkipped ? { paystackRefundSkipped: true } : {}),
         ...(paystackRefundId !== undefined ? { paystackRefundId } : {}),
@@ -263,6 +295,7 @@ export class OrderRefundService {
   private async callPaystackRefund(
     secret: string,
     transaction: string | number,
+    amountCents: number,
   ): Promise<{ refundId?: number }> {
     const res = await fetch('https://api.paystack.co/refund', {
       method: 'POST',
@@ -270,7 +303,7 @@ export class OrderRefundService {
         Authorization: `Bearer ${secret}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ transaction }),
+      body: JSON.stringify({ transaction, amount: amountCents }),
     });
     const data = (await res.json().catch(() => ({}))) as PaystackRefundResponse;
     if (!res.ok || !data.status) {

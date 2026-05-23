@@ -81,6 +81,14 @@ export class Order extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   notes?: string;
 
+  /** Amount returned to the buyer when status is REFUNDED (may be < amountCents). */
+  @Column({ type: 'integer', nullable: true, name: 'refunded_amount_cents' })
+  refundedAmountCents?: number | null;
+
+  /** POLICY | FULL | CUSTOM — how refundedAmountCents was chosen. */
+  @Column({ type: 'varchar', length: 16, nullable: true, name: 'refund_mode' })
+  refundMode?: string | null;
+
   @OneToMany(() => OrderItem, (i) => i.order)
   items!: OrderItem[];
 

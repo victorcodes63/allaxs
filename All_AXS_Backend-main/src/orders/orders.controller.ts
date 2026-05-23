@@ -62,6 +62,15 @@ function serializeRefundRequest(request: {
 export class OrdersController {
   constructor(private readonly refundRequestsService: RefundRequestsService) {}
 
+  @Get('refund-requests')
+  @ApiOperation({ summary: 'List all refund requests for the signed-in buyer' })
+  async listRefundRequests(@GetUser() user: CurrentUser) {
+    const refundRequests = await this.refundRequestsService.listForBuyer(
+      user.id,
+    );
+    return { refundRequests };
+  }
+
   @Post(':id/refund-request')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Submit a refund request for a paid order (buyer)' })

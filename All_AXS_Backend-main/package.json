@@ -34,6 +34,8 @@
     "migrate:run:test": "cross-env NODE_ENV=test npm run typeorm -- migration:run",
     "migrate:revert:test": "cross-env NODE_ENV=test npm run typeorm -- migration:revert",
     "seed:demo": "ts-node -r tsconfig-paths/register scripts/seed-demo-flow.ts",
+    "ensure:fan-e2e-fixtures": "ts-node -r tsconfig-paths/register scripts/ensure-fan-e2e-fixtures.ts",
+    "test:fan-endpoints": "node scripts/test-fan-endpoints.mjs",
     "ensure-admin-user": "ts-node -r tsconfig-paths/register scripts/ensure-admin-user.ts",
     "smoke:resend": "ts-node -r tsconfig-paths/register scripts/smoke-resend.ts",
     "smoke:all-emails": "ts-node -r tsconfig-paths/register scripts/smoke-all-emails.ts",

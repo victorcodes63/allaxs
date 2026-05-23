@@ -25,8 +25,9 @@ describe('Home Page', () => {
     cy.get('footer').should('be.visible');
     cy.contains(/© \d{4} All AXS\. All rights reserved\./).should('be.visible');
     cy.get('footer').within(() => {
-      cy.contains('a', 'Terms of service').should('be.visible');
+      cy.contains('a', 'Terms & conditions').should('be.visible');
       cy.contains('a', 'Privacy policy').should('be.visible');
+      cy.contains('a', 'Refund & cancellation').should('be.visible');
     });
   });
 

@@ -39,6 +39,7 @@ import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
 import { AdminAuditLog } from './entities/admin-audit-log.entity';
 import { AdminAuditService } from './admin-audit.service';
 import { OrderRefundService } from './order-refund.service';
+import { RefundOrderDto } from './dto/refund-order.dto';
 import { AdminAction } from './decorators/admin-action.decorator';
 import { AdminAuditInterceptor } from './interceptors/admin-audit.interceptor';
 import { EventsService } from '../events/events.service';
@@ -974,7 +975,7 @@ export class AdminController {
   @Post('orders/:id/refund')
   async refundOrder(
     @Param('id') orderId: string,
-    @Body() body: { reason?: string },
+    @Body() body: RefundOrderDto,
     @GetUser() user: CurrentUser,
     @Req() request: Request,
   ) {
@@ -991,6 +992,9 @@ export class AdminController {
         newStatus: o.status,
         refundAmountCents: o.refundAmountCents,
         originalAmountCents: o.originalAmountCents,
+        retainedCents: o.retainedCents,
+        refundMode: o.refundMode,
+        isPartialRefund: o.isPartialRefund,
         currency: o.currency,
         reason: body.reason || null,
         ...(o.paystackRefundId !== undefined
@@ -1013,6 +1017,9 @@ export class AdminController {
         status: o.status,
         previousStatus: o.previousStatus,
         refundAmountCents: o.refundAmountCents,
+        retainedCents: o.retainedCents,
+        refundMode: o.refundMode,
+        isPartialRefund: o.isPartialRefund,
       },
     };
   }

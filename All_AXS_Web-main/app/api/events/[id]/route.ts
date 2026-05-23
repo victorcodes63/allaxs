@@ -176,3 +176,91 @@ export async function PATCH(
   }
 }
 
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const accessToken = await getAccessToken();
+
+    if (!accessToken) {
+      return NextResponse.json(
+        { message: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    const { id: eventId } = await params;
+    const endpoint = `${API_URL}/events/${eventId}`;
+
+    const response = await fetch(endpoint, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.status === 204) {
+      return new NextResponse(null, { status: 204 });
+    }
+
+    const contentType = response.headers.get("content-type");
+    let data: { message?: string } | undefined;
+    if (contentType && contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      console.error("Non-JSON response:", text.substring(0, 200));
+      return NextResponse.json(
+        {
+          message: `Backend endpoint returned non-JSON response (${response.status})`,
+        },
+        { status: response.status || 500 }
+      );
+    }
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        return NextResponse.json(
+          {
+            message:
+              data?.message || "You do not have permission to delete this event",
+          },
+          { status: 403 }
+        );
+      }
+      if (response.status === 404) {
+        return NextResponse.json(
+          {
+            message: data?.message || "Event not found",
+          },
+          { status: 404 }
+        );
+      }
+      if (response.status === 400) {
+        return NextResponse.json(data, { status: 400 });
+      }
+      return NextResponse.json(
+        {
+          message:
+            data?.message || `Failed to delete event (${response.status})`,
+        },
+        { status: response.status }
+      );
+    }
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error("Delete event error:", error);
+    return NextResponse.json(
+      {
+        message:
+          (error as Error).message ||
+          "An error occurred while deleting the event",
+      },
+      { status: 500 }
+    );
+  }
+}
+

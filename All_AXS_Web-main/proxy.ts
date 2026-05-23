@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  decodeAccessTokenPayload,
+} from "@/lib/auth/jwt-payload";
+import {
+  isGuestOnlyPublicPath,
+  resolveGuestOnlyPublicRedirect,
+} from "@/lib/auth/guest-only-public-routes";
 
 // Helper to decode JWT without verification (just to check exp)
 function decodeJWT(token: string): { exp?: number } | null {
-  try {
-    const base64Url = token.split(".")[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = Buffer.from(base64, "base64").toString("utf-8");
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
+  return decodeAccessTokenPayload(token);
 }
 
 function accessTokenNeedsRotation(accessToken: string | undefined): boolean {
@@ -49,6 +48,33 @@ function isAuthEntryPath(pathname: string): boolean {
     "/resend-verification",
   ] as const;
   return authPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+function isProtectedAppPath(pathname: string): boolean {
+  return (
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/organizer" ||
+    pathname.startsWith("/organizer/") ||
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/account" ||
+    pathname.startsWith("/account/")
+  );
+}
+
+function redirectSignedInFromGuestPublic(
+  request: NextRequest,
+  pathname: string,
+  accessToken: string,
+): NextResponse {
+  const decoded = decodeAccessTokenPayload(accessToken);
+  const target = resolveGuestOnlyPublicRedirect(
+    pathname,
+    request.nextUrl.search,
+    decoded?.roles ?? [],
+  );
+  return NextResponse.redirect(new URL(target, request.url));
 }
 
 /**
@@ -100,7 +126,22 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (accessTokenNeedsRotation(accessToken)) {
+  if (isGuestOnlyPublicPath(pathname)) {
+    if (accessToken && !accessTokenNeedsRotation(accessToken)) {
+      return redirectSignedInFromGuestPublic(request, pathname, accessToken);
+    }
+
+    if (accessTokenNeedsRotation(accessToken)) {
+      const renewed = await tryRefreshAndContinue(request);
+      if (renewed) {
+        return renewed;
+      }
+    }
+
+    return NextResponse.next();
+  }
+
+  if (isProtectedAppPath(pathname) && accessTokenNeedsRotation(accessToken)) {
     const renewed = await tryRefreshAndContinue(request);
     if (renewed) return renewed;
 
@@ -126,6 +167,12 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/",
+    "/events",
+    "/events/:path*",
+    "/organizers",
+    "/organizers/:path*",
+    "/e/:path*",
     "/login",
     "/register",
     "/forgot-password",

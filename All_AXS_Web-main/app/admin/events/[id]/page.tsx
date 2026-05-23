@@ -12,6 +12,7 @@ import {
 } from "@/components/admin/EventReviewActions";
 import { useAuth } from "@/lib/auth";
 import { EventFeaturedToggle } from "@/components/admin/EventFeaturedToggle";
+import { DeleteEventButton } from "@/components/events/DeleteEventButton";
 import { EventStatus } from "@/lib/validation/event";
 import {
   getEventBannerUrl,
@@ -576,6 +577,15 @@ export default function AdminEventInspectPage() {
               Edit as admin
             </Button>
           </Link>
+          <DeleteEventButton
+            eventId={event.id}
+            eventTitle={event.title}
+            eventStatus={event.status}
+            mode="admin"
+            paidOrderCount={paidCount}
+            redirectTo="/admin/events"
+            className="w-full sm:w-auto"
+          />
         </div>
       </header>
 

@@ -36,7 +36,13 @@ function buildWhatsAppDemoLink(phone: string, message: string): string | null {
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
-export function OrderConfirmation({ orderId }: { orderId: string }) {
+export function OrderConfirmation({
+  orderId,
+  hubContext = false,
+}: {
+  orderId: string;
+  hubContext?: boolean;
+}) {
   const [order, setOrder] = useState<StoredOrder | null | undefined>(undefined);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
@@ -214,6 +220,9 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
     })();
   }, [order, resendTicketEmail]);
 
+  const ticketsHref = "/tickets";
+  const browseHref = hubContext ? "/dashboard/events" : "/events";
+
   if (order === undefined) {
     return (
       <div className="min-h-[40vh] flex items-center justify-center text-muted">
@@ -229,8 +238,8 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
         <p className="text-muted">
           This confirmation link may have expired in your browser, or the order id is invalid.
         </p>
-        <ArrowCtaLink href="/events" variant="primary">
-          Browse events
+        <ArrowCtaLink href={hubContext ? "/dashboard/orders" : browseHref} variant="primary">
+          {hubContext ? "My orders" : "Browse events"}
         </ArrowCtaLink>
       </div>
     );
@@ -240,6 +249,9 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
   const guest = order.guestCheckout === true;
   const delivery = order.ticketDelivery;
   const forgotPasswordHref = `/forgot-password?email=${encodeURIComponent(order.buyerEmail)}`;
+  const eventHref = hubContext
+    ? `/dashboard/events/${order.eventSlug}`
+    : `/e/${order.eventSlug}`;
 
   return (
     <div className="max-w-2xl mx-auto space-y-10 pb-16">
@@ -262,7 +274,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
                 purchased—your tickets are already linked. We&apos;ve emailed your tickets as a{" "}
                 <strong className="font-medium text-foreground">PDF attachment</strong> (QR codes are
                 not shown inline in the email body). Open{" "}
-                <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
                   My tickets
                 </Link>{" "}
                 to view passes or download a PDF. Didn&apos;t receive the email? Use{" "}
@@ -275,7 +287,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
                 <span className="text-foreground font-medium">{order.buyerEmail}</span>. Open the{" "}
                 <strong className="font-medium text-foreground">PDF attachment</strong> for entry QR
                 codes—they are not shown inline in the email body. You can also view passes in{" "}
-                <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
                   My tickets
                 </Link>{" "}
                 or download a PDF from any pass. Didn&apos;t receive it? Use{" "}
@@ -291,7 +303,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
                   <span className="text-foreground font-medium">{order.buyerEmail}</span> and send a WhatsApp summary to{" "}
                   <span className="text-foreground font-medium">{order.buyerPhone}</span>. For this demo, QR passes are
                   stored on <strong>this device</strong>—open{" "}
-                  <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                  <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
                     My tickets
                   </Link>{" "}
                   in this browser to scan them.
@@ -301,7 +313,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
                   In production we&apos;d email your receipt and ticket links to{" "}
                   <span className="text-foreground font-medium">{order.buyerEmail}</span>. For this demo, QR passes are
                   stored on <strong>this device</strong>—open{" "}
-                  <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                  <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
                     My tickets
                   </Link>{" "}
                   in this browser to scan them.
@@ -316,7 +328,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
             <>
               {" "}
               Your passes are saved in this browser—open{" "}
-              <Link href="/tickets" className="text-primary font-semibold hover:underline">
+              <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
                 My tickets
               </Link>{" "}
               to open each pass and scan the QR code.
@@ -340,7 +352,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
               Set a password
             </Link>
             <Link
-              href="/tickets"
+              href={ticketsHref}
               className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] border border-border bg-surface px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/40"
             >
               My tickets
@@ -416,7 +428,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
               <p className="mt-1 leading-relaxed">
                 Your tickets were sent to{" "}
                 <span className="text-foreground font-medium">{order.buyerEmail}</span> as a PDF attachment. Open{" "}
-                <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
                   My tickets
                 </Link>{" "}
                 to view QR codes or download a PDF from each pass. Use{" "}
@@ -430,7 +442,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
               <p className="mt-1 leading-relaxed">
                 QR tickets are stored in session storage for the demo. Open this confirmation on the same device where you
                 paid, or go to{" "}
-                <Link href="/tickets" className="text-primary font-semibold hover:underline">
+                <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
                   My tickets
                 </Link>{" "}
                 there.
@@ -545,7 +557,7 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
           </ArrowCtaLink>
         ) : null}
         <ArrowCtaLink
-          href="/tickets"
+          href={ticketsHref}
           variant={!apiCheckout && passes[0] ? "outline" : apiCheckout && guest ? "outline" : "primary"}
           className="justify-center"
         >
@@ -557,12 +569,17 @@ export function OrderConfirmation({ orderId }: { orderId: string }) {
           </ArrowCtaLink>
         ) : null}
         <ArrowCtaLink
-          href={`/e/${order.eventSlug}`}
+          href={eventHref}
           variant="outline"
           className="justify-center"
         >
           Back to event
         </ArrowCtaLink>
+        {hubContext ? (
+          <ArrowCtaLink href="/dashboard/orders" variant="outline" className="justify-center">
+            My orders
+          </ArrowCtaLink>
+        ) : null}
       </div>
     </div>
   );

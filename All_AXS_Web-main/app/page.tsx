@@ -6,10 +6,12 @@ import {
 import { isDemoPublicEventsMode } from "@/lib/public-events-mode";
 import { fetchPublicEvents } from "@/lib/utils/api-server";
 import { HomeView } from "@/components/home/HomeView";
+import { redirectSignedInFromGuestPublicPath } from "@/lib/auth/redirect-signed-in-from-public";
 
 export const revalidate = 60;
 
 export default async function Home() {
+  await redirectSignedInFromGuestPublicPath("/");
   let featuredEvents: Awaited<
     ReturnType<typeof deriveHomeEventsLists>
   >["featuredEvents"] = [];

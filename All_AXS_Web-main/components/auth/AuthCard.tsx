@@ -23,7 +23,7 @@ export function AuthCard({ title, subtitle, children }: AuthCardProps) {
             {title}
           </h1>
           {subtitle ? (
-            <p className="text-[12px] leading-snug tracking-wide text-muted/90">{subtitle}</p>
+            <p className="text-[12px] leading-snug tracking-wide text-muted">{subtitle}</p>
           ) : null}
         </header>
         {children}

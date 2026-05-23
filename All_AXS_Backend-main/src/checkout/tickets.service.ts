@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Ticket } from '../domain/ticket.entity';
 import { normalizeCurrencyCode } from '../common/currency';
+import { UsersService } from '../users/users.service';
+import { TransferTicketDto } from './dto/transfer-ticket.dto';
 
 export type TicketMineRow = {
   id: string;
@@ -22,6 +28,7 @@ export class TicketsService {
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
+    private readonly usersService: UsersService,
   ) {}
 
   private toTicketRow(t: Ticket): TicketMineRow {
@@ -91,5 +98,43 @@ export class TicketsService {
     }
     const ticket: TicketMineRow = this.toTicketRow(t);
     return { ticket };
+  }
+
+  async transfer(
+    userId: string,
+    ticketId: string,
+    dto: TransferTicketDto,
+    userEmail?: string,
+  ): Promise<{ ticket: TicketMineRow }> {
+    await this.findOneForOwner(userId, ticketId, userEmail);
+
+    const recipientEmail = dto.recipientEmail.trim().toLowerCase();
+    if (!recipientEmail) {
+      throw new BadRequestException('Recipient email is required');
+    }
+
+    const recipient = await this.usersService.findByEmail(recipientEmail);
+
+    const ticket = await this.ticketRepository.findOne({
+      where: { id: ticketId, ownerUserId: userId },
+    });
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    ticket.attendeeEmail = recipientEmail;
+    ticket.attendeeName = dto.recipientName?.trim() || undefined;
+    ticket.ownerUserId = recipient?.id ?? null;
+    await this.ticketRepository.save(ticket);
+
+    const updated = await this.ticketRepository.findOne({
+      where: { id: ticketId },
+      relations: ['order', 'order.event', 'ticketType'],
+    });
+    if (!updated) {
+      throw new NotFoundException('Ticket not found');
+    }
+
+    return { ticket: this.toTicketRow(updated) };
   }
 }

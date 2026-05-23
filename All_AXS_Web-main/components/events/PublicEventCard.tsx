@@ -7,6 +7,7 @@ import {
   shouldUnoptimizeEventImage,
 } from "@/lib/utils/image";
 import { resolveCurrencyFromTiers } from "@/lib/currency";
+import { SavedEventButton } from "@/components/events/SavedEventButton";
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -31,12 +32,15 @@ export function PublicEventCard({
   variant = "default",
   className,
   eventHref,
+  saveSlug,
 }: {
   event: PublicEvent;
   /** Compact: short banner rail. featuredRail: poster-like + details for home featured scroller. listRow: horizontal row (poster left). */
   variant?: "default" | "compact" | "featuredRail" | "listRow";
   className?: string;
   eventHref?: string;
+  /** When set, shows a heart toggle to save the event locally. */
+  saveSlug?: string;
 }) {
   const compact = variant === "compact";
   const featuredRail = variant === "featuredRail";
@@ -63,6 +67,7 @@ export function PublicEventCard({
         aria-label={`View event: ${event.title}`}
       >
         <div className="relative h-[5.5rem] w-[5.5rem] shrink-0 overflow-hidden rounded-lg bg-foreground/5 sm:h-28 sm:w-28">
+          {saveSlug ? <SavedEventButton slug={saveSlug} variant="card" /> : null}
           {event.bannerUrl ? (
             <Image
               src={bannerUrl}
@@ -172,6 +177,7 @@ export function PublicEventCard({
           />
         )}
         <div className="absolute inset-0 bg-linear-to-t from-foreground/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {saveSlug ? <SavedEventButton slug={saveSlug} variant="card" /> : null}
       </div>
       <div
         className={[

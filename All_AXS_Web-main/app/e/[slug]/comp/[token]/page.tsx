@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchCompLink } from "@/lib/utils/api-server";
 import { CompCheckoutExperience } from "@/components/checkout/CompCheckoutExperience";
+import { redirectSignedInFromGuestPublicPath } from "@/lib/auth/redirect-signed-in-from-public";
 
 interface Props {
   params: Promise<{ slug: string; token: string }>;
@@ -26,6 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CompLinkCheckoutPage({ params }: Props) {
   const { slug, token } = await params;
+  await redirectSignedInFromGuestPublicPath(`/e/${slug}/comp/${token}`);
+
   let preview;
   try {
     preview = await fetchCompLink(slug, token);

@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  Patch,
   Post,
   Query,
   Req,
@@ -22,6 +23,8 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { CloseAccountDto } from './dto/close-account.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GetUser } from './decorators/current-user.decorator';
 import type { CurrentUser } from './decorators/current-user.decorator';
@@ -91,8 +94,33 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getMe(@GetUser() user: CurrentUser) {
-    return { user };
+  async getMe(@GetUser() user: CurrentUser) {
+    return { user: await this.authService.getAccountProfile(user.id) };
+  }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateProfile(
+    @GetUser() user: CurrentUser,
+    @Body() dto: UpdateProfileDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.updateProfile(
+      user.id,
+      dto,
+      this.extractMetadata(req),
+    );
+  }
+
+  @Post('close-account')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async closeAccount(
+    @GetUser() user: CurrentUser,
+    @Body() dto: CloseAccountDto,
+  ) {
+    return this.authService.closeAccount(user.id, dto);
   }
 
   @Post('promote-organizer-demo')

@@ -108,6 +108,27 @@ export class RefundRequestsService {
     return request;
   }
 
+  async listForBuyer(userId: string) {
+    const requests = await this.refundRequestRepository.find({
+      where: { userId },
+      relations: ['order', 'order.event'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return requests.map((request) => ({
+      id: request.id,
+      orderId: request.orderId,
+      email: request.email,
+      reason: request.reason,
+      status: request.status,
+      createdAt: request.createdAt,
+      reviewedAt: request.reviewedAt ?? null,
+      adminNote: request.adminNote ?? null,
+      eventTitle: request.order?.event?.title ?? null,
+      eventSlug: request.order?.event?.slug ?? null,
+    }));
+  }
+
   async listForAdmin(filters: RefundRequestListFilters) {
     const qb = this.refundRequestRepository
       .createQueryBuilder('request')
@@ -139,7 +160,11 @@ export class RefundRequestsService {
   async approve(
     id: string,
     adminUserId: string,
-    note?: string,
+    options?: {
+      note?: string;
+      refundMode?: string;
+      amountCents?: number;
+    },
     audit?: RefundRequestAuditContext,
   ) {
     const request = await this.refundRequestRepository.findOne({
@@ -157,20 +182,24 @@ export class RefundRequestsService {
 
     const refundReason = [
       `Buyer request: ${request.reason}`,
-      note?.trim() ? `Admin note: ${note.trim()}` : null,
+      options?.note?.trim() ? `Admin note: ${options.note.trim()}` : null,
     ]
       .filter(Boolean)
       .join('\n');
 
     const refundResult = await this.orderRefundService.refundPaidOrder(
       request.orderId,
-      { reason: refundReason },
+      {
+        reason: refundReason,
+        refundMode: options?.refundMode,
+        amountCents: options?.amountCents,
+      },
     );
 
     request.status = RefundRequestStatus.APPROVED;
     request.reviewedAt = new Date();
     request.reviewedByUserId = adminUserId;
-    request.adminNote = note?.trim() || null;
+    request.adminNote = options?.note?.trim() || null;
     const saved = await this.refundRequestRepository.save(request);
 
     await this.adminAuditService.logAction({
@@ -183,6 +212,8 @@ export class RefundRequestsService {
         buyerReason: request.reason,
         adminNote: saved.adminNote,
         refundAmountCents: refundResult.order.refundAmountCents,
+        retainedCents: refundResult.order.retainedCents,
+        refundMode: refundResult.order.refundMode,
         currency: refundResult.order.currency,
       },
       ipAddress: audit?.ipAddress ?? null,

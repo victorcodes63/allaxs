@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -111,6 +112,36 @@ export class UsersService {
 
   async clearAutoCreatedAt(userId: string): Promise<void> {
     await this.userRepository.update({ id: userId }, { autoCreatedAt: null });
+  }
+
+  async updateProfile(
+    userId: string,
+    data: { name?: string; phone?: string },
+  ): Promise<User> {
+    const user = await this.findByIdOrFail(userId);
+    if (data.name !== undefined) {
+      const trimmed = data.name.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Name cannot be empty');
+      }
+      user.name = trimmed;
+    }
+    if (data.phone !== undefined) {
+      const trimmed = data.phone.trim();
+      user.phone = trimmed || undefined;
+    }
+    return this.userRepository.save(user);
+  }
+
+  async closeAccount(userId: string): Promise<void> {
+    const user = await this.findByIdOrFail(userId);
+    user.status = UserStatus.SUSPENDED;
+    user.email = `closed.${user.id.replace(/-/g, '')}@closed.allaxs.internal`;
+    user.name = 'Closed account';
+    user.phone = undefined;
+    user.passwordHash = undefined;
+    user.autoCreatedAt = null;
+    await this.userRepository.save(user);
   }
 
   /**

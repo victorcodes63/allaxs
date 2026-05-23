@@ -55,6 +55,7 @@ export class OrganizerLedgerService {
     manager: EntityManager,
     order: Order,
     organizerId: string,
+    refundAmountCents?: number,
   ): Promise<void> {
     const earnKey = `earn:order:${order.id}`;
     const earn = await manager.findOne(OrganizerLedgerEntry, {
@@ -63,6 +64,22 @@ export class OrganizerLedgerService {
     if (!earn || earn.amountCents <= 0) {
       return;
     }
+
+    const paidTotal = order.amountCents;
+    const refundTotal =
+      refundAmountCents !== undefined && refundAmountCents >= 0
+        ? Math.min(refundAmountCents, paidTotal)
+        : paidTotal;
+
+    const reversalCents =
+      refundTotal >= paidTotal
+        ? earn.amountCents
+        : Math.round((earn.amountCents * refundTotal) / paidTotal);
+
+    if (reversalCents <= 0) {
+      return;
+    }
+
     const idempotencyKey = `refund:order:${order.id}`;
     await manager
       .createQueryBuilder()
@@ -72,10 +89,15 @@ export class OrganizerLedgerService {
         organizerId,
         orderId: order.id,
         entryType: LedgerEntryType.ORDER_REFUND_REVERSAL,
-        amountCents: -earn.amountCents,
+        amountCents: -reversalCents,
         currency: order.currency,
         idempotencyKey,
-        metadata: { orderId: order.id, reversedEarnEntryId: earn.id },
+        metadata: {
+          orderId: order.id,
+          reversedEarnEntryId: earn.id,
+          refundAmountCents: refundTotal,
+          originalOrderAmountCents: paidTotal,
+        },
       })
       .orIgnore()
       .execute();

@@ -5,6 +5,7 @@ import { CheckoutExperience } from "@/components/checkout/CheckoutExperience";
 
 type Props = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ waitlist?: string }>;
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -20,8 +21,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default async function DashboardCheckoutPage({ params }: Props) {
+export default async function DashboardCheckoutPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { waitlist: waitlistToken } = await searchParams;
   let event;
   try {
     event = await fetchEventBySlug(slug);
@@ -29,5 +31,11 @@ export default async function DashboardCheckoutPage({ params }: Props) {
     notFound();
   }
 
-  return <CheckoutExperience event={event} context="dashboard" />;
+  return (
+    <CheckoutExperience
+      event={event}
+      context="dashboard"
+      waitlistToken={waitlistToken}
+    />
+  );
 }

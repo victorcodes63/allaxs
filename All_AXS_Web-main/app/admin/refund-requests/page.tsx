@@ -77,8 +77,9 @@ export default function AdminRefundRequestsPage() {
           Refund requests
         </h1>
         <p className="max-w-2xl text-sm text-muted">
-          Buyer-submitted refund requests awaiting review. Approving runs the full order refund
-          path; denying leaves the order paid.
+          Buyer-submitted refund requests awaiting review. Approving runs the refund
+          you select — policy default is 75% unless you choose full or custom.
+          Denying leaves the order paid.
         </p>
       </header>
 

@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Textarea } from "@/components/ui/Textarea";
 import { formatMoneyFromCents } from "@/lib/organizer-sales";
+import {
+  RefundAmountSelector,
+  refundSelectionToPayload,
+  type RefundAmountSelection,
+} from "@/components/admin/RefundAmountSelector";
+import { calculatePolicyRefundCents, resolveRefundPreview } from "@/lib/refunds/policy";
 
 export interface AdminRefundRequestRow {
   id: string;
@@ -44,12 +50,16 @@ export function RefundRequestReviewDialog({
   onCompleted,
 }: RefundRequestReviewDialogProps) {
   const [note, setNote] = useState("");
+  const [refundSelection, setRefundSelection] = useState<RefundAmountSelection>({
+    refundMode: "POLICY",
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (request && mode) {
       setNote("");
+      setRefundSelection({ refundMode: "POLICY" });
       setError(null);
     }
   }, [request, mode]);
@@ -61,14 +71,45 @@ export function RefundRequestReviewDialog({
   const totalLabel = order
     ? formatMoneyFromCents(order.amountCents, order.currency)
     : "—";
+  const policyLabel =
+    order != null
+      ? formatMoneyFromCents(
+          calculatePolicyRefundCents(order.amountCents),
+          order.currency,
+        )
+      : "—";
 
   const submit = async () => {
+    if (isApprove && order) {
+      const preview = resolveRefundPreview(
+        order.amountCents,
+        refundSelection.refundMode,
+        refundSelection.customAmountCents,
+      );
+      if (
+        refundSelection.refundMode === "CUSTOM" &&
+        (!refundSelection.customAmountCents ||
+          refundSelection.customAmountCents <= 0 ||
+          refundSelection.customAmountCents > order.amountCents)
+      ) {
+        setError("Enter a valid custom refund amount.");
+        return;
+      }
+      if (preview.refundAmountCents <= 0) {
+        setError("Refund amount must be greater than zero.");
+        return;
+      }
+    }
+
     setSubmitting(true);
     setError(null);
     try {
       await axios.patch(
         `/api/admin/refund-requests/${request.id}/${mode}`,
-        { note: note.trim() || undefined },
+        {
+          note: note.trim() || undefined,
+          ...(isApprove ? refundSelectionToPayload(refundSelection) : {}),
+        },
       );
       onCompleted();
     } catch (err) {
@@ -148,6 +189,12 @@ export function RefundRequestReviewDialog({
             <dd className="mt-0.5 text-foreground/90">{totalLabel}</dd>
           </div>
           <div>
+            <dt className="font-semibold uppercase tracking-[0.14em] text-muted">
+              Policy default (75%)
+            </dt>
+            <dd className="mt-0.5 text-foreground/90">{policyLabel}</dd>
+          </div>
+          <div className="col-span-2">
             <dt className="font-semibold uppercase tracking-[0.14em] text-muted">Reference</dt>
             <dd className="mt-0.5 truncate text-foreground/90">
               {order?.reference || order?.id.slice(0, 8) || "—"}
@@ -161,6 +208,15 @@ export function RefundRequestReviewDialog({
           </p>
           <p className="mt-2 whitespace-pre-wrap text-foreground/90">{request.reason}</p>
         </div>
+
+        {isApprove && order ? (
+          <RefundAmountSelector
+            orderAmountCents={order.amountCents}
+            currency={order.currency}
+            value={refundSelection}
+            onChange={setRefundSelection}
+          />
+        ) : null}
 
         <Textarea
           label="Admin note (optional)"
@@ -177,8 +233,8 @@ export function RefundRequestReviewDialog({
         <p className="text-xs leading-relaxed text-muted">
           {isApprove ? (
             <>
-              Approving runs the existing full-order refund path: Paystack reversal when
-              applicable, tickets voided, inventory restored, and order marked REFUNDED.
+              Approving voids tickets, restores inventory, and marks the order REFUNDED.
+              Default policy refund is 75% ({policyLabel}) unless you choose full or custom.
             </>
           ) : (
             <>Denying leaves the order PAID. The buyer can see your note if you add one.</>

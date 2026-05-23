@@ -1,86 +1,139 @@
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { normalizeWebUserRoles } from "@/lib/auth/hub-routing";
 
-// Helper to decode JWT payload without verification (just to get user info)
-function decodeJWT(token: string): {
-  sub?: string;
+const API_URL = process.env.API_URL || "http://localhost:8080";
+
+type ApiUser = {
   id?: string;
   email?: string;
   name?: string;
+  phone?: string | null;
   roles?: string[];
-  autoCreatedAt?: string;
+  status?: string;
   emailVerified?: boolean;
-  exp?: number;
-} | null {
-  try {
-    const base64Url = token.split(".")[1];
-    if (!base64Url) return null;
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = Buffer.from(base64, "base64").toString("utf-8");
-    return JSON.parse(jsonPayload);
-  } catch {
-    return null;
-  }
+  hasPassword?: boolean;
+  autoCreatedAt?: string | null;
+  createdAt?: string;
+};
+
+function mapUser(raw: ApiUser | null | undefined) {
+  if (!raw?.email && !raw?.id) return null;
+  return {
+    id: raw.id ?? "",
+    email: raw.email ?? "",
+    name: typeof raw.name === "string" ? raw.name : undefined,
+    phone:
+      typeof raw.phone === "string"
+        ? raw.phone
+        : raw.phone === null
+          ? null
+          : undefined,
+    roles: normalizeWebUserRoles(raw.roles),
+    status: raw.status,
+    emailVerified:
+      typeof raw.emailVerified === "boolean" ? raw.emailVerified : undefined,
+    hasPassword:
+      typeof raw.hasPassword === "boolean" ? raw.hasPassword : undefined,
+    autoCreatedAt:
+      typeof raw.autoCreatedAt === "string" ? raw.autoCreatedAt : undefined,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : undefined,
+  };
+}
+
+async function readAccessToken() {
+  const cookieStore = await cookies();
+  return cookieStore.get("accessToken")?.value;
+}
+
+function setAuthCookies(
+  response: NextResponse,
+  tokens: { accessToken: string; refreshToken: string },
+) {
+  response.cookies.set("accessToken", tokens.accessToken, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 15,
+  });
+  response.cookies.set("refreshToken", tokens.refreshToken, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
 }
 
 export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get("accessToken")?.value;
-
+    const accessToken = await readAccessToken();
     if (!accessToken) {
-      return NextResponse.json(
-        { message: "Not authenticated" },
-        { status: 401 }
-      );
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
     }
 
-    // Decode the JWT to get user info from the token itself
-    // This avoids making an unnecessary API call right after login
-    const decoded = decodeJWT(accessToken);
-    
-    if (!decoded || !decoded.email) {
-      return NextResponse.json(
-        { message: "Invalid token" },
-        { status: 401 }
-      );
-    }
-
-    // Check if token is expired
-    if (decoded.exp) {
-      const now = Math.floor(Date.now() / 1000);
-      if (decoded.exp < now) {
-        return NextResponse.json(
-          { message: "Token expired" },
-          { status: 401 }
-        );
-      }
-    }
-
-    // Return user info from token (roles normalized for web hub + guards)
-    return NextResponse.json({
-      user: {
-        id: decoded.sub || decoded.id || "",
-        email: decoded.email || "",
-        name: decoded.name,
-        roles: normalizeWebUserRoles((decoded as Record<string, unknown>).roles),
-        autoCreatedAt:
-          typeof decoded.autoCreatedAt === "string"
-            ? decoded.autoCreatedAt
-            : undefined,
-        emailVerified:
-          typeof decoded.emailVerified === "boolean"
-            ? decoded.emailVerified
-            : undefined,
-      },
+    const response = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
     });
+    const data = (await response.json().catch(() => ({}))) as {
+      user?: ApiUser;
+      message?: string;
+    };
+    if (!response.ok) {
+      return NextResponse.json(
+        { message: data.message || "Unable to load profile" },
+        { status: response.status },
+      );
+    }
+    const user = mapUser(data.user);
+    if (!user) {
+      return NextResponse.json({ message: "Invalid profile response" }, { status: 502 });
+    }
+    return NextResponse.json({ user });
   } catch (error) {
     console.error("Get user error:", error);
-    return NextResponse.json(
-      { message: "An error occurred" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "An error occurred" }, { status: 500 });
   }
 }
 
+export async function PATCH(request: NextRequest) {
+  try {
+    const accessToken = await readAccessToken();
+    if (!accessToken) {
+      return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const response = await fetch(`${API_URL}/auth/profile`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = (await response.json().catch(() => ({}))) as {
+      user?: ApiUser;
+      tokens?: { accessToken: string; refreshToken: string };
+      message?: string | string[];
+    };
+    if (!response.ok) {
+      const message = Array.isArray(data.message)
+        ? data.message.join(", ")
+        : data.message || "Unable to update profile";
+      return NextResponse.json({ message }, { status: response.status });
+    }
+
+    const user = mapUser(data.user);
+    const next = NextResponse.json({ user });
+    if (data.tokens?.accessToken && data.tokens?.refreshToken) {
+      setAuthCookies(next, data.tokens);
+    }
+    return next;
+  } catch (error) {
+    console.error("Update profile error:", error);
+    return NextResponse.json({ message: "An error occurred" }, { status: 500 });
+  }
+}

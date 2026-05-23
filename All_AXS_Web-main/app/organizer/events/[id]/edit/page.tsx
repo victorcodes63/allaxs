@@ -18,6 +18,7 @@ import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab
 import { EventCouponsTab } from "@/components/organizer/event-editor/EventCouponsTab";
 import { EventScannerTab } from "@/components/organizer/event-editor/EventScannerTab";
 import { OrganizerAdminEditBanner } from "@/components/organizer/event-editor/OrganizerAdminEditBanner";
+import { DeleteEventButton } from "@/components/events/DeleteEventButton";
 import { resolveCurrencyFromTiers } from "@/lib/currency";
 import { EventStatus } from "@/lib/validation/event";
 
@@ -252,6 +253,25 @@ export default function EventEditorPage() {
       >
         <EventEditorTabsSection event={event} tabs={tabs} />
       </Suspense>
+
+      <section className="rounded-[var(--radius-panel)] border border-red-400/25 bg-red-500/5 p-5">
+        <h2 className="font-display text-base font-semibold text-foreground">
+          Danger zone
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+          Delete draft, in-review, or rejected events that you no longer need.
+          Events with paid orders cannot be removed from the organizer workspace.
+        </p>
+        <div className="mt-4">
+          <DeleteEventButton
+            eventId={event.id}
+            eventTitle={event.title}
+            eventStatus={event.status}
+            mode="organizer"
+            redirectTo="/organizer/events"
+          />
+        </div>
+      </section>
     </div>
   );
 }

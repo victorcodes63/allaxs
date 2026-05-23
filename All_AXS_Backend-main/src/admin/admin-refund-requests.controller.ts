@@ -124,7 +124,11 @@ export class AdminRefundRequestsController {
     const result = await this.refundRequestsService.approve(
       id,
       user.id,
-      body.note,
+      {
+        note: body.note,
+        refundMode: body.refundMode,
+        amountCents: body.amountCents,
+      },
       extractAuditContext(req),
     );
 
@@ -135,6 +139,8 @@ export class AdminRefundRequestsController {
         id: result.refund.id,
         status: result.refund.status,
         refundAmountCents: result.refund.refundAmountCents,
+        retainedCents: result.refund.retainedCents,
+        refundMode: result.refund.refundMode,
         currency: result.refund.currency,
       },
     };

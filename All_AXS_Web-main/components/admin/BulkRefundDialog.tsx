@@ -31,10 +31,9 @@ interface BulkRefundDialogProps {
 }
 
 /**
- * Bulk-refund flow for the admin orders view. Always issues a FULL refund
- * per selected order. Sequential calls via `Promise.allSettled` so a
- * single failure doesn't abort the batch; the summary banner on
- * `/admin/orders` reports succeeded/failed counts.
+ * Bulk-refund flow for the admin orders view. Issues FULL (100%) refunds per
+ * selected order — intended for event cancellations. Sequential calls via
+ * `Promise.allSettled` so a single failure doesn't abort the batch.
  *
  * Why a hard cap? Refunds are money operations (Paystack refund + DB).
  * Batches of <= 20 limit the blast radius of a misclick.
@@ -88,6 +87,7 @@ export function BulkRefundDialog({
       orders.map((order) =>
         axios.post(`/api/admin/orders/${order.id}/refund`, {
           reason: trimmedReason,
+          refundMode: "FULL",
         }),
       ),
     );
@@ -214,10 +214,9 @@ export function BulkRefundDialog({
         />
 
         <div className="rounded-[var(--radius-panel)] border border-amber-400/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100">
-          <strong className="font-semibold">Money path.</strong> Each row calls the refund API with
-          Paystack for live card payments (then voids passes in All AXS). Demo checkouts skip the
-          provider. If Paystack rejects a row, that order stays paid — use the summary banner and
-          provider dashboard to reconcile failures.
+          <strong className="font-semibold">Bulk = full refund.</strong> Each order is refunded at
+          100% (for event cancellations). Single-order refunds from the row action support policy
+          (75%), full, or custom amounts.
         </div>
       </div>
     </Dialog>

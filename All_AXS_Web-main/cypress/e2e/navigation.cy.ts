@@ -53,8 +53,9 @@ describe('Navigation', () => {
     pages.forEach((page) => {
       cy.visit(page);
       cy.get('footer').should('be.visible');
-      cy.contains('Terms').should('be.visible');
-      cy.contains('Privacy').should('be.visible');
+      cy.contains('Terms & conditions').should('be.visible');
+      cy.contains('Privacy policy').should('be.visible');
+      cy.contains('Refund & cancellation').should('be.visible');
     });
   });
 

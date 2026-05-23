@@ -50,7 +50,19 @@ export function PaymentCallbackClient() {
               // Email retries remain available from the confirmation page.
             }
           }
-          router.replace(`/orders/${data.orderId}/confirmation`);
+          let confirmationPath = `/orders/${data.orderId}/confirmation`;
+          try {
+            const meRes = await fetch("/api/auth/me", { credentials: "same-origin" });
+            if (meRes.ok) {
+              const meData = (await meRes.json()) as { user?: { email?: string } };
+              if (meData.user?.email) {
+                confirmationPath = `/dashboard/orders/${data.orderId}/confirmation`;
+              }
+            }
+          } catch {
+            /* fall back to public confirmation path */
+          }
+          router.replace(confirmationPath);
           return;
         }
 

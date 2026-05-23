@@ -16,6 +16,7 @@ import { TicketType } from '../events/entities/ticket-type.entity';
 import { DomainModule } from '../domain/domain.module';
 import { EventsModule } from '../events/events.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     DomainModule,
     EventsModule,
     NotificationsModule,
+    UsersModule,
   ],
   controllers: [CheckoutController, PaystackWebhookController, TicketsController],
   providers: [CheckoutService, TicketsService, WalletPassService],

@@ -5,6 +5,12 @@ import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Textarea } from "@/components/ui/Textarea";
+import {
+  RefundAmountSelector,
+  refundSelectionToPayload,
+  type RefundAmountSelection,
+} from "@/components/admin/RefundAmountSelector";
+import { resolveRefundPreview } from "@/lib/refunds/policy";
 
 export interface RefundOrderTarget {
   id: string;
@@ -26,8 +32,8 @@ function formatMajor(cents: number): string {
 }
 
 /**
- * Refund flow for the admin /admin/orders view — full order total only.
- * Posts to `POST /api/admin/orders/:id/refund` (Nest + Paystack when applicable).
+ * Admin refund flow for `/admin/orders`. Supports policy (75%), full, or custom
+ * amounts via `POST /api/admin/orders/:id/refund`.
  */
 export function RefundOrderDialog({
   order,
@@ -35,12 +41,16 @@ export function RefundOrderDialog({
   onRefunded,
 }: RefundOrderDialogProps) {
   const [reason, setReason] = useState("");
+  const [refundSelection, setRefundSelection] = useState<RefundAmountSelection>({
+    refundMode: "POLICY",
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (order) {
       setReason("");
+      setRefundSelection({ refundMode: "POLICY" });
       setError(null);
     }
   }, [order]);
@@ -52,10 +62,30 @@ export function RefundOrderDialog({
   const submit = async () => {
     setError(null);
 
+    const preview = resolveRefundPreview(
+      order.amountCents,
+      refundSelection.refundMode,
+      refundSelection.customAmountCents,
+    );
+    if (
+      refundSelection.refundMode === "CUSTOM" &&
+      (!refundSelection.customAmountCents ||
+        refundSelection.customAmountCents <= 0 ||
+        refundSelection.customAmountCents > order.amountCents)
+    ) {
+      setError("Enter a valid custom refund amount.");
+      return;
+    }
+    if (preview.refundAmountCents <= 0) {
+      setError("Refund amount must be greater than zero.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await axios.post(`/api/admin/orders/${order.id}/refund`, {
         reason: reason.trim() || undefined,
+        ...refundSelectionToPayload(refundSelection),
       });
       onRefunded();
     } catch (err) {
@@ -101,11 +131,11 @@ export function RefundOrderDialog({
           </Button>
           <Button
             variant="primary"
-            onClick={submit}
+            onClick={() => void submit()}
             disabled={submitting}
             className="w-auto bg-red-600 text-white hover:bg-red-700"
           >
-            {submitting ? "Refunding…" : "Refund order"}
+            {submitting ? "Refunding…" : "Issue refund"}
           </Button>
         </div>
       }
@@ -148,6 +178,13 @@ export function RefundOrderDialog({
           </div>
         </dl>
 
+        <RefundAmountSelector
+          orderAmountCents={order.amountCents}
+          currency={order.currency}
+          value={refundSelection}
+          onChange={setRefundSelection}
+        />
+
         <Textarea
           label="Reason (optional)"
           value={reason}
@@ -157,9 +194,8 @@ export function RefundOrderDialog({
         />
 
         <p className="text-xs leading-relaxed text-muted">
-          This refunds the <strong className="text-foreground">full order total</strong> ({totalLabel}). It voids
-          tickets, restores tier inventory, sets the order to REFUNDED, and is logged in the admin audit trail. Live
-          Paystack payments are refunded via Paystack first (requires API keys). Demo orders skip the provider.
+          Paystack is called with the selected refund amount. Demo orders skip the
+          provider. The action is logged in the admin audit trail.
         </p>
       </div>
     </Dialog>

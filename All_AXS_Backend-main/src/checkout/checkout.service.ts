@@ -50,6 +50,7 @@ import {
   PaymentInstallment,
   PaymentInstallmentStatus,
 } from '../domain/payment-installment.entity';
+import { PaymentPlanStatus } from '../domain/payment-plan.entity';
 import {
   WaitlistService,
   type WaitlistPurchaseContext,
@@ -1131,6 +1132,102 @@ export class CheckoutService {
     return { resent: true };
   }
 
+  async resendReceipt(userId: string, orderId: string) {
+    const order = await this.dataSource.getRepository(Order).findOne({
+      where: { id: orderId, userId },
+      relations: ['event', 'event.organizer'],
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.status !== OrderStatus.PAID && order.status !== OrderStatus.REFUNDED) {
+      throw new BadRequestException(
+        'Receipts can only be resent for paid or refunded orders',
+      );
+    }
+    const payment = await this.dataSource.getRepository(Payment).findOne({
+      where: { orderId: order.id, status: PaymentStatus.SUCCESS },
+      order: { createdAt: 'DESC' },
+    });
+    if (!payment) {
+      throw new NotFoundException('No successful payment found for this order');
+    }
+
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL')?.trim() ||
+      'http://localhost:3000';
+    await this.sendOrderPaymentReceiptEmail(order, order.event ?? null, {
+      paymentReference: payment.intentId,
+      paidAt: this.resolveGatewayPaidAt(
+        (payment.rawPayload?.gatewayPayload as Record<string, unknown>) ??
+          payment.rawPayload ??
+          {},
+      ),
+      amountCents: payment.amountCents,
+      currency: payment.currency,
+      paymentMethodLabel: this.resolveGatewayPaymentMethodLabel(
+        (payment.rawPayload?.gatewayPayload as Record<string, unknown>) ??
+          payment.rawPayload ??
+          {},
+      ),
+      orderConfirmationUrl: `${frontendUrl.replace(/\/$/, '')}/orders/${order.id}/confirmation`,
+      ticketsPending: false,
+      organizerName:
+        order.event?.organizer?.orgName ??
+        this.configService.get<string>('APP_NAME', 'All AXS'),
+      organizerSupportEmail: order.event?.organizer?.supportEmail ?? null,
+    });
+
+    payment.rawPayload = {
+      ...(payment.rawPayload ?? {}),
+      receiptEmailSentAt: new Date().toISOString(),
+    };
+    await this.dataSource.getRepository(Payment).save(payment);
+
+    return { resent: true };
+  }
+
+  async listOrdersForUser(userId: string, limit: number, offset: number) {
+    const repo = this.dataSource.getRepository(Order);
+    const [orders, total] = await repo.findAndCount({
+      where: { userId },
+      relations: ['event', 'tickets', 'payments'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+      skip: offset,
+    });
+
+    const visible = orders.filter((o) => o.status !== OrderStatus.DRAFT);
+
+    return {
+      orders: visible.map((order) => {
+        const payment = [...(order.payments ?? [])]
+          .filter((p) => p.status === PaymentStatus.SUCCESS)
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          )[0];
+        return {
+          id: order.id,
+          status: order.status,
+          totalCents: order.amountCents,
+          currency: order.currency,
+          createdAt: order.createdAt.toISOString(),
+          eventId: order.eventId,
+          eventTitle: order.event?.title ?? 'Event',
+          eventSlug: order.event?.slug ?? '',
+          eventStartAt: order.event?.startAt?.toISOString() ?? null,
+          eventEndAt: order.event?.endAt?.toISOString() ?? null,
+          ticketCount: order.tickets?.length ?? 0,
+          paymentReference: payment?.intentId ?? null,
+        };
+      }),
+      total,
+      limit,
+      offset,
+    };
+  }
+
   private resolveInstallmentSequence(
     payment: Payment,
     installments: PaymentInstallment[],
@@ -1800,6 +1897,10 @@ export class CheckoutService {
       currency: string;
       eventTitle: string;
       eventSlug: string;
+      eventStartAt: string | null;
+      eventEndAt: string | null;
+      createdAt: string;
+      paymentReference: string | null;
       buyerName: string;
       buyerEmail: string;
       guestCheckout: boolean;
@@ -1812,10 +1913,32 @@ export class CheckoutService {
         currency: string;
       }[];
     };
+    paymentPlan: {
+      status: PaymentPlanStatus;
+      totalAmount: number;
+      currency: string;
+      nextDueAt: string | null;
+      installments: {
+        sequence: number;
+        amount: number;
+        pct: number;
+        dueAt: string;
+        status: PaymentInstallmentStatus;
+        paidAt: string | null;
+      }[];
+    } | null;
   }> {
     const order = await this.dataSource.getRepository(Order).findOne({
       where: { id: orderId, userId },
-      relations: ['event', 'items', 'items.ticketType', 'appliedCoupon'],
+      relations: [
+        'event',
+        'items',
+        'items.ticketType',
+        'appliedCoupon',
+        'payments',
+        'paymentPlans',
+        'paymentPlans.installments',
+      ],
     });
     if (!order || !order.event) {
       throw new NotFoundException('Order not found');
@@ -1843,6 +1966,33 @@ export class CheckoutService {
     const coupon = order.appliedCoupon
       ? { code: order.appliedCoupon.code, discountCents: discount }
       : null;
+    const payment = [...(order.payments ?? [])]
+      .filter((p) => p.status === PaymentStatus.SUCCESS)
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0];
+
+    const plan = order.paymentPlans?.[0];
+    const paymentPlan = plan
+      ? {
+          status: plan.status,
+          totalAmount: plan.totalAmount,
+          currency: plan.currency,
+          nextDueAt: plan.nextDueAt?.toISOString() ?? null,
+          installments: [...(plan.installments ?? [])]
+            .sort((a, b) => a.sequence - b.sequence)
+            .map((inst) => ({
+              sequence: inst.sequence,
+              amount: inst.amount,
+              pct: Number(inst.pct),
+              dueAt: inst.dueAt.toISOString(),
+              status: inst.status,
+              paidAt: inst.paidAt?.toISOString() ?? null,
+            })),
+        }
+      : null;
+
     return {
       order: {
         id: order.id,
@@ -1856,12 +2006,131 @@ export class CheckoutService {
         currency: order.currency,
         eventTitle: order.event.title,
         eventSlug: order.event.slug,
+        eventStartAt: order.event.startAt?.toISOString() ?? null,
+        eventEndAt: order.event.endAt?.toISOString() ?? null,
+        createdAt: order.createdAt.toISOString(),
+        paymentReference: payment?.intentId ?? null,
         buyerName,
         buyerEmail: order.email,
         guestCheckout: notesMeta.guestCheckout === true,
         coupon,
         lineItems,
       },
+      paymentPlan,
+    };
+  }
+
+  async initializeInstallmentPayment(userId: string, orderId: string) {
+    await this.authService.assertEmailVerifiedForCheckout(userId);
+
+    const order = await this.dataSource.getRepository(Order).findOne({
+      where: { id: orderId, userId },
+    });
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const plan = await this.paymentPlansService.findByOrder(orderId);
+    if (!plan || plan.status !== PaymentPlanStatus.ACTIVE) {
+      throw new BadRequestException('No active payment plan for this order');
+    }
+
+    const nextInstallment = [...(plan.installments ?? [])]
+      .filter((i) => i.status === PaymentInstallmentStatus.PENDING)
+      .sort((a, b) => a.sequence - b.sequence)[0];
+    if (!nextInstallment) {
+      throw new BadRequestException('No pending installment to pay');
+    }
+
+    const reference = `pay_${crypto.randomUUID().replace(/-/g, '')}`;
+    const callbackUrl = this.getPaystackCallbackUrl();
+    const secret = this.getPaystackSecret();
+
+    await this.dataSource.getRepository(Payment).save(
+      this.dataSource.getRepository(Payment).create({
+        orderId: order.id,
+        gateway: PaymentGateway.PAYSTACK,
+        intentId: reference,
+        status: PaymentStatus.INITIATED,
+        amountCents: nextInstallment.amount,
+        currency: order.currency,
+        txRef: reference,
+        rawPayload: {
+          stage: 'initialized_locally',
+          orderId: order.id,
+          payInInstallments: true,
+          installmentSequence: nextInstallment.sequence,
+        },
+      }),
+    );
+
+    const initResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: order.email,
+        amount: nextInstallment.amount,
+        currency: order.currency,
+        reference,
+        callback_url: callbackUrl,
+        metadata: {
+          orderId: order.id,
+          userId,
+          eventId: order.eventId,
+          payInInstallments: true,
+          installmentSequence: nextInstallment.sequence,
+        },
+      }),
+    });
+
+    const initData = (await initResponse.json().catch(() => ({}))) as {
+      status?: boolean;
+      message?: string;
+      data?: {
+        authorization_url?: string;
+        access_code?: string;
+        reference?: string;
+      };
+    };
+
+    if (!initResponse.ok || !initData.status || !initData.data?.authorization_url) {
+      const payment = await this.dataSource.getRepository(Payment).findOne({
+        where: { intentId: reference },
+      });
+      if (payment) {
+        payment.status = PaymentStatus.FAILED;
+        payment.rawPayload = {
+          ...(payment.rawPayload ?? {}),
+          reason: initData.message ?? 'Failed to initialize Paystack transaction',
+        };
+        await this.dataSource.getRepository(Payment).save(payment);
+      }
+      throw new BadRequestException(
+        initData.message ?? 'Failed to initialize Paystack transaction',
+      );
+    }
+
+    const payment = await this.dataSource.getRepository(Payment).findOne({
+      where: { intentId: reference },
+    });
+    if (payment) {
+      payment.status = PaymentStatus.AUTH_REQUIRED;
+      payment.rawPayload = {
+        ...(payment.rawPayload ?? {}),
+        stage: 'paystack_initialized',
+        initializeResponse: initData,
+      };
+      await this.dataSource.getRepository(Payment).save(payment);
+    }
+
+    return {
+      authorizationUrl: initData.data.authorization_url,
+      reference,
+      amountCents: nextInstallment.amount,
+      installmentSequence: nextInstallment.sequence,
     };
   }
 }

@@ -4,6 +4,7 @@ import { CtaArrow } from "@/components/ui/CtaArrow";
 import { FooterBackToTop } from "@/components/layout/FooterBackToTop";
 import { FooterStayInTheLoop } from "@/components/layout/FooterStayInTheLoop";
 import { AuthFooterDemoLogins } from "@/components/auth/AuthFooterDemoLogins";
+import { FooterLegalLinks } from "@/components/legal/FooterLegalLinks";
 
 const FOOTER_NAV = [
   ["/", "Home"],
@@ -77,14 +78,10 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
         </div>
         <div className="border-t border-white/10 bg-[#050506] text-white">
           <div className="axs-page-shell flex flex-col gap-2 px-4 py-2.5 pb-[max(0.5rem,calc(0.5rem+env(safe-area-inset-bottom)))] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 md:px-8 lg:px-10">
-            <div className="flex flex-wrap gap-x-5 gap-y-1">
-              <Link href="/privacy" className="text-[10px] uppercase tracking-[0.2em] text-white/75 transition-colors hover:text-primary/85">
-                Privacy policy
-              </Link>
-              <Link href="/terms" className="text-[10px] uppercase tracking-[0.2em] text-white/75 transition-colors hover:text-primary/85">
-                Terms of service
-              </Link>
-            </div>
+            <FooterLegalLinks
+              className="flex flex-wrap gap-x-5 gap-y-1"
+              linkClassName="text-[10px] uppercase tracking-[0.2em] text-white/75 transition-colors hover:text-primary/85"
+            />
             <p className="text-[10px] uppercase tracking-[0.2em] text-white/55">
               © {year} All AXS
             </p>
@@ -187,14 +184,7 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
 
       <div className="border-t border-[color:var(--footer-legal-border)] bg-[color:var(--footer-legal-bg)] text-white">
         <div className="axs-page-shell flex flex-col gap-4 pt-4 pb-[max(1rem,calc(1rem+env(safe-area-inset-bottom)))] text-[10px] uppercase tracking-[0.2em] sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          <div className="flex flex-wrap gap-x-6 gap-y-2">
-            <Link href="/privacy" className="text-white/75 transition-colors hover:text-primary/85">
-              Privacy policy
-            </Link>
-            <Link href="/terms" className="text-white/75 transition-colors hover:text-primary/85">
-              Terms of service
-            </Link>
-          </div>
+          <FooterLegalLinks />
           <p className="text-white/55 sm:text-center">
             © {year} All AXS. <span className="text-white/40">All rights reserved.</span>
           </p>

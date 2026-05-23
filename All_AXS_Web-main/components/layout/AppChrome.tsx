@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { LoggedInBrowseChrome } from "@/components/layout/LoggedInBrowseChrome";
 import { useAuth } from "@/lib/auth";
+import { useGuestOnlyPublicRedirect } from "@/lib/auth/use-guest-only-public-redirect";
 
 function isHubPath(
   pathname: string | null,
@@ -88,12 +89,20 @@ function isOrganizersMarketingPath(pathname: string | null): boolean {
   return pathname === "/organizers" || pathname.startsWith("/organizers/");
 }
 
+/** Legal policy pages — always use marketing chrome + footer. */
+function isLegalPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  const paths = ["/terms", "/privacy", "/refund-policy", "/payout-policy"] as const;
+  return paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 function usesFullMarketingChrome(pathname: string | null): boolean {
   return (
     isPublicAuthPath(pathname) ||
     isPublicHomePath(pathname) ||
     isPublicEventsCatalogPath(pathname) ||
-    isOrganizersMarketingPath(pathname)
+    isOrganizersMarketingPath(pathname) ||
+    isLegalPath(pathname)
   );
 }
 
@@ -101,8 +110,17 @@ function AppChromeInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const layoutSegments = useSelectedLayoutSegments();
   const { user, loading } = useAuth();
+  const guestPublicRedirect = useGuestOnlyPublicRedirect();
   const shellClass =
     "flex min-h-dvh flex-1 w-full flex-col bg-background text-foreground";
+
+  if (guestPublicRedirect === "redirecting") {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background">
+        <p className="text-sm text-muted">Redirecting…</p>
+      </div>
+    );
+  }
 
   if (isHubPath(pathname, layoutSegments, !!user)) {
     return (

@@ -7,8 +7,12 @@ import {
   shouldOfferOrganizerHub,
   userHasRole,
 } from "@/lib/auth/hub-routing";
+import { hubLegalPageTitle } from "@/lib/legal/hub-paths";
 
 function attendeePageTitle(pathname: string): string {
+  const legalTitle = hubLegalPageTitle(pathname);
+  if (legalTitle) return legalTitle;
+
   if (pathname === "/organizer/onboarding" || pathname.startsWith("/organizer/onboarding/")) {
     return "Become a host";
   }
@@ -16,7 +20,26 @@ function attendeePageTitle(pathname: string): string {
     return "Team invite";
   }
   if (pathname === "/dashboard/events" || pathname.startsWith("/dashboard/events/")) {
-    return "Browse events";
+    return pathname === "/dashboard/events" ? "Browse events" : "Event details";
+  }
+  if (pathname === "/dashboard/orders" || pathname.startsWith("/dashboard/orders/")) {
+    if (pathname.endsWith("/confirmation")) return "Order confirmation";
+    return pathname === "/dashboard/orders" ? "My orders" : "Order details";
+  }
+  if (pathname === "/dashboard/refunds" || pathname.startsWith("/dashboard/refunds/")) {
+    return "My refunds";
+  }
+  if (pathname === "/dashboard/calendar" || pathname.startsWith("/dashboard/calendar/")) {
+    return "My calendar";
+  }
+  if (pathname === "/dashboard/saved" || pathname.startsWith("/dashboard/saved/")) {
+    return "Saved events";
+  }
+  if (pathname === "/dashboard/support" || pathname.startsWith("/dashboard/support/")) {
+    return "Support";
+  }
+  if (pathname === "/dashboard/account" || pathname.startsWith("/dashboard/account/")) {
+    return "Account";
   }
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
     return "Overview";
@@ -55,9 +78,34 @@ export function AttendeeHubShell({
             match: (p) => p === "/tickets" || p.startsWith("/tickets/"),
           },
           {
+            href: "/dashboard/orders",
+            label: "My orders",
+            match: (p) => p === "/dashboard/orders" || p.startsWith("/dashboard/orders/"),
+          },
+          {
+            href: "/dashboard/refunds",
+            label: "Refunds",
+            match: (p) => p === "/dashboard/refunds" || p.startsWith("/dashboard/refunds/"),
+          },
+          {
+            href: "/dashboard/calendar",
+            label: "Calendar",
+            match: (p) => p === "/dashboard/calendar" || p.startsWith("/dashboard/calendar/"),
+          },
+          {
             href: "/notifications",
             label: "Notifications",
             match: (p) => p === "/notifications" || p.startsWith("/notifications/"),
+          },
+          {
+            href: "/dashboard/support",
+            label: "Support",
+            match: (p) => p === "/dashboard/support" || p.startsWith("/dashboard/support/"),
+          },
+          {
+            href: "/dashboard/account",
+            label: "Account",
+            match: (p) => p === "/dashboard/account" || p.startsWith("/dashboard/account/"),
           },
         ],
       },
@@ -68,6 +116,11 @@ export function AttendeeHubShell({
             href: "/dashboard/events",
             label: "Browse events",
             match: (p) => p === "/dashboard/events" || p.startsWith("/dashboard/events/"),
+          },
+          {
+            href: "/dashboard/saved",
+            label: "Saved",
+            match: (p) => p === "/dashboard/saved" || p.startsWith("/dashboard/saved/"),
           },
         ],
       },

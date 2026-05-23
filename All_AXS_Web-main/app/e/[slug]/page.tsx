@@ -12,6 +12,7 @@ import {
 import { ArrowBackCtaLink, ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { TierWaitlistJoin } from "@/components/events/TierWaitlistJoin";
 import { resolveCurrencyFromTiers } from "@/lib/currency";
+import { redirectSignedInFromGuestPublicPath } from "@/lib/auth/redirect-signed-in-from-public";
 
 export const revalidate = 300;
 
@@ -158,6 +159,8 @@ function isTierSoldOut(tier: NonNullable<PublicEvent["ticketTypes"]>[0]) {
 
 export default async function EventDetailPage({ params }: EventDetailPageProps) {
   const { slug } = await params;
+  await redirectSignedInFromGuestPublicPath(`/e/${slug}`);
+
   let event;
   try {
     event = await fetchEventBySlug(slug);

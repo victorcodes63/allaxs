@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
+import { STANDARD_REFUND_PERCENT } from "@/lib/refunds/policy";
 
 export type RefundRequestStatus = "PENDING" | "APPROVED" | "DENIED";
 
@@ -22,6 +24,7 @@ interface RefundRequestPanelProps {
   orderId: string;
   orderStatus: string;
   enabled: boolean;
+  refundPolicyHref?: string;
 }
 
 function statusMessage(request: BuyerRefundRequest): string {
@@ -29,7 +32,7 @@ function statusMessage(request: BuyerRefundRequest): string {
     case "PENDING":
       return "Your refund request is pending admin review. We will email you when it is processed.";
     case "APPROVED":
-      return "Your refund request was approved. The order has been refunded.";
+      return "Your refund request was approved. The refund has been processed to your original payment method.";
     case "DENIED":
       return request.adminNote
         ? `Your refund request was denied. Note from our team: ${request.adminNote}`
@@ -43,6 +46,7 @@ export function RefundRequestPanel({
   orderId,
   orderStatus,
   enabled,
+  refundPolicyHref = "/refund-policy",
 }: RefundRequestPanelProps) {
   const [request, setRequest] = useState<BuyerRefundRequest | null | undefined>(
     undefined,
@@ -139,8 +143,13 @@ export function RefundRequestPanel({
       <div>
         <h2 className="font-display text-lg font-semibold text-foreground">Request a refund</h2>
         <p className="mt-1 text-sm text-muted leading-relaxed">
-          Tell us why you need a refund. An admin will review your request—approval is not
-          automatic. If approved, the full order total is refunded and tickets are voided.
+          Tell us why you need a refund. An admin will review your request — approval
+          is not automatic. If approved, eligible refunds are typically processed at{" "}
+          {STANDARD_REFUND_PERCENT}% of the ticket value per our{" "}
+          <Link href={refundPolicyHref} className="underline hover:text-foreground">
+            refund &amp; cancellation policy
+          </Link>
+          . Full refunds may apply for cancelled events or platform errors.
         </p>
       </div>
 

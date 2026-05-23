@@ -1,5 +1,10 @@
+import { hubLegalPageTitle } from "@/lib/legal/hub-paths";
+
 /** Labels for the organizer app chrome (sidebar + top bar). */
 export function organizerPageTitle(pathname: string): string {
+  const legalTitle = hubLegalPageTitle(pathname);
+  if (legalTitle) return legalTitle;
+
   if (pathname === "/organizer/dashboard") return "Overview";
   if (pathname === "/organizer/sales") return "Sales & orders";
   if (pathname === "/organizer/earnings") return "Earnings & payouts";

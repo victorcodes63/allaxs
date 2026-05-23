@@ -697,8 +697,16 @@ export function PublicGuestCheckout({
             By completing purchase, an account will be created for ticket management. See our{" "}
             <Link href="/privacy" className="underline hover:text-foreground">
               privacy policy
-            </Link>{" "}
-            for how we handle your data (GDPR).
+            </Link>
+            ,{" "}
+            <Link href="/terms" className="underline hover:text-foreground">
+              terms
+            </Link>
+            , and{" "}
+            <Link href="/refund-policy" className="underline hover:text-foreground">
+              refund policy
+            </Link>
+            .
           </section>
 
           {error ? (

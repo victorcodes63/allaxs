@@ -6,6 +6,11 @@
  */
 
 import { DEMO_PUBLIC_EVENTS } from "@/lib/data/demo-public-events";
+import {
+  comparePublicEventsByStartAt,
+  filterActivePublicEvents,
+  sortPublicEventsByStartAt,
+} from "@/lib/events/public-events-catalog";
 import { isDemoPublicEventsMode } from "@/lib/public-events-mode";
 import type { PublicEvent, PublicEventsResponse } from "@/lib/types/public-event";
 
@@ -30,12 +35,6 @@ function filterDemoPublicEvents(options: {
 
   if (options.featured) {
     list = list.filter((e) => e.isFeatured);
-    list.sort((a, b) => {
-      const ao = a.featuredSortOrder ?? Number.MAX_SAFE_INTEGER;
-      const bo = b.featuredSortOrder ?? Number.MAX_SAFE_INTEGER;
-      if (ao !== bo) return ao - bo;
-      return new Date(a.startAt).getTime() - new Date(b.startAt).getTime();
-    });
   }
 
   if (options.q?.trim()) {
@@ -60,6 +59,22 @@ function filterDemoPublicEvents(options: {
   }
   if (options.dateTo) {
     list = list.filter((e) => e.startAt <= options.dateTo!);
+  }
+
+  // Catalogue default: hide ended events so the nearest start dates surface first.
+  if (!options.dateFrom && !options.dateTo) {
+    list = filterActivePublicEvents(list);
+  }
+
+  if (options.featured) {
+    list.sort((a, b) => {
+      const ao = a.featuredSortOrder ?? Number.MAX_SAFE_INTEGER;
+      const bo = b.featuredSortOrder ?? Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      return comparePublicEventsByStartAt(a, b);
+    });
+  } else {
+    list = sortPublicEventsByStartAt(list);
   }
 
   const page = Math.max(1, options.page ?? 1);
@@ -110,7 +125,11 @@ export async function fetchPublicEvents(options: {
     throw new Error(`Failed to fetch events: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = (await response.json()) as PublicEventsResponse;
+  return {
+    ...data,
+    events: sortPublicEventsByStartAt(data.events ?? []),
+  };
 }
 
 /**

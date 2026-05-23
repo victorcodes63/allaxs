@@ -63,15 +63,76 @@ export function CheckoutExperience({
   }
 
   const router = useRouter();
-  const tiers = useMemo(
-    () => event.ticketTypes?.filter(tierAvailable) ?? [],
-    [event.ticketTypes]
-  );
+  const waitlistQs = waitlistToken?.trim()
+    ? `?waitlist=${encodeURIComponent(waitlistToken.trim())}`
+    : "";
+  const confirmationPath = (orderId: string) =>
+    context === "dashboard"
+      ? `/dashboard/orders/${orderId}/confirmation`
+      : `/orders/${orderId}/confirmation`;
+  const [waitlistOffer, setWaitlistOffer] = useState<{
+    tierId: string;
+    tierName?: string;
+    email?: string;
+    expiresAt?: string;
+  } | null>(null);
+  const [waitlistError, setWaitlistError] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+
+  useEffect(() => {
+    const token = waitlistToken?.trim();
+    if (!token) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/public/events/waitlist/verify?token=${encodeURIComponent(token)}`,
+          { cache: "no-store" },
+        );
+        const data = (await res.json()) as {
+          valid?: boolean;
+          reason?: string;
+          tierId?: string;
+          tierName?: string;
+          email?: string;
+          expiresAt?: string;
+        };
+        if (cancelled) return;
+        if (!data.valid || !data.tierId) {
+          setWaitlistError(data.reason || "This waitlist link is invalid or expired.");
+          return;
+        }
+        setWaitlistOffer({
+          tierId: data.tierId,
+          tierName: data.tierName,
+          email: data.email,
+          expiresAt: data.expiresAt,
+        });
+      } catch {
+        if (!cancelled) {
+          setWaitlistError("Could not verify your waitlist link.");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [waitlistToken]);
+
+  const tiers = useMemo(() => {
+    const available = event.ticketTypes?.filter(tierAvailable) ?? [];
+    if (!waitlistOffer) return available;
+    const waitlistTier = event.ticketTypes?.find((t) => t.id === waitlistOffer.tierId);
+    if (waitlistTier && !available.some((t) => t.id === waitlistTier.id)) {
+      return [waitlistTier, ...available];
+    }
+    return available;
+  }, [event.ticketTypes, waitlistOffer]);
   const eventDetailPath =
     context === "dashboard" ? `/dashboard/events/${event.slug}` : `/e/${event.slug}`;
   const checkoutReturnPath =
     context === "dashboard"
-      ? `/dashboard/events/${event.slug}/checkout`
+      ? `/dashboard/events/${event.slug}/checkout${waitlistQs}`
       : `/events/${event.id}/checkout`;
   const [step, setStep] = useState<CheckoutStep>("tickets");
   const [qty, setQty] = useState<Record<string, number>>(() =>
@@ -101,7 +162,19 @@ export function CheckoutExperience({
     const draft = loadCheckoutDraft(event.id);
     setQty(resolveCheckoutQuantities(tiers, draft?.qty));
     setStep(draft?.step === "buyer" ? "buyer" : "tickets");
+    setDraftReady(true);
   }, [event.id, tiers]);
+
+  useEffect(() => {
+    if (!waitlistOffer || !draftReady) return;
+    const tier = event.ticketTypes?.find((t) => t.id === waitlistOffer.tierId);
+    if (!tier) return;
+    const minQ = tier.minPerOrder ?? 1;
+    setQty((prev) => ({ ...prev, [waitlistOffer.tierId]: minQ }));
+    if (waitlistOffer.email) {
+      setEmail((prev) => (prev.trim() ? prev : waitlistOffer.email ?? ""));
+    }
+  }, [waitlistOffer, draftReady, event.ticketTypes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -347,6 +420,7 @@ export function CheckoutExperience({
             ...(payInInstallments && installmentsAvailable
               ? { payInInstallments: true }
               : {}),
+            ...(waitlistToken?.trim() ? { waitlistToken: waitlistToken.trim() } : {}),
           }),
         });
         const data = (await res.json().catch(() => ({}))) as {
@@ -418,7 +492,7 @@ export function CheckoutExperience({
             saveOrderForSession(paid);
             saveOrderSnapshot(paid);
             clearCheckoutDraft();
-            router.push(`/orders/${data.orderId}/confirmation`);
+            router.push(confirmationPath(data.orderId || ""));
           }
           return;
         }
@@ -498,7 +572,7 @@ export function CheckoutExperience({
         };
         saveOrderSnapshot(snapshot);
         clearCheckoutDraft();
-        router.push(`/orders/${orderId}/confirmation`);
+        router.push(confirmationPath(orderId));
         return;
       }
 
@@ -603,6 +677,19 @@ export function CheckoutExperience({
             </>
           )}
         </p>
+        {waitlistError && (
+          <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {waitlistError}
+          </p>
+        )}
+        {waitlistOffer && (
+          <p className="mt-4 rounded-lg border border-primary/25 bg-primary/[0.06] px-4 py-3 text-sm text-foreground">
+            Waitlist offer for <strong>{waitlistOffer.tierName ?? "your tier"}</strong>
+            {waitlistOffer.expiresAt
+              ? ` — complete checkout before ${new Date(waitlistOffer.expiresAt).toLocaleString()}.`
+              : " — complete checkout within 30 minutes."}
+          </p>
+        )}
 
         <div className="mt-10 space-y-10">
           {step === "tickets" ? (
@@ -859,10 +946,14 @@ export function CheckoutExperience({
                   By continuing you agree to our{" "}
                   <Link href="/terms" className="underline hover:text-foreground">
                     terms
-                  </Link>{" "}
-                  and{" "}
+                  </Link>
+                  ,{" "}
                   <Link href="/privacy" className="underline hover:text-foreground">
                     privacy policy
+                  </Link>
+                  , and{" "}
+                  <Link href="/refund-policy" className="underline hover:text-foreground">
+                    refund policy
                   </Link>
                   .
                 </p>

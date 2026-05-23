@@ -10,6 +10,7 @@ import { PublicEventCard } from "@/components/events/PublicEventCard";
 import { EventsSearchSubmitButton } from "@/components/events/EventsSearchSubmitButton";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { buildEventsCatalogQueryString } from "@/lib/events/build-events-catalog-query";
+import { redirectSignedInFromGuestPublicPath } from "@/lib/auth/redirect-signed-in-from-public";
 
 export const revalidate = 60;
 
@@ -52,6 +53,22 @@ export async function generateMetadata({
 
 export default async function EventsPage({ searchParams }: EventsPageProps) {
   const params = await searchParams;
+  const catalogSearch = buildEventsCatalogQueryString(
+    {
+      q: params.q,
+      size: params.size,
+      type: params.type,
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+      city: params.city,
+    },
+    parseInt(params.page || "1", 10),
+  );
+  await redirectSignedInFromGuestPublicPath(
+    "/events",
+    catalogSearch ? `?${catalogSearch}` : "",
+  );
+
   const page = parseInt(params.page || "1", 10);
   const size = parseInt(params.size || "20", 10);
 

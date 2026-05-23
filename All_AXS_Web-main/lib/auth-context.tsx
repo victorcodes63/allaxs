@@ -16,11 +16,15 @@ export interface AuthUser {
   id: string;
   email: string;
   name?: string;
+  phone?: string | null;
   roles?: string[];
+  status?: string;
   /** ISO timestamp when account was auto-provisioned at guest checkout. */
   autoCreatedAt?: string;
   /** Present when the access JWT includes `emailVerified` (password sign-up flow). */
   emailVerified?: boolean;
+  hasPassword?: boolean;
+  createdAt?: string;
 }
 
 export interface AuthState {
@@ -63,11 +67,21 @@ async function fetchAuthUser(): Promise<AuthUser | null> {
       id,
       email,
       name: typeof o.name === "string" ? o.name : undefined,
+      phone:
+        typeof o.phone === "string"
+          ? o.phone
+          : o.phone === null
+            ? null
+            : undefined,
       roles: normalizeWebUserRoles(o.roles),
+      status: typeof o.status === "string" ? o.status : undefined,
       autoCreatedAt:
         typeof o.autoCreatedAt === "string" ? o.autoCreatedAt : undefined,
       emailVerified:
         typeof o.emailVerified === "boolean" ? o.emailVerified : undefined,
+      hasPassword:
+        typeof o.hasPassword === "boolean" ? o.hasPassword : undefined,
+      createdAt: typeof o.createdAt === "string" ? o.createdAt : undefined,
     };
   };
 

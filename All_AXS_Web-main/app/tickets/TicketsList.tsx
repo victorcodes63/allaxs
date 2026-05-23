@@ -6,6 +6,9 @@ import { loadAllTickets, type StoredTicket } from "@/lib/checkout-storage";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
 import { mergeTicketsById, normalizeApiTicketsPayload } from "@/lib/tickets-api";
+import { splitTicketsByTime } from "@/lib/tickets-grouping";
+
+type TicketTab = "upcoming" | "past" | "all";
 
 function formatTicketWhen(startIso?: string, endIso?: string): string | null {
   if (!startIso) return null;
@@ -75,6 +78,7 @@ export function TicketsList() {
   const [apiTickets, setApiTickets] = useState<StoredTicket[] | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [resendByOrder, setResendByOrder] = useState<Record<string, ResendState>>({});
+  const [activeTab, setActiveTab] = useState<TicketTab>("upcoming");
 
   const apiCheckout = isApiCheckoutEnabled();
 
@@ -118,6 +122,12 @@ export function TicketsList() {
       : mergeTicketsById(apiTickets ?? [], sessionTickets);
 
   const orderGroups = useMemo(() => groupTicketsByOrder(tickets), [tickets]);
+  const { upcoming, past, unknown } = useMemo(() => splitTicketsByTime(tickets), [tickets]);
+  const visibleTickets = useMemo(() => {
+    if (activeTab === "upcoming") return [...upcoming, ...unknown];
+    if (activeTab === "past") return past;
+    return tickets;
+  }, [activeTab, upcoming, past, unknown, tickets]);
 
   const resendTicketEmail = async (orderId: string) => {
     setResendByOrder((prev) => ({ ...prev, [orderId]: "sending" }));
@@ -148,7 +158,7 @@ export function TicketsList() {
 
   if (apiError && tickets.length === 0) {
     return (
-      <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-16 text-center space-y-4 max-w-lg mx-auto">
+      <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-16 text-center space-y-4">
         <p className="text-lg text-muted">{apiError}</p>
         <ArrowCtaLink href="/login" variant="primary">
           Sign in
@@ -159,7 +169,7 @@ export function TicketsList() {
 
   if (tickets.length === 0) {
     return (
-      <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-16 text-center space-y-4 max-w-lg mx-auto">
+      <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-16 text-center space-y-4">
         <p className="text-lg text-muted">No tickets yet—complete checkout on a published event.</p>
         <ArrowCtaLink href="/dashboard/events" variant="primary">
           Find an event
@@ -170,7 +180,7 @@ export function TicketsList() {
 
   const sessionFallbackBanner =
     apiCheckout && apiError && tickets.length > 0 ? (
-      <div className="rounded-[var(--radius-panel)] border border-border bg-primary/5 px-5 py-4 text-sm text-muted max-w-2xl">
+      <div className="rounded-[var(--radius-panel)] border border-border bg-primary/5 px-5 py-4 text-sm text-muted">
         <p className="font-medium text-foreground">Account passes unavailable</p>
         <p className="mt-1 leading-relaxed">{apiError}</p>
         <p className="mt-2 leading-relaxed">
@@ -181,7 +191,7 @@ export function TicketsList() {
 
   const resendEmailBanner =
     apiCheckout && !apiError && orderGroups.length > 0 ? (
-      <div className="rounded-[var(--radius-panel)] border border-border bg-surface px-5 py-4 text-sm text-muted max-w-2xl space-y-3">
+      <div className="rounded-[var(--radius-panel)] border border-border bg-surface px-5 py-4 text-sm text-muted space-y-3">
         <div>
           <p className="font-medium text-foreground">Email tickets</p>
           <p className="mt-1 leading-relaxed">
@@ -231,8 +241,42 @@ export function TicketsList() {
     <div className="space-y-6">
       {sessionFallbackBanner}
       {resendEmailBanner}
-      <ul className="grid gap-4 sm:grid-cols-2">
-      {tickets.map((t: StoredTicket) => {
+
+      <div className="flex flex-wrap gap-2">
+        {([
+          ["upcoming", `Upcoming (${upcoming.length + unknown.length})`],
+          ["past", `Past (${past.length})`],
+          ["all", `All (${tickets.length})`],
+        ] as Array<[TicketTab, string]>).map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={[
+              "rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.1em] transition-colors",
+              activeTab === tab
+                ? "border-primary/60 bg-primary/10 text-primary"
+                : "border-border/80 bg-background/40 text-muted hover:text-foreground",
+            ].join(" ")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {visibleTickets.length === 0 ? (
+        <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-12 text-center">
+          <p className="text-muted">
+            {activeTab === "upcoming"
+              ? "No upcoming passes. Check Past or browse events for your next show."
+              : activeTab === "past"
+                ? "No past passes yet."
+                : "No tickets found."}
+          </p>
+        </div>
+      ) : (
+      <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
+      {visibleTickets.map((t: StoredTicket) => {
         const whenLabel = formatTicketWhen(t.eventStartAt, t.eventEndAt);
         const locationLabel = [t.eventVenue, t.eventCity].filter(Boolean).join(" · ");
         return (
@@ -267,6 +311,7 @@ export function TicketsList() {
         );
       })}
       </ul>
+      )}
     </div>
   );
 }

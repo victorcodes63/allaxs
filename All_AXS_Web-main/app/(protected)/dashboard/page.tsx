@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { AutoCreatedAccountBanner } from "@/components/dashboard/AutoCreatedAccountBanner";
 import { EmailVerificationBanner } from "@/components/dashboard/EmailVerificationBanner";
+import { FanAccountSummaryCard } from "@/components/dashboard/FanAccountSummaryCard";
+import { DashboardWelcomeHeader } from "@/components/dashboard/DashboardWelcomeHeader";
 import { DashboardTicketsOverview } from "./DashboardTicketsOverview";
 import { DashboardHostingCard } from "./DashboardHostingCard";
 
@@ -14,14 +16,25 @@ const modules: {
     blurb: "Passes you have bought or received appear here with QR codes for check-in.",
     links: [
       { label: "Open my tickets", href: "/tickets", hint: "List and open each pass" },
+      { label: "My calendar", href: "/dashboard/calendar", hint: "Upcoming events in one view" },
+      { label: "My orders", href: "/dashboard/orders", hint: "Receipts and installment payments" },
+      { label: "My refunds", href: "/dashboard/refunds", hint: "Track refund request status" },
+    ],
+  },
+  {
+    title: "Account",
+    blurb: "View and edit your name, phone, password, notification preferences, or close your fan account.",
+    links: [
+      { label: "Profile & security", href: "/dashboard/account", hint: "Name, password, close account" },
+      { label: "Support", href: "/dashboard/support", hint: "FAQs and contact help" },
     ],
   },
   {
     title: "Discover",
-    blurb: "Search published shows, pick a date, and continue to checkout when you are signed in.",
+    blurb: "Search published shows, save favourites, and continue to checkout when you are signed in.",
     links: [
       { label: "Browse events", href: "/dashboard/events" },
-      { label: "Home", href: "/" },
+      { label: "Saved events", href: "/dashboard/saved", hint: "Events you bookmarked" },
     ],
   },
 ];
@@ -29,33 +42,15 @@ const modules: {
 export default function DashboardPage() {
   return (
     <div className="space-y-10">
-      <header className="max-w-3xl space-y-4">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
-          Dashboard home
-        </p>
-        <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          Your fan home
-        </h2>
-        <p className="text-sm leading-relaxed text-muted sm:text-base">
-          This space is for people attending events: find tickets, open QR passes, and jump
-          back to discovery. When you also host events, use{" "}
-          <strong className="font-medium text-foreground">Organizer hub</strong> from the
-          sidebar.
-        </p>
-        <div>
-          <Link
-            href="/dashboard/events"
-            className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] bg-primary px-6 text-sm font-semibold text-white shadow-[var(--btn-shadow-primary)] transition-opacity hover:opacity-92"
-          >
-            Find events
-          </Link>
-        </div>
-      </header>
+      <DashboardWelcomeHeader />
 
       <EmailVerificationBanner />
       <AutoCreatedAccountBanner />
 
-      <DashboardTicketsOverview />
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(280px,340px)] xl:items-start">
+        <DashboardTicketsOverview />
+        <FanAccountSummaryCard />
+      </div>
 
       <section aria-labelledby="fan-modules-heading">
         <h3

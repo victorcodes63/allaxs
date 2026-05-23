@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { preferredHubShell } from "@/lib/auth/hub-routing";
@@ -51,7 +51,6 @@ export default function NotificationsPage() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [lastVisitedAt, setLastVisitedAt] = useState<number | null>(null);
   const [organizerSlugToId, setOrganizerSlugToId] = useState<Record<string, string>>({});
-  const autoMarkedAllReadRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -137,14 +136,6 @@ export default function NotificationsPage() {
       /* optimistic */
     }
   }, []);
-
-  useEffect(() => {
-    if (loading || error || autoMarkedAllReadRef.current) return;
-    autoMarkedAllReadRef.current = true;
-    if (unreadCount > 0) {
-      void markAllRead();
-    }
-  }, [loading, error, unreadCount, markAllRead]);
 
   const hasMore = useMemo(() => items.length < total, [items.length, total]);
   const filteredItems = useMemo(() => {

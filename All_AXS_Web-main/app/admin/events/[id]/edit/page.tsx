@@ -36,6 +36,7 @@ import { EventTicketTiersTab } from "@/components/organizer/event-editor/EventTi
 import { EventSalesTab } from "@/components/organizer/event-editor/EventSalesTab";
 import { EventCouponsTab } from "@/components/organizer/event-editor/EventCouponsTab";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
+import { DeleteEventButton } from "@/components/events/DeleteEventButton";
 import { resolveCurrencyFromTiers } from "@/lib/currency";
 
 interface TicketType {
@@ -300,6 +301,25 @@ export default function AdminEventEditorPage() {
       >
         <AdminEditorTabsSection event={event} tabs={tabs} />
       </Suspense>
+
+      <section className="rounded-[var(--radius-panel)] border border-red-400/25 bg-red-500/5 p-5">
+        <h2 className="font-display text-base font-semibold text-foreground">
+          Danger zone
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+          Permanently remove this event and its related platform data. Use this
+          to clean up seeded or test listings. The action is audit-logged.
+        </p>
+        <div className="mt-4">
+          <DeleteEventButton
+            eventId={event.id}
+            eventTitle={event.title}
+            eventStatus={event.status}
+            mode="admin"
+            redirectTo="/admin/events"
+          />
+        </div>
+      </section>
     </div>
   );
 }

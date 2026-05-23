@@ -120,6 +120,28 @@ export class CheckoutController {
     return this.checkoutService.resendTickets(user.id, orderId);
   }
 
+  @Post('orders/:orderId/resend-receipt')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async resendReceipt(
+    @GetUser() user: CurrentUser,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.checkoutService.resendReceipt(user.id, orderId);
+  }
+
+  @Get('orders')
+  @UseGuards(JwtAuthGuard)
+  async listOrders(
+    @GetUser() user: CurrentUser,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const parsedLimit = Math.min(Math.max(parseInt(limit ?? '20', 10) || 20, 1), 50);
+    const parsedOffset = Math.max(parseInt(offset ?? '0', 10) || 0, 0);
+    return this.checkoutService.listOrdersForUser(user.id, parsedLimit, parsedOffset);
+  }
+
   @Get('orders/:orderId')
   @UseGuards(JwtAuthGuard)
   async orderSummary(
@@ -127,5 +149,15 @@ export class CheckoutController {
     @Param('orderId') orderId: string,
   ) {
     return this.checkoutService.getOrderSummaryForUser(user.id, orderId);
+  }
+
+  @Post('orders/:orderId/installments/pay')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async payNextInstallment(
+    @GetUser() user: CurrentUser,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.checkoutService.initializeInstallmentPayment(user.id, orderId);
   }
 }

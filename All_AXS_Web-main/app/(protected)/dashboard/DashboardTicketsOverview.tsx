@@ -5,8 +5,9 @@ import Link from "next/link";
 import { loadAllTickets, type StoredTicket } from "@/lib/checkout-storage";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
 import { mergeTicketsById, normalizeApiTicketsPayload } from "@/lib/tickets-api";
-import QRCode from "react-qr-code";
+import { nextUpcomingTicket } from "@/lib/tickets-grouping";
 import { buildTicketQrUrl } from "@/lib/ticket-qr";
+import QRCode from "react-qr-code";
 
 export function DashboardTicketsOverview() {
   const [origin, setOrigin] = useState("");
@@ -85,8 +86,8 @@ export function DashboardTicketsOverview() {
     );
   }
 
-  const featuredPass = tickets[0];
-  const extraPasses = tickets.slice(1, 4);
+  const featuredPass = nextUpcomingTicket(tickets) ?? tickets[0];
+  const extraPasses = tickets.filter((t) => t.id !== featuredPass.id).slice(0, 3);
   const featuredQrValue = origin ? buildTicketQrUrl(origin, featuredPass) : "";
 
   return (

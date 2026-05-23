@@ -73,7 +73,10 @@ describe('OrderRefundService', () => {
   });
 
   it('calls rollbackRedemption inside the refund transaction when a coupon was applied', async () => {
-    const result = await service.refundPaidOrder('order-id', { reason: 'test refund' });
+    const result = await service.refundPaidOrder('order-id', {
+      reason: 'test refund',
+      refundMode: 'FULL',
+    });
 
     expect(result.order.status).toBe(OrderStatus.REFUNDED);
     expect(couponsService.rollbackRedemption).toHaveBeenCalledWith(
@@ -118,7 +121,7 @@ describe('OrderRefundService', () => {
     }).compile();
 
     const localService = module.get(OrderRefundService);
-    await localService.refundPaidOrder('order-id', {});
+    await localService.refundPaidOrder('order-id', { refundMode: 'FULL' });
 
     expect(couponsService.rollbackRedemption).not.toHaveBeenCalled();
   });

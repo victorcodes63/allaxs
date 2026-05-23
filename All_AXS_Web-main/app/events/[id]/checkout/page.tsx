@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { fetchEventBySlug, getEventSlugById } from "@/lib/utils/api-server";
 import { CheckoutExperience } from "@/components/checkout/CheckoutExperience";
+import { redirectSignedInFromGuestPublicPath } from "@/lib/auth/redirect-signed-in-from-public";
+import { cookies } from "next/headers";
+import {
+  accessTokenIsExpired,
+  decodeAccessTokenPayload,
+} from "@/lib/auth/jwt-payload";
+import { redirect } from "next/navigation";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -25,6 +32,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function CheckoutPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { waitlist: waitlistToken } = await searchParams;
+
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get("accessToken")?.value;
+  const decoded = accessToken ? decodeAccessTokenPayload(accessToken) : null;
+  if (decoded?.email && !accessTokenIsExpired(decoded)) {
+    try {
+      const slug = await getEventSlugById(id);
+      const qs = waitlistToken
+        ? `?waitlist=${encodeURIComponent(waitlistToken)}`
+        : "";
+      redirect(`/dashboard/events/${slug}/checkout${qs}`);
+    } catch {
+      await redirectSignedInFromGuestPublicPath("/events");
+    }
+  }
+
   let event;
   try {
     const slug = await getEventSlugById(id);

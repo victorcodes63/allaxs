@@ -121,11 +121,11 @@ function ResetPasswordForm() {
           subtitle="Your password has been reset successfully"
         >
           <div className="space-y-4">
-            <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-4 text-sm">
+            <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-200">
               Password reset successfully. You can now log in with your new
               password.
             </div>
-            <p className="text-sm text-black/60 text-center">
+            <p className="text-center text-sm text-muted">
               Redirecting to login page...
             </p>
             <Link href="/login">

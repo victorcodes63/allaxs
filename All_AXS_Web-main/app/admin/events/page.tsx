@@ -11,6 +11,7 @@ import {
   shouldUnoptimizeEventImage,
 } from "@/lib/utils/image";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
+import { DeleteEventButton } from "@/components/events/DeleteEventButton";
 
 type EventStatusKey = (typeof EventStatus)[keyof typeof EventStatus];
 
@@ -252,7 +253,15 @@ function AdminEventsPageContent() {
       ) : (
         <ul className="space-y-3">
           {events.map((event) => (
-            <AdminEventCard key={event.id} event={event} />
+            <AdminEventCard
+              key={event.id}
+              event={event}
+              onDeleted={() =>
+                setEvents((current) =>
+                  current.filter((row) => row.id !== event.id),
+                )
+              }
+            />
           ))}
         </ul>
       )}
@@ -285,7 +294,13 @@ function ArrowIcon() {
   );
 }
 
-function AdminEventCard({ event }: { event: AdminEventRow }) {
+function AdminEventCard({
+  event,
+  onDeleted,
+}: {
+  event: AdminEventRow;
+  onDeleted: () => void;
+}) {
   const bannerSrc = event.bannerUrl ? getEventBannerUrl(event.bannerUrl) : null;
   const tierCount = event.ticketTypes?.length ?? 0;
   const isPending = event.status === EventStatus.PENDING_REVIEW;
@@ -377,6 +392,16 @@ function AdminEventCard({ event }: { event: AdminEventRow }) {
         >
           Inspect
         </Link>
+        <DeleteEventButton
+          eventId={event.id}
+          eventTitle={event.title}
+          eventStatus={event.status}
+          mode="admin"
+          redirectTo="/admin/events"
+          buttonLabel="Delete"
+          className="h-8 min-h-8 w-auto rounded-full px-3 text-xs"
+          onDeleted={onDeleted}
+        />
       </div>
     </li>
   );

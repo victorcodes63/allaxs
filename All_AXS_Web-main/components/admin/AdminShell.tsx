@@ -5,10 +5,14 @@ import {
   HubAppShell,
   type HubNavSection,
 } from "@/components/layout/hub/HubAppShell";
+import { hubLegalPageTitle } from "@/lib/legal/hub-paths";
 
 type ShellUser = { name?: string; email: string; roles?: string[] };
 
 function adminPageTitle(pathname: string): string {
+  const legalTitle = hubLegalPageTitle(pathname);
+  if (legalTitle) return legalTitle;
+
   if (pathname === "/admin" || pathname === "/admin/") {
     return "Admin overview";
   }

@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import axios from "axios";
 import { userInitials } from "@/lib/hub-user";
 import { HubTopBar, type HubKind } from "@/components/layout/hub/HubTopBar";
+import { HubLegalLinks } from "@/components/legal/HubLegalLinks";
 import { useAuth } from "@/lib/auth";
 
 export type HubNavItem = {
@@ -266,21 +267,45 @@ export function HubAppShell({
         ].join(" ")}
       >
         <div className={["flex items-center gap-3", collapsed ? "justify-center" : ""].join(" ")}>
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface text-xs font-semibold tracking-tight text-foreground ring-2 ring-primary/10"
-            aria-hidden
-          >
-            {initials}
-          </div>
-          {collapsed ? null : (
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold leading-snug text-foreground">
-                {user.name || "Member"}
-              </p>
-              <p className="mt-0.5 truncate text-xs leading-snug text-muted">
-                {user.email}
-              </p>
-            </div>
+          {hubKind === "attendee" && !collapsed ? (
+            <Link
+              href="/dashboard/account"
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-md transition-colors hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            >
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface text-xs font-semibold tracking-tight text-foreground ring-2 ring-primary/10"
+                aria-hidden
+              >
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold leading-snug text-foreground">
+                  {user.name || "Member"}
+                </p>
+                <p className="mt-0.5 truncate text-xs leading-snug text-muted">
+                  {user.email}
+                </p>
+              </div>
+            </Link>
+          ) : (
+            <>
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface text-xs font-semibold tracking-tight text-foreground ring-2 ring-primary/10"
+                aria-hidden
+              >
+                {initials}
+              </div>
+              {collapsed ? null : (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold leading-snug text-foreground">
+                    {user.name || "Member"}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs leading-snug text-muted">
+                    {user.email}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
         <button
@@ -377,6 +402,7 @@ export function HubAppShell({
         >
           <NavBlock collapsed={sidebarCollapsed} />
         </div>
+        <HubLegalLinks collapsed={sidebarCollapsed} />
         <UserFooter collapsed={sidebarCollapsed} />
       </aside>
 
@@ -414,6 +440,7 @@ export function HubAppShell({
         >
           <NavBlock onNavigate={closeDrawer} />
         </div>
+        <HubLegalLinks compact />
         <UserFooter compact />
       </aside>
 
