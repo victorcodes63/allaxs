@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import type { AdminUserStatus } from "@/lib/admin-user-account";
 
 export type UserActionKind =
   | "promote"
@@ -16,7 +17,7 @@ export interface UserActionTarget {
   email: string;
   name?: string | null;
   roles: string[];
-  status: "ACTIVE" | "SUSPENDED";
+  status: AdminUserStatus;
 }
 
 interface UserActionConfirmDialogProps {
