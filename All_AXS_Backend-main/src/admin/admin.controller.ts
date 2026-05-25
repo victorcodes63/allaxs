@@ -1063,15 +1063,17 @@ export class AdminController {
 
     if (search && search.trim().length > 0) {
       const term = `%${search.trim()}%`;
-      qb.andWhere('(user.email ILIKE :term OR user.name ILIKE :term OR user.id::text ILIKE :term)', {
-        term,
-      });
+      // Quote the "user" alias — PostgreSQL treats unquoted `user` as the reserved role name.
+      qb.andWhere(
+        '("user"."email" ILIKE :term OR "user"."name" ILIKE :term OR "user"."id"::text ILIKE :term)',
+        { term },
+      );
     }
     if (role && Object.values(Role).includes(role)) {
-      qb.andWhere(':role = ANY(user.roles)', { role });
+      qb.andWhere(':role = ANY("user"."roles")', { role });
     }
     if (status && Object.values(UserStatus).includes(status)) {
-      qb.andWhere('user.status = :status', { status });
+      qb.andWhere('"user"."status" = :status', { status });
     }
 
     qb.skip(parsedOffset).take(parsedLimit);
