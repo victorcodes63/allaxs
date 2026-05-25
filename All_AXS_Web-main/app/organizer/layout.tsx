@@ -7,8 +7,8 @@ import { OrganizerShell } from "@/components/organizer/OrganizerShell";
 import { AttendeeHubShell } from "@/components/layout/hub/AttendeeHubShell";
 import {
   normalizeWebUserRoles,
-  rolesIncludeAdmin,
   shouldOfferOrganizerHub,
+  userHasRole,
 } from "@/lib/auth/hub-routing";
 import { buildAuthQuery } from "@/lib/auth/post-auth-redirect";
 
@@ -37,11 +37,11 @@ export default function OrganizerLayout({
       return;
     }
     if (!user) return;
-    const roles = normalizeWebUserRoles(user.roles);
-    if (rolesIncludeAdmin(roles)) {
+    if (userHasRole(user, "ADMIN")) {
       router.replace("/admin");
       return;
     }
+    const roles = normalizeWebUserRoles(user.roles);
     const canOrganizerApp = shouldOfferOrganizerHub(roles);
     if (!onOnboarding && !canOrganizerApp) {
       router.replace("/organizer/onboarding");
@@ -70,8 +70,7 @@ export default function OrganizerLayout({
     );
   }
 
-  const roles = normalizeWebUserRoles(user.roles);
-  if (rolesIncludeAdmin(roles)) {
+  if (userHasRole(user, "ADMIN")) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <p className="text-muted">Redirecting…</p>
@@ -79,6 +78,7 @@ export default function OrganizerLayout({
     );
   }
 
+  const roles = normalizeWebUserRoles(user.roles);
   const canOrganizerApp = shouldOfferOrganizerHub(roles);
   if (!onOnboarding && !canOrganizerApp) {
     return (

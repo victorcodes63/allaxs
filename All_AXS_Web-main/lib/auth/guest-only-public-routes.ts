@@ -1,4 +1,8 @@
-import { normalizeWebUserRoles, rolesIncludeAdmin } from "@/lib/auth/hub-routing";
+import {
+  normalizeWebUserRoles,
+  primaryHubLandingPath,
+  rolesIncludeAdmin,
+} from "@/lib/auth/hub-routing";
 
 /**
  * When `public=1` is present, signed-in users may view guest-only marketing
@@ -100,11 +104,7 @@ export function isGuestOnlyPublicPath(pathname: string): boolean {
 
 /** Primary hub landing when a signed-in user hits a guest-only marketing route. */
 export function signedInHubLandingPath(roles: string[]): string {
-  const normalized = normalizeWebUserRoles(roles);
-  if (rolesIncludeAdmin(normalized)) return "/admin";
-  if (normalized.includes("ATTENDEE")) return "/dashboard";
-  if (normalized.includes("ORGANIZER")) return "/organizer/dashboard";
-  return "/dashboard";
+  return primaryHubLandingPath(roles);
 }
 
 /**
@@ -125,13 +125,9 @@ export function resolveGuestOnlyPublicRedirect(
         : "";
 
   const nonAttendeeLanding = (() => {
+    if (normalized.includes("ATTENDEE")) return null;
     if (rolesIncludeAdmin(normalized)) return "/admin";
-    if (
-      normalized.includes("ORGANIZER") &&
-      !normalized.includes("ATTENDEE")
-    ) {
-      return "/organizer/dashboard";
-    }
+    if (normalized.includes("ORGANIZER")) return "/organizer/dashboard";
     return null;
   })();
 

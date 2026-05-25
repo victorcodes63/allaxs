@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { buildLoginRedirectFromPath } from "@/lib/auth/post-auth-redirect";
+import { landingPathForNonAdmin } from "@/lib/auth/hub-routing";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 export default function AdminLayout({
@@ -23,30 +24,25 @@ export default function AdminLayout({
       );
       return;
     }
-    if (!user.roles?.includes("ADMIN")) {
-      router.replace("/dashboard");
+    const fallback = landingPathForNonAdmin(user);
+    if (fallback) {
+      router.replace(fallback);
     }
   }, [user, loading, router, pathname]);
 
   if (loading || !user) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="space-y-2 text-center">
-          <p className="text-lg text-muted">Checking access…</p>
-        </div>
+        <p className="text-sm text-muted">Checking access…</p>
       </div>
     );
   }
 
-  if (!user.roles?.includes("ADMIN")) {
+  const fallback = landingPathForNonAdmin(user);
+  if (fallback) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="space-y-2 text-center">
-          <p className="text-lg text-primary">
-            You do not have permission to access this page
-          </p>
-          <p className="text-sm text-muted">Admin access is required</p>
-        </div>
+        <p className="text-sm text-muted">Redirecting…</p>
       </div>
     );
   }

@@ -77,6 +77,43 @@ export function landingPathForNonAttendee(
   return null;
 }
 
+/** Signed-in default landing (marketing `/`, post-login without `next`, etc.). */
+export function primaryHubLandingPath(roles: unknown): string {
+  const normalized = normalizeWebUserRoles(roles);
+  if (normalized.includes("ATTENDEE")) return "/dashboard";
+  if (rolesIncludeAdmin(normalized)) return "/admin";
+  if (normalized.includes("ORGANIZER")) return "/organizer/dashboard";
+  return "/dashboard";
+}
+
+/** Where to send a signed-in user who opened `/admin` without moderation access. */
+export function landingPathForNonAdmin(
+  user: { roles?: RoleLike[] | null } | null | undefined,
+): string | null {
+  if (!user) return "/login";
+  if (userHasRole(user, "ADMIN")) return null;
+  if (userHasRole(user, "ORGANIZER")) return "/organizer/dashboard";
+  return "/dashboard";
+}
+
+export function canAccessFanDashboard(
+  user: { roles?: RoleLike[] | null } | null | undefined,
+): boolean {
+  return landingPathForNonAttendee(user) === null;
+}
+
+export function canAccessAdminHub(
+  user: { roles?: RoleLike[] | null } | null | undefined,
+): boolean {
+  return userHasRole(user, "ADMIN");
+}
+
+export function canAccessOrganizerApp(
+  user: { roles?: RoleLike[] | null } | null | undefined,
+): boolean {
+  return shouldOfferOrganizerHub(normalizeWebUserRoles(user?.roles));
+}
+
 /** Which hub shell should wrap pages that are accessible to all signed-in users (e.g. /notifications). */
 export type HubShellChoice = "attendee" | "admin" | "organizer";
 

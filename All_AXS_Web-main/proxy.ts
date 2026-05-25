@@ -56,6 +56,10 @@ function isProtectedAppPath(pathname: string): boolean {
   return (
     pathname === "/dashboard" ||
     pathname.startsWith("/dashboard/") ||
+    pathname === "/tickets" ||
+    pathname.startsWith("/tickets/") ||
+    pathname === "/notifications" ||
+    pathname.startsWith("/notifications/") ||
     pathname === "/organizer" ||
     pathname.startsWith("/organizer/") ||
     pathname === "/admin" ||
@@ -207,6 +211,8 @@ export const config = {
     "/check-email",
     "/resend-verification",
     "/dashboard/:path*",
+    "/tickets/:path*",
+    "/notifications/:path*",
     "/organizer/:path*",
     "/admin/:path*",
     "/account/:path*",

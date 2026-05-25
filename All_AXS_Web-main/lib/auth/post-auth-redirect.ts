@@ -1,5 +1,9 @@
 import axios from "axios";
-import { rolesIncludeAdmin } from "@/lib/auth/hub-routing";
+import {
+  normalizeWebUserRoles,
+  primaryHubLandingPath,
+  rolesIncludeAdmin,
+} from "@/lib/auth/hub-routing";
 
 export type AuthIntent = "attend" | "host";
 
@@ -186,9 +190,6 @@ export function resolvePostAuthRedirect(options: {
     );
   }
 
-  const isOrganizer = roles.includes("ORGANIZER");
-  const isAdmin = rolesIncludeAdmin(roles);
-
   if (intent === "attend") {
     return "/dashboard";
   }
@@ -197,14 +198,5 @@ export function resolvePostAuthRedirect(options: {
     return hostLandingPath(roles, hasOrganizerProfile);
   }
 
-  if (isAdmin) {
-    return "/admin";
-  }
-
-  if (isOrganizer) {
-    if (!hasOrganizerProfile) return "/organizer/onboarding";
-    return "/organizer/dashboard";
-  }
-
-  return "/dashboard";
+  return primaryHubLandingPath(normalizeWebUserRoles(roles));
 }
