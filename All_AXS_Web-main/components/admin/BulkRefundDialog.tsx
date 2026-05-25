@@ -162,7 +162,7 @@ export function BulkRefundDialog({
           </div>
         ) : null}
 
-        <dl className="grid grid-cols-2 gap-3 rounded-[var(--radius-panel)] border border-border/70 bg-surface/70 p-3 text-xs">
+        <dl className="grid grid-cols-1 gap-3 rounded-[var(--radius-panel)] border border-border/70 bg-surface/70 p-3 text-xs sm:grid-cols-2">
           <div>
             <dt className="font-semibold uppercase tracking-[0.14em] text-muted">
               Orders

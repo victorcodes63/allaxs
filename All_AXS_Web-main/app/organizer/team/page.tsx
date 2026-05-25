@@ -246,7 +246,47 @@ export default function OrganizerTeamPage(): ReactElement {
         <h2 id="members-heading" className="text-xs font-bold uppercase tracking-[0.14em] text-foreground/50">
           Members
         </h2>
-        <div className="mt-4 overflow-x-auto">
+        <ul className="mt-4 grid gap-3 md:hidden">
+          <li className="rounded-lg border border-border/80 bg-background/40 p-4">
+            <p className="font-medium text-foreground">
+              {team.owner.name?.trim() || team.owner.email || "Owner"}
+            </p>
+            {team.owner.email ? (
+              <p className="text-xs text-muted">{team.owner.email}</p>
+            ) : null}
+            <span className="mt-2 inline-flex rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase text-primary">
+              Owner
+            </span>
+          </li>
+          {team.members.map((member) => (
+            <li
+              key={member.id}
+              className="rounded-lg border border-border/80 bg-background/40 p-4"
+            >
+              <p className="font-medium text-foreground">
+                {member.name?.trim() || member.email || "Member"}
+              </p>
+              {member.email ? <p className="text-xs text-muted">{member.email}</p> : null}
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <RoleBadge role={member.role} />
+                <span className="text-xs text-muted">{formatTeamDate(member.joinedAt)}</span>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                className="mt-3 w-auto min-w-[7rem]"
+                disabled={actionId === `member:${member.id}`}
+                onClick={() => void onRemoveMember(member.id)}
+              >
+                {actionId === `member:${member.id}` ? "Removing…" : "Remove"}
+              </Button>
+            </li>
+          ))}
+          {team.members.length === 0 ? (
+            <li className="py-4 text-center text-sm text-muted">No teammates yet — send an invite above.</li>
+          ) : null}
+        </ul>
+        <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[32rem] text-left text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wide text-muted">
@@ -317,7 +357,31 @@ export default function OrganizerTeamPage(): ReactElement {
         {team.pendingInvites.length === 0 ? (
           <p className="mt-4 text-sm text-muted">No open invitations.</p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
+          <>
+            <ul className="mt-4 grid gap-3 md:hidden">
+              {team.pendingInvites.map((invite) => (
+                <li
+                  key={invite.id}
+                  className="rounded-lg border border-border/80 bg-background/40 p-4"
+                >
+                  <p className="font-medium text-foreground">{invite.email}</p>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <RoleBadge role={invite.role} />
+                    <span className="text-xs text-muted">{formatTeamDate(invite.expiresAt)}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="mt-3 w-auto min-w-[7rem]"
+                    disabled={actionId === `invite:${invite.id}`}
+                    onClick={() => void onRevokeInvite(invite.id)}
+                  >
+                    {actionId === `invite:${invite.id}` ? "Revoking…" : "Revoke"}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 hidden overflow-x-auto md:block">
             <table className="w-full min-w-[32rem] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs uppercase tracking-wide text-muted">
@@ -350,7 +414,8 @@ export default function OrganizerTeamPage(): ReactElement {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </section>
     </div>

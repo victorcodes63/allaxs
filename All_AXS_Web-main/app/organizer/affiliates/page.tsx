@@ -9,6 +9,7 @@ import { nativeDarkControlClass } from "@/components/ui/nativeDarkField";
 import { formatMoneyFromCents } from "@/lib/organizer-sales";
 import { normalizeCurrencyCode } from "@/lib/currency";
 import { normalizeOrganizerEventsListPayload } from "@/lib/organizer-events-list";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 type AffiliateStatus = "ACTIVE" | "PAUSED" | "DISABLED";
 
@@ -231,8 +232,10 @@ export default function OrganizerAffiliatesPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-          <table className="min-w-full divide-y divide-border text-left text-sm">
+        <ResponsiveDataView
+          table={
+            <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
             <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Code / name</th>
@@ -317,8 +320,77 @@ export default function OrganizerAffiliatesPage() {
                 );
               })}
             </tbody>
-          </table>
-        </div>
+              </table>
+            </div>
+          }
+          mobile={
+            <ul className="grid gap-4">
+              {rows.map((row) => {
+                const conversionRate =
+                  row.visits > 0 ? row.conversionsCount / row.visits : 0;
+                return (
+                  <li
+                    key={row.id}
+                    className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-mono text-sm font-semibold text-foreground">
+                        {row.code}
+                      </p>
+                      <span
+                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${STATUS_TONE[row.status]}`}
+                      >
+                        {row.status.toLowerCase()}
+                      </span>
+                    </div>
+                    {row.name ? (
+                      <p className="mt-1 text-xs text-muted">{row.name}</p>
+                    ) : null}
+                    <p className="mt-2 text-xs text-muted">
+                      {row.eventTitle ?? "All events"} · {row.commissionPercent}% commission
+                    </p>
+                    <p className="mt-1 text-xs tabular-nums text-muted">
+                      {row.visits} visits · {row.conversionsCount} conversions
+                      {row.visits > 0
+                        ? ` (${(conversionRate * 100).toFixed(1)}%)`
+                        : ""}{" "}
+                      · {formatMoneyFromCents(row.revenueCents, row.currency)}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {row.status === "ACTIVE" ? (
+                        <button
+                          type="button"
+                          disabled={busyId === row.id}
+                          onClick={() => void setStatus(row, "PAUSED")}
+                          className="text-xs font-semibold text-muted disabled:opacity-50"
+                        >
+                          Pause
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busyId === row.id}
+                          onClick={() => void setStatus(row, "ACTIVE")}
+                          className="text-xs font-semibold text-primary disabled:opacity-50"
+                        >
+                          Activate
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={busyId === row.id}
+                        onClick={() => void remove(row)}
+                        className="text-xs font-semibold text-muted disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          }
+        />
       )}
 
       <Dialog

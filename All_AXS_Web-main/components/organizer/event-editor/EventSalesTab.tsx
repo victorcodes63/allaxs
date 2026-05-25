@@ -136,7 +136,7 @@ export function EventSalesTab({
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-[var(--radius-panel)] border border-border bg-surface/90 p-4">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Gross sales</p>
           <p className="mt-2 font-display text-2xl font-semibold tabular-nums text-foreground">

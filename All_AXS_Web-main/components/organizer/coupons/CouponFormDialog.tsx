@@ -310,7 +310,11 @@ export function CouponFormDialog({
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-medium text-foreground">Discount</legend>
-          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Discount kind">
+          <div
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+            role="radiogroup"
+            aria-label="Discount kind"
+          >
             {(["PERCENT", "FIXED"] as const).map((k) => {
               const selected = form.kind === k;
               return (

@@ -9,6 +9,7 @@ import {
   readInstallDismissed,
   shouldOfferPwaInstall,
 } from "@/lib/pwa/install";
+import { readCookieConsent } from "@/components/consent/CookieConsentBanner";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -23,6 +24,14 @@ export function PwaInstallBanner() {
     null,
   );
   const [installing, setInstalling] = useState(false);
+  const [cookieBarVisible, setCookieBarVisible] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setCookieBarVisible(readCookieConsent() === null);
+    sync();
+    window.addEventListener("allaxs:cookie-consent-change", sync);
+    return () => window.removeEventListener("allaxs:cookie-consent-change", sync);
+  }, []);
 
   useEffect(() => {
     if (!shouldOfferPwaInstall(pathname) || readInstallDismissed()) {
@@ -77,7 +86,12 @@ export function PwaInstallBanner() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-[62] flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4"
+      className={[
+        "pointer-events-none fixed inset-x-0 z-[58] flex justify-center p-3 sm:p-4",
+        cookieBarVisible
+          ? "bottom-[calc(5.5rem+env(safe-area-inset-bottom))] sm:bottom-[calc(6rem+env(safe-area-inset-bottom))]"
+          : "bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+      ].join(" ")}
       role="region"
       aria-label="Install app"
     >

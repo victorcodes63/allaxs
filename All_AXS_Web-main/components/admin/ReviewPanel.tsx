@@ -191,6 +191,8 @@ export function ReviewPanel({
         open={!!event}
         onClose={onClose}
         title="Review Event"
+        size="lg"
+        mobileSheet
         ariaLabel="Event review panel"
         footer={
           <div className="flex flex-wrap gap-3">

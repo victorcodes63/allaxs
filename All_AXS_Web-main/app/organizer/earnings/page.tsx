@@ -8,6 +8,7 @@ import { OrganizerWithdrawPanel } from "@/components/organizer/OrganizerWithdraw
 import { hubLegalHref } from "@/lib/legal/hub-paths";
 import { formatMoneyFromCents } from "@/lib/organizer-sales";
 import { normalizeCurrencyCode } from "@/lib/currency";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 import type {
   OrganizerEarningsLedgerPayload,
   OrganizerEarningsSummary,
@@ -188,8 +189,10 @@ export default function OrganizerEarningsPage() {
           <p className="text-sm text-muted">No ledger activity yet.</p>
         ) : null}
         {ledger && ledger.entries.length > 0 ? (
-          <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-            <table className="min-w-full divide-y divide-border text-left text-sm">
+          <ResponsiveDataView
+            table={
+              <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+                <table className="min-w-full divide-y divide-border text-left text-sm">
               <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3">When</th>
@@ -219,8 +222,40 @@ export default function OrganizerEarningsPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+                </table>
+              </div>
+            }
+            mobile={
+              <ul className="grid gap-3">
+                {ledger.entries.map((row) => (
+                  <li
+                    key={row.id}
+                    className="rounded-[var(--radius-panel)] border border-border bg-surface p-4 text-sm"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium text-foreground">{row.entryTypeLabel}</p>
+                      <p
+                        className={`shrink-0 font-semibold tabular-nums ${
+                          row.amountCents < 0 ? "text-primary" : "text-foreground"
+                        }`}
+                      >
+                        {row.amountCents >= 0 ? "+" : ""}
+                        {formatMoneyFromCents(row.amountCents, row.currency)}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-xs text-muted tabular-nums">
+                      {new Date(row.createdAt).toLocaleString()}
+                    </p>
+                    {row.orderId ? (
+                      <p className="mt-1 font-mono text-xs text-muted">
+                        Order {row.orderId.slice(0, 8)}…
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            }
+          />
         ) : null}
       </section>
     </div>

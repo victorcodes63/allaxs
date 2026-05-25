@@ -10,6 +10,7 @@ import {
   formatShortDateTime,
 } from "@/lib/organizer-sales";
 import { normalizeCurrencyCode } from "@/lib/currency";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 interface CustomerRow {
   id: string;
@@ -226,8 +227,10 @@ export default function OrganizerCustomersPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-          <table className="min-w-full divide-y divide-border text-left text-sm">
+        <ResponsiveDataView
+          table={
+            <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
             <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Buyer</th>
@@ -269,8 +272,50 @@ export default function OrganizerCustomersPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+              </table>
+            </div>
+          }
+          mobile={
+            <ul className="grid gap-4">
+              {filtered.map((row) => (
+                <li
+                  key={row.id}
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                >
+                  <p className="font-semibold text-foreground">
+                    {row.name || row.email || "—"}
+                  </p>
+                  {row.name && row.email ? (
+                    <p className="text-xs text-muted">{row.email}</p>
+                  ) : null}
+                  <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
+                    <div>
+                      <dt className="font-semibold uppercase tracking-wide">Orders</dt>
+                      <dd className="tabular-nums text-foreground">{row.ordersCount}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold uppercase tracking-wide">Tickets</dt>
+                      <dd className="tabular-nums text-foreground">{row.ticketsCount}</dd>
+                    </div>
+                    <div className="col-span-2">
+                      <dt className="font-semibold uppercase tracking-wide">Spent</dt>
+                      <dd className="tabular-nums text-foreground">
+                        {formatMoneyFromCents(row.totalSpentCents, row.currency)}
+                      </dd>
+                    </div>
+                  </dl>
+                  <button
+                    type="button"
+                    onClick={() => setOpenCustomerId(row.id)}
+                    className="mt-3 text-sm font-semibold text-primary"
+                  >
+                    View orders →
+                  </button>
+                </li>
+              ))}
+            </ul>
+          }
+        />
       )}
 
       <Dialog

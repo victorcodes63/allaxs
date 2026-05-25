@@ -763,7 +763,7 @@ function SummaryStrip({
 }: SummaryStripProps) {
   return (
     <div className="flex flex-col gap-4 rounded-[var(--radius-panel)] border border-border bg-surface/70 p-5 sm:p-6 sm:flex-row sm:items-center sm:justify-between">
-      <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryStat label="Tiers" value={String(ticketTiers)} />
         <SummaryStat
           label="On sale"

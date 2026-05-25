@@ -17,6 +17,7 @@ import {
 } from "@/lib/organizer-sales";
 import { organizerEventStatusChipClass } from "@/lib/organizer-event-status-chip";
 import { OrganizerAnalyticsSection } from "@/components/organizer/OrganizerAnalyticsSection";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 const PAGE_SIZE = 25;
 
@@ -245,7 +246,7 @@ export function OrganizerSalesContent(): ReactElement {
           >
             All events (paid orders)
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4">
             <RollupTile
               label="Gross sales"
               value={formatMoneyFromCents(rollup.grossCents, rollup.currency)}
@@ -289,22 +290,24 @@ export function OrganizerSalesContent(): ReactElement {
             Create and publish an event with ticket tiers to start seeing sales here.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-            <table className="min-w-full divide-y divide-border text-left text-sm">
-              <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
-                <tr>
-                  <th className="px-4 py-3">Event</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Sold / cap</th>
-                  <th className="px-4 py-3 text-right">Sales</th>
-                  <th className="px-4 py-3 text-right">Gross</th>
-                  <th className="px-4 py-3 text-right">Fees</th>
-                  <th className="px-4 py-3 text-right">Net</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-background/40">
-                {eventRows.map((row) => {
+          <ResponsiveDataView
+            table={
+              <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+                <table className="min-w-full divide-y divide-border text-left text-sm">
+                  <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    <tr>
+                      <th className="px-4 py-3">Event</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Sold / cap</th>
+                      <th className="px-4 py-3 text-right">Sales</th>
+                      <th className="px-4 py-3 text-right">Gross</th>
+                      <th className="px-4 py-3 text-right">Fees</th>
+                      <th className="px-4 py-3 text-right">Net</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-background/40">
+                    {eventRows.map((row) => {
                   const capLabel =
                     row.capacityTotal > 0
                       ? `${row.ticketsSold} / ${row.capacityTotal}`
@@ -353,10 +356,68 @@ export function OrganizerSalesContent(): ReactElement {
                       </td>
                     </tr>
                   );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            }
+            mobile={
+              <ul className="grid gap-4">
+                {eventRows.map((row) => {
+                  const capLabel =
+                    row.capacityTotal > 0
+                      ? `${row.ticketsSold} / ${row.capacityTotal}`
+                      : `${row.ticketsSold}`;
+                  return (
+                    <li
+                      key={row.eventId}
+                      className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                    >
+                      <p className="font-semibold text-foreground line-clamp-2">{row.title}</p>
+                      <p className="mt-1 text-xs text-muted tabular-nums">
+                        {formatShortDateTime(row.startAt)}
+                      </p>
+                      <span
+                        className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${organizerEventStatusChipClass(row.status)}`}
+                      >
+                        {row.status.replace(/_/g, " ")}
+                      </span>
+                      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
+                        <div>
+                          <dt>Sold</dt>
+                          <dd className="tabular-nums text-foreground">{capLabel}</dd>
+                        </div>
+                        <div>
+                          <dt>Orders</dt>
+                          <dd className="tabular-nums text-foreground">{row.ordersCount}</dd>
+                        </div>
+                        <div className="col-span-2">
+                          <dt>Net</dt>
+                          <dd className="tabular-nums font-medium text-foreground">
+                            {formatMoneyFromCents(row.netCents, row.currency)}
+                          </dd>
+                        </div>
+                      </dl>
+                      <div className="mt-3 flex gap-3">
+                        <Link
+                          href={`/organizer/sales?event=${encodeURIComponent(row.eventId)}`}
+                          className="text-sm font-semibold text-primary"
+                        >
+                          Orders
+                        </Link>
+                        <Link
+                          href={`/organizer/tickets?event=${encodeURIComponent(row.eventId)}`}
+                          className="text-sm font-semibold text-primary"
+                        >
+                          Passes
+                        </Link>
+                      </div>
+                    </li>
+                  );
                 })}
-              </tbody>
-            </table>
-          </div>
+              </ul>
+            }
+          />
         )}
       </section>
 
@@ -438,23 +499,25 @@ export function OrganizerSalesContent(): ReactElement {
         ) : orders.length === 0 ? (
           <p className="text-sm text-muted">No orders yet for this selection.</p>
         ) : (
-          <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-            <table className="min-w-full divide-y divide-border text-left text-sm">
-              <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
-                <tr>
-                  <th className="px-4 py-3">When</th>
-                  <th className="px-4 py-3">Event</th>
-                  <th className="px-4 py-3">Buyer</th>
-                  <th className="px-4 py-3">Line items</th>
-                  <th className="px-4 py-3 text-right">Tickets</th>
-                  <th className="px-4 py-3 text-right">Total</th>
-                  <th className="px-4 py-3 text-right">Fees</th>
-                  <th className="px-4 py-3 text-right">Net</th>
-                  <th className="px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border bg-background/40">
-                {orders.map((o) => (
+          <ResponsiveDataView
+            table={
+              <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+                <table className="min-w-full divide-y divide-border text-left text-sm">
+                  <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                    <tr>
+                      <th className="px-4 py-3">When</th>
+                      <th className="px-4 py-3">Event</th>
+                      <th className="px-4 py-3">Buyer</th>
+                      <th className="px-4 py-3">Line items</th>
+                      <th className="px-4 py-3 text-right">Tickets</th>
+                      <th className="px-4 py-3 text-right">Total</th>
+                      <th className="px-4 py-3 text-right">Fees</th>
+                      <th className="px-4 py-3 text-right">Net</th>
+                      <th className="px-4 py-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-background/40">
+                    {orders.map((o) => (
                   <tr key={o.id} className="align-top text-foreground">
                     <td className="px-4 py-3 text-xs text-muted tabular-nums whitespace-nowrap">
                       {formatShortDateTime(o.createdAt)}
@@ -481,10 +544,37 @@ export function OrganizerSalesContent(): ReactElement {
                     </td>
                     <td className="px-4 py-3 text-xs uppercase text-muted">{o.status.replace(/_/g, " ")}</td>
                   </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            }
+            mobile={
+              <ul className="grid gap-4">
+                {orders.map((o) => (
+                  <li
+                    key={o.id}
+                    className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                  >
+                    <p className="font-semibold text-foreground line-clamp-2">{o.eventTitle}</p>
+                    <p className="mt-1 text-sm text-muted truncate">{o.buyerEmail}</p>
+                    <p className="mt-2 text-xs text-muted line-clamp-2">{o.lineSummary}</p>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span className="text-muted tabular-nums">
+                        {formatShortDateTime(o.createdAt)}
+                      </span>
+                      <span className="font-semibold tabular-nums text-foreground">
+                        {formatMoneyFromCents(o.amountCents, o.currency)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[10px] uppercase tracking-wide text-muted">
+                      {o.status.replace(/_/g, " ")} · {o.ticketsInOrder} tickets
+                    </p>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </ul>
+            }
+          />
         )}
 
         {ordersTotal > PAGE_SIZE ? (

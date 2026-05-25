@@ -389,7 +389,7 @@ function AdminOrdersPageContent() {
               aria-label="Search orders"
             />
           </div>
-          <div className="flex flex-1 flex-wrap items-center gap-1.5 sm:flex-none">
+          <div className="flex flex-1 gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin] sm:flex-wrap sm:overflow-visible sm:pb-0">
             {STATUS_FILTERS.map((filter) => {
               const active = filter.value === statusFilter;
               return (
@@ -398,7 +398,7 @@ function AdminOrdersPageContent() {
                   type="button"
                   onClick={() => setStatusFilter(filter.value)}
                   aria-pressed={active}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-[border-color,background-color,color] ${
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-[border-color,background-color,color] ${
                     active
                       ? "border-primary/60 bg-primary/15 text-foreground"
                       : "border-border bg-surface/80 text-muted hover:border-primary/30 hover:text-foreground"
@@ -566,7 +566,7 @@ function BulkRefundActionBar({
     : `Select all (${Math.min(refundableCount, BULK_REFUND_MAX)})`;
 
   return (
-    <div className="flex flex-col gap-2 rounded-[var(--radius-panel)] border border-border bg-surface/80 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-border bg-surface/80 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:py-2">
       <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
         <input
           type="checkbox"
@@ -668,7 +668,7 @@ function AdminOrderCard({
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="min-w-0 truncate font-display text-base font-semibold tracking-tight text-foreground sm:text-lg">
+          <h3 className="min-w-0 font-display text-base font-semibold leading-snug tracking-tight text-foreground line-clamp-2 sm:truncate sm:text-lg">
             {refLabel}
           </h3>
           <span
@@ -680,7 +680,7 @@ function AdminOrderCard({
             {grossLabel}
           </span>
         </div>
-        <p className="text-xs text-muted">
+        <p className="text-xs leading-relaxed text-muted break-words">
           {order.event ? (
             <Link
               href={`/admin/events/${order.event.id}`}
@@ -694,7 +694,7 @@ function AdminOrderCard({
           <span className="text-muted/70"> · {organizerLabel}</span>
         </p>
         <div className="grid grid-cols-1 gap-1 text-xs text-muted tabular-nums sm:grid-cols-2">
-          <p>
+          <p className="break-all">
             <span className="font-semibold text-foreground/85">Buyer</span>{" "}
             {order.email}
             {order.phone ? <span className="text-muted/70"> · {order.phone}</span> : null}
@@ -713,7 +713,7 @@ function AdminOrderCard({
           </p>
         </div>
       </div>
-      <div className="flex shrink-0 flex-row flex-wrap items-center justify-start gap-1.5 sm:items-end sm:justify-end sm:self-center">
+      <div className="flex w-full shrink-0 flex-row flex-wrap items-stretch justify-start gap-2 sm:w-auto sm:items-end sm:justify-end sm:self-center">
         {refundable ? (
           <button
             type="button"

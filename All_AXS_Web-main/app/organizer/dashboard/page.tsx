@@ -468,7 +468,7 @@ export default function OrganizerDashboardPage(): React.ReactElement {
         >
           At a glance
         </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
           <StatTile label="All events" value={stats.total} hint="Everything you own in All AXS." />
           <StatTile
             label="Live"
@@ -528,7 +528,7 @@ export default function OrganizerDashboardPage(): React.ReactElement {
             </button>
           </p>
         ) : salesRollup ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 sm:gap-4">
             <div className="rounded-[var(--radius-panel)] border border-border bg-surface/90 p-4 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] sm:p-5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">Gross (paid)</p>
               <p className="mt-2 font-display text-2xl font-semibold tabular-nums tracking-tight text-foreground sm:text-3xl">

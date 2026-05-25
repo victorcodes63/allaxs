@@ -12,6 +12,7 @@ import {
   type EligiblePayoutOrganizer,
 } from "@/lib/admin-payout-eligible";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 function payoutMethodLabel(method: string | null): string {
   if (!method) return "—";
@@ -318,41 +319,78 @@ export default function AdminPayoutsPage() {
       ) : null}
 
       {data && data.batches.length > 0 ? (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-          <table className="min-w-full divide-y divide-border text-left text-sm">
-            <thead className="bg-surface/80 text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-4 py-3">Created</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3">Lines</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-background/40">
+        <ResponsiveDataView
+          table={
+            <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
+                <thead className="bg-surface/80 text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <th className="px-4 py-3">Created</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3">Lines</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border bg-background/40">
+                  {data.batches.map((b: PayoutBatchRow) => (
+                    <tr key={b.id} className="text-foreground">
+                      <td className="px-4 py-3 text-xs text-muted tabular-nums whitespace-nowrap">
+                        {new Date(b.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-xs uppercase">
+                        {b.status.replace(/_/g, " ")}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium tabular-nums">
+                        {formatMoneyFromCents(b.totalCents, b.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-muted">{b.lines?.length ?? 0}</td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/admin/payouts/${b.id}`}
+                          className="text-sm font-medium text-primary hover:underline"
+                        >
+                          Open
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+          mobile={
+            <ul className="grid gap-4">
               {data.batches.map((b: PayoutBatchRow) => (
-                <tr key={b.id} className="text-foreground">
-                  <td className="px-4 py-3 text-xs text-muted tabular-nums whitespace-nowrap">
+                <li
+                  key={b.id}
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold tabular-nums text-foreground">
+                      {formatMoneyFromCents(b.totalCents, b.currency)}
+                    </p>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      {b.status.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted tabular-nums">
                     {new Date(b.createdAt).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-xs uppercase">{b.status.replace(/_/g, " ")}</td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums">
-                    {formatMoneyFromCents(b.totalCents, b.currency)}
-                  </td>
-                  <td className="px-4 py-3 text-muted">{b.lines?.length ?? 0}</td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/payouts/${b.id}`}
-                      className="text-sm font-medium text-primary hover:underline"
-                    >
-                      Open
-                    </Link>
-                  </td>
-                </tr>
+                  </p>
+                  <p className="mt-1 text-xs text-muted">
+                    {b.lines?.length ?? 0} line{(b.lines?.length ?? 0) === 1 ? "" : "s"}
+                  </p>
+                  <Link
+                    href={`/admin/payouts/${b.id}`}
+                    className="mt-3 inline-block text-sm font-semibold text-primary"
+                  >
+                    Open batch →
+                  </Link>
+                </li>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </ul>
+          }
+        />
       ) : null}
     </div>
   );

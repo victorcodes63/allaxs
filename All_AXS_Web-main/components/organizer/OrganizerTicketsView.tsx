@@ -17,6 +17,7 @@ import {
   organizerTicketStatusChipClass,
   type OrganizerTicketRow,
 } from "@/lib/organizer-tickets";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 const PAGE_SIZE = 25;
 
@@ -389,8 +390,10 @@ export function OrganizerTicketsContent(): ReactElement {
       ) : tickets.length === 0 ? (
         <p className="text-sm text-muted">No tickets match this selection.</p>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-          <table className="min-w-full divide-y divide-border text-left text-sm">
+        <ResponsiveDataView
+          table={
+            <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
             <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Issued</th>
@@ -483,8 +486,78 @@ export function OrganizerTicketsContent(): ReactElement {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+              </table>
+            </div>
+          }
+          mobile={
+            <ul className="grid gap-4">
+              {tickets.map((t) => (
+                <li
+                  key={t.id}
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                >
+                  <p className="font-semibold text-foreground line-clamp-2">{t.eventTitle}</p>
+                  <p className="mt-1 text-xs text-muted">{t.tierName}</p>
+                  <p className="mt-1 text-sm truncate">
+                    {t.attendeeName || t.attendeeEmail || t.buyerEmail}
+                  </p>
+                  <p className="mt-1 text-xs text-muted tabular-nums">
+                    {formatShortDateTime(t.issuedAt)}
+                  </p>
+                  <span className={`mt-2 inline-flex ${organizerTicketStatusChipClass(t.status)}`}>
+                    {t.status.replace(/_/g, " ")}
+                  </span>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {t.status === "ISSUED" ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-auto px-2 py-1 text-xs min-h-0"
+                          disabled={busyId === t.id}
+                          onClick={() => void patchStatus(t, "CHECKED_IN")}
+                        >
+                          Check in
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-auto px-2 py-1 text-xs min-h-0 border-rose-500/30 text-rose-200"
+                          disabled={busyId === t.id}
+                          onClick={() => setVoidTarget(t)}
+                        >
+                          Void
+                        </Button>
+                      </>
+                    ) : null}
+                    {t.status === "CHECKED_IN" ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-auto px-2 py-1 text-xs min-h-0"
+                          disabled={busyId === t.id}
+                          onClick={() => void patchStatus(t, "ISSUED")}
+                        >
+                          Undo
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="w-auto px-2 py-1 text-xs min-h-0 border-rose-500/30 text-rose-200"
+                          disabled={busyId === t.id}
+                          onClick={() => setVoidTarget(t)}
+                        >
+                          Void
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          }
+        />
       )}
 
       {ticketsTotal > PAGE_SIZE ? (

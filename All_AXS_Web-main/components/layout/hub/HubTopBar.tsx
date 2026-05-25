@@ -458,9 +458,12 @@ export function HubTopBar({
                 : "Return to fan home (tickets and browse) in the same session"
             }
             onClick={navigateHubContext}
-            className="relative z-10 inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-[var(--radius-button)] border border-border/80 bg-surface/70 px-2.5 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] text-foreground/90 shadow-[var(--btn-shadow-outline)] transition-[border-color,background-color] hover:border-primary/35 hover:bg-wash sm:max-w-none sm:px-3 sm:text-xs sm:tracking-[0.12em]"
+            className="relative z-10 inline-flex max-w-[7.5rem] shrink-0 items-center truncate rounded-[var(--radius-button)] border border-border/80 bg-surface/70 px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-foreground/90 shadow-[var(--btn-shadow-outline)] transition-[border-color,background-color] hover:border-primary/35 hover:bg-wash sm:max-w-none sm:px-3 sm:text-xs sm:tracking-[0.12em]"
           >
-            {switchLabel}
+            <span className="sm:hidden">
+              {hubKind === "attendee" ? "Host" : "Fan"}
+            </span>
+            <span className="hidden sm:inline">{switchLabel}</span>
           </button>
         ) : null}
 

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { formatMoneyFromCents } from "@/lib/organizer-sales";
 import type { PayoutBatchRow } from "@/lib/organizer-earnings";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 type BatchDetailResponse = { batch: PayoutBatchRow };
 
@@ -208,33 +209,80 @@ export default function AdminPayoutBatchDetailPage() {
         </section>
       ) : null}
 
-      <section className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-        <table className="min-w-full divide-y divide-border text-left text-sm">
-          <thead className="bg-surface/80 text-xs uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-4 py-3">Organizer</th>
-              <th className="px-4 py-3">Method</th>
-              <th className="px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3">Disbursement</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-background/40">
+      <ResponsiveDataView
+        table={
+          <section className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+            <table className="min-w-full divide-y divide-border text-left text-sm">
+              <thead className="bg-surface/80 text-xs uppercase tracking-wide text-muted">
+                <tr>
+                  <th className="px-4 py-3">Organizer</th>
+                  <th className="px-4 py-3">Method</th>
+                  <th className="px-4 py-3 text-right">Amount</th>
+                  <th className="px-4 py-3">Disbursement</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-background/40">
+                {(payoutBatch.lines ?? []).map((line) => (
+                  <tr key={line.id}>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-foreground">{line.orgName ?? "—"}</div>
+                      <div className="font-mono text-xs text-muted">{line.organizerId}</div>
+                    </td>
+                    <td className="px-4 py-3 text-muted">{line.payoutMethod ?? "—"}</td>
+                    <td className="px-4 py-3 text-right font-medium tabular-nums">
+                      {formatMoneyFromCents(line.amountCents, line.currency)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {line.externalReference ? (
+                        <div>
+                          <span className="text-emerald-200">Sent</span>
+                          <div className="font-mono text-xs text-muted">
+                            {line.externalReference}
+                          </div>
+                        </div>
+                      ) : line.disbursementError ? (
+                        <span className="text-amber-100">{line.disbursementError}</span>
+                      ) : line.payoutMethod === "MPESA" ? (
+                        <span className="text-muted">Ready for Daraja B2C</span>
+                      ) : (
+                        <span className="text-muted">Manual payout</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        }
+        mobile={
+          <ul className="grid gap-3">
             {(payoutBatch.lines ?? []).map((line) => (
-              <tr key={line.id}>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-foreground">{line.orgName ?? "—"}</div>
-                  <div className="font-mono text-xs text-muted">{line.organizerId}</div>
-                </td>
-                <td className="px-4 py-3 text-muted">{line.payoutMethod ?? "—"}</td>
-                <td className="px-4 py-3 text-right font-medium tabular-nums">
-                  {formatMoneyFromCents(line.amountCents, line.currency)}
-                </td>
-                <td className="px-4 py-3 text-sm">
+              <li
+                key={line.id}
+                className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 font-semibold text-foreground line-clamp-2">
+                    {line.orgName ?? "—"}
+                  </p>
+                  <p className="shrink-0 font-semibold tabular-nums text-foreground">
+                    {formatMoneyFromCents(line.amountCents, line.currency)}
+                  </p>
+                </div>
+                <p className="mt-1 font-mono text-[10px] text-muted break-all">
+                  {line.organizerId}
+                </p>
+                <p className="mt-2 text-xs text-muted">
+                  {line.payoutMethod ?? "—"}
+                </p>
+                <p className="mt-2 text-sm">
                   {line.externalReference ? (
-                    <div>
+                    <>
                       <span className="text-emerald-200">Sent</span>
-                      <div className="font-mono text-xs text-muted">{line.externalReference}</div>
-                    </div>
+                      <span className="mt-1 block font-mono text-xs text-muted break-all">
+                        {line.externalReference}
+                      </span>
+                    </>
                   ) : line.disbursementError ? (
                     <span className="text-amber-100">{line.disbursementError}</span>
                   ) : line.payoutMethod === "MPESA" ? (
@@ -242,12 +290,12 @@ export default function AdminPayoutBatchDetailPage() {
                   ) : (
                     <span className="text-muted">Manual payout</span>
                   )}
-                </td>
-              </tr>
+                </p>
+              </li>
             ))}
-          </tbody>
-        </table>
-      </section>
+          </ul>
+        }
+      />
 
       {st === "MARKED_PAID" ? (
         <p className="text-sm text-muted">

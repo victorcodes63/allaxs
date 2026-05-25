@@ -7,6 +7,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { formatMoneyFromCents } from "@/lib/organizer-sales";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 import {
   normalizePayoutRequests,
   normalizePayoutSummary,
@@ -297,8 +298,10 @@ export function OrganizerWithdrawPanel() {
       )}
 
       {requests.length > 0 ? (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-          <table className="min-w-full divide-y divide-border text-left text-sm">
+        <ResponsiveDataView
+          table={
+            <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
             <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Requested</th>
@@ -350,8 +353,53 @@ export function OrganizerWithdrawPanel() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+              </table>
+            </div>
+          }
+          mobile={
+            <ul className="grid gap-3">
+              {requests.map((row) => (
+                <li
+                  key={row.id}
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface p-4 text-sm"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold tabular-nums text-foreground">
+                      {formatMoneyFromCents(row.amountCents, row.currency)}
+                    </p>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${payoutStatusChipClass(row.status)}`}
+                    >
+                      {payoutStatusLabel(row.status)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted tabular-nums">
+                    {new Date(row.createdAt).toLocaleString()}
+                  </p>
+                  {row.rejectionReason || row.note ? (
+                    <p className="mt-2 text-xs text-muted">
+                      {row.rejectionReason ? (
+                        <span className="text-red-300">{row.rejectionReason}</span>
+                      ) : (
+                        row.note
+                      )}
+                    </p>
+                  ) : null}
+                  {row.status === "PENDING" ? (
+                    <button
+                      type="button"
+                      onClick={() => void cancelRequest(row.id)}
+                      disabled={cancellingId === row.id}
+                      className="mt-3 text-xs font-semibold text-primary disabled:opacity-50"
+                    >
+                      {cancellingId === row.id ? "Cancelling…" : "Cancel request"}
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          }
+        />
       ) : (
         !loading && (
           <p className="text-sm text-muted">

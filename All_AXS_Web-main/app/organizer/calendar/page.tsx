@@ -149,6 +149,22 @@ export default function OrganizerCalendarPage() {
     setMonth(now.getMonth());
   };
 
+  const monthEvents = useMemo(() => {
+    return events
+      .filter((evt) => {
+        const start = new Date(evt.startAt);
+        return (
+          !Number.isNaN(start.getTime()) &&
+          start.getFullYear() === year &&
+          start.getMonth() === month
+        );
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+      );
+  }, [events, year, month]);
+
   return (
     <div className="space-y-8">
       <header className="space-y-3">
@@ -215,7 +231,58 @@ export default function OrganizerCalendarPage() {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-[var(--radius-panel)] border border-border bg-surface/40">
+      <section className="md:hidden" aria-label="Events this month">
+        {monthEvents.length === 0 ? (
+          <p className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-6 py-10 text-center text-sm text-muted">
+            No events in {MONTH_NAMES[month]} {year}.
+          </p>
+        ) : (
+          <ul className="grid gap-3">
+            {monthEvents.map((evt) => {
+              const start = new Date(evt.startAt);
+              const dateLabel = start.toLocaleDateString(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              return (
+                <li
+                  key={evt.id}
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4"
+                >
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${statusDot(evt.status)}`}
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/organizer/events/${evt.id}/edit`}
+                        className="font-semibold text-foreground hover:text-primary line-clamp-2"
+                      >
+                        {evt.title}
+                      </Link>
+                      <p className="mt-1 text-xs text-muted tabular-nums">{dateLabel}</p>
+                      {evt.venue ? (
+                        <p className="mt-1 text-xs text-muted line-clamp-1">{evt.venue}</p>
+                      ) : null}
+                      <span
+                        className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${organizerEventStatusChipClass(evt.status)}`}
+                      >
+                        {evt.status.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <div className="hidden overflow-hidden rounded-[var(--radius-panel)] border border-border bg-surface/40 md:block">
         <div className="grid grid-cols-7 border-b border-border bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
           {WEEKDAYS.map((d) => (
             <div key={d} className="px-2 py-2 text-center">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { nativeDarkControlClass } from "@/components/ui/nativeDarkField";
 import { formatShortDateTime } from "@/lib/organizer-sales";
 import { normalizeOrganizerEventsListPayload } from "@/lib/organizer-events-list";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 interface WaitlistEntry {
   id: string;
@@ -227,8 +228,10 @@ export default function OrganizerWaitlistPage() {
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-          <table className="min-w-full divide-y divide-border text-left text-sm">
+        <ResponsiveDataView
+          table={
+            <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
             <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Joined</th>
@@ -293,8 +296,59 @@ export default function OrganizerWaitlistPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+              </table>
+            </div>
+          }
+          mobile={
+            <ul className="grid gap-4">
+              {filtered.map((row) => (
+                <li
+                  key={row.id}
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                >
+                  <p className="font-semibold text-foreground">{row.eventTitle}</p>
+                  <p className="mt-1 text-sm text-foreground">
+                    {row.name || row.email}
+                  </p>
+                  {row.email && row.name ? (
+                    <p className="text-xs text-muted">{row.email}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-muted">
+                    {row.ticketTypeName ?? "Any tier"} ·{" "}
+                    {row.createdAt ? formatShortDateTime(row.createdAt) : "—"}
+                  </p>
+                  <span
+                    className={`mt-2 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${STATUS_TONE[row.status]}`}
+                  >
+                    {row.status.toLowerCase()}
+                  </span>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {row.status === "PENDING" || row.status === "NOTIFIED" ? (
+                      <button
+                        type="button"
+                        disabled={busyId === row.id}
+                        onClick={() => void notifyEntry(row.id)}
+                        className="text-xs font-semibold text-primary disabled:opacity-50"
+                      >
+                        Notify
+                      </button>
+                    ) : null}
+                    {row.status !== "CANCELLED" && row.status !== "CONVERTED" ? (
+                      <button
+                        type="button"
+                        disabled={busyId === row.id}
+                        onClick={() => void cancelEntry(row.id)}
+                        className="text-xs font-semibold text-muted disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          }
+        />
       )}
     </div>
   );

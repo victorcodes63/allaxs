@@ -11,6 +11,7 @@ import {
   formatShortDateTime,
 } from "@/lib/organizer-sales";
 import { normalizeCurrencyCode } from "@/lib/currency";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 type RefundStatus =
   | "REQUESTED"
@@ -303,8 +304,10 @@ export default function OrganizerRefundsPage() {
           <p className="text-sm text-muted">No refund requests in this view.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-          <table className="min-w-full divide-y divide-border text-left text-sm">
+        <ResponsiveDataView
+          table={
+            <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
             <thead className="bg-surface/80 text-[10px] font-semibold uppercase tracking-wide text-muted">
               <tr>
                 <th className="px-4 py-3">Requested</th>
@@ -387,8 +390,67 @@ export default function OrganizerRefundsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+              </table>
+            </div>
+          }
+          mobile={
+            <ul className="grid gap-4">
+              {filtered.map((row) => (
+                <li
+                  key={row.id}
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="min-w-0 font-semibold text-foreground line-clamp-2">
+                      {row.eventTitle}
+                    </p>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase ${STATUS_TONE[row.status]}`}
+                    >
+                      {STATUS_LABEL[row.status]}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted">
+                    {row.buyerName || row.buyerEmail || "—"}
+                  </p>
+                  <p className="mt-2 text-sm font-medium tabular-nums">
+                    {formatMoneyFromCents(row.amountCents, row.currency)}
+                  </p>
+                  <p className="mt-1 text-xs text-muted line-clamp-2">{row.reason || "—"}</p>
+                  {row.decisionNote ? (
+                    <p className="mt-1 text-xs text-foreground/80">Note: {row.decisionNote}</p>
+                  ) : null}
+                  {row.status === "REQUESTED" ? (
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        disabled={busyId === row.id}
+                        onClick={() => {
+                          setDecisionDialog({ mode: "approve", row });
+                          setDecisionNote("");
+                        }}
+                        className="text-sm font-semibold text-primary disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyId === row.id}
+                        onClick={() => {
+                          setDecisionDialog({ mode: "deny", row });
+                          setDecisionNote("");
+                        }}
+                        className="text-sm font-semibold text-muted disabled:opacity-50"
+                      >
+                        Deny
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          }
+        />
       )}
 
       <Dialog

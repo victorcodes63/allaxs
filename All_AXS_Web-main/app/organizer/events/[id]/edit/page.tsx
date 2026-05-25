@@ -103,6 +103,7 @@ function EventEditorTabsSection({
       key={`${event.id}-${qs}`}
       tabs={tabs}
       defaultTab={defaultTab}
+      ariaLabel="Event editor tabs"
     />
   );
 }

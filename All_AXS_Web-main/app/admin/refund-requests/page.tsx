@@ -10,6 +10,7 @@ import {
   RefundRequestReviewDialog,
   type AdminRefundRequestRow,
 } from "@/components/admin/RefundRequestReviewDialog";
+import { ResponsiveDataView } from "@/components/ui/ResponsiveDataView";
 
 interface RefundRequestsListPayload {
   total: number;
@@ -127,75 +128,137 @@ export default function AdminRefundRequestsPage() {
       ) : null}
 
       {data && data.refundRequests.length > 0 ? (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
-          <table className="min-w-full divide-y divide-border text-left text-sm">
-            <thead className="bg-surface/80 text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="px-4 py-3">Submitted</th>
-                <th className="px-4 py-3">Buyer</th>
-                <th className="px-4 py-3">Event</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Reason</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-background/40">
+        <ResponsiveDataView
+          table={
+            <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-border">
+              <table className="min-w-full divide-y divide-border text-left text-sm">
+                <thead className="bg-surface/80 text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <th className="px-4 py-3">Submitted</th>
+                    <th className="px-4 py-3">Buyer</th>
+                    <th className="px-4 py-3">Event</th>
+                    <th className="px-4 py-3 text-right">Total</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Reason</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border bg-background/40">
+                  {data.refundRequests.map((row) => (
+                    <tr key={row.id} className="text-foreground align-top">
+                      <td className="px-4 py-3 text-xs text-muted tabular-nums whitespace-nowrap">
+                        {new Date(row.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-xs">{row.email}</td>
+                      <td className="px-4 py-3 text-xs max-w-[12rem] truncate">
+                        {row.event?.title ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs font-medium tabular-nums whitespace-nowrap">
+                        {row.order
+                          ? formatMoneyFromCents(
+                              row.order.amountCents,
+                              row.order.currency,
+                            )
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs uppercase whitespace-nowrap">
+                        {row.status}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted max-w-[16rem]">
+                        <span className="line-clamp-3">{row.reason}</span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex flex-col gap-2">
+                          {row.status === "PENDING" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="text-left text-sm font-medium text-red-400 hover:underline"
+                                onClick={() => openReview(row, "approve")}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                className="text-left text-sm font-medium text-primary hover:underline"
+                                onClick={() => openReview(row, "deny")}
+                              >
+                                Deny
+                              </button>
+                            </>
+                          ) : null}
+                          {row.order ? (
+                            <Link
+                              href={`/admin/orders?search=${encodeURIComponent(row.order.reference || row.order.id)}`}
+                              className="text-sm font-medium text-muted hover:text-primary hover:underline"
+                            >
+                              View order
+                            </Link>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+          mobile={
+            <ul className="grid gap-4">
               {data.refundRequests.map((row) => (
-                <tr key={row.id} className="text-foreground align-top">
-                  <td className="px-4 py-3 text-xs text-muted tabular-nums whitespace-nowrap">
+                <li
+                  key={row.id}
+                  className="rounded-[var(--radius-panel)] border border-border bg-surface p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 font-semibold text-foreground line-clamp-2">
+                      {row.event?.title ?? "—"}
+                    </p>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted">
+                      {row.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">{row.email}</p>
+                  <p className="mt-2 text-sm text-muted line-clamp-3">{row.reason}</p>
+                  <p className="mt-2 text-xs text-muted tabular-nums">
                     {new Date(row.createdAt).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-xs">{row.email}</td>
-                  <td className="px-4 py-3 text-xs max-w-[12rem] truncate">
-                    {row.event?.title ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right text-xs font-medium tabular-nums whitespace-nowrap">
                     {row.order
-                      ? formatMoneyFromCents(row.order.amountCents, row.order.currency)
-                      : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-xs uppercase whitespace-nowrap">
-                    {row.status}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted max-w-[16rem]">
-                    <span className="line-clamp-3">{row.reason}</span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="flex flex-col gap-2">
-                      {row.status === "PENDING" ? (
-                        <>
-                          <button
-                            type="button"
-                            className="text-left text-sm font-medium text-red-400 hover:underline"
-                            onClick={() => openReview(row, "approve")}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            className="text-left text-sm font-medium text-primary hover:underline"
-                            onClick={() => openReview(row, "deny")}
-                          >
-                            Deny
-                          </button>
-                        </>
-                      ) : null}
-                      {row.order ? (
-                        <Link
-                          href={`/admin/orders?search=${encodeURIComponent(row.order.reference || row.order.id)}`}
-                          className="text-sm font-medium text-muted hover:text-primary hover:underline"
+                      ? ` · ${formatMoneyFromCents(row.order.amountCents, row.order.currency)}`
+                      : ""}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {row.status === "PENDING" ? (
+                      <>
+                        <button
+                          type="button"
+                          className="text-sm font-semibold text-red-400"
+                          onClick={() => openReview(row, "approve")}
                         >
-                          View order
-                        </Link>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="text-sm font-semibold text-primary"
+                          onClick={() => openReview(row, "deny")}
+                        >
+                          Deny
+                        </button>
+                      </>
+                    ) : null}
+                    {row.order ? (
+                      <Link
+                        href={`/admin/orders?search=${encodeURIComponent(row.order.reference || row.order.id)}`}
+                        className="text-sm font-semibold text-primary"
+                      >
+                        View order
+                      </Link>
+                    ) : null}
+                  </div>
+                </li>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </ul>
+          }
+        />
       ) : null}
 
       <RefundRequestReviewDialog
