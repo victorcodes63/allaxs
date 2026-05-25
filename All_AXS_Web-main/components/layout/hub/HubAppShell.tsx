@@ -59,10 +59,41 @@ function navItemIcon(label: string, href: string): React.ReactNode {
       </svg>
     );
   }
-  if (key.includes("overview") || key.includes("/dashboard")) {
+  if (key.includes("calendar")) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={shared} aria-hidden>
+        <rect x="4" y="5" width="16" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8 3.5v3M16 3.5v3M4 10h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (key.includes("overview") || (key.includes("/dashboard") && key.includes("overview"))) {
     return (
       <svg viewBox="0 0 24 24" fill="none" className={shared} aria-hidden>
         <path d="M4 10 12 4l8 6v9a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (key.includes("refund")) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={shared} aria-hidden>
+        <path d="M4 12a8 8 0 1 1 2.3 5.7M4 12V8M4 12H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (key.includes("notification")) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={shared} aria-hidden>
+        <path d="M12 4.5a5 5 0 0 0-5 5v2.5l-1.5 2.5h13L17 12V9.5a5 5 0 0 0-5-5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+        <path d="M10 18.5a2 2 0 0 0 4 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (key.includes("support")) {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={shared} aria-hidden>
+        <circle cx="12" cy="12" r="7.5" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M12 10v5M12 8.2h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       </svg>
     );
   }

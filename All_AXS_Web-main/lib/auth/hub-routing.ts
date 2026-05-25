@@ -69,10 +69,10 @@ export function landingPathForNonAttendee(
   user: { roles?: RoleLike[] | null } | null | undefined,
 ): string | null {
   if (!user) return null;
-  // Moderation accounts take precedence over fan-home, even when promote-organizer
-  // has added ATTENDEE to the same JWT.
-  if (userHasRole(user, "ADMIN")) return "/admin";
+  // ATTENDEE must win when present — many hosts and moderators are ATTENDEE+ADMIN.
+  // Checking ADMIN first incorrectly bounced them off /dashboard/* (e.g. calendar).
   if (userHasRole(user, "ATTENDEE")) return null;
+  if (userHasRole(user, "ADMIN")) return "/admin";
   if (userHasRole(user, "ORGANIZER")) return "/organizer/dashboard";
   return null;
 }
