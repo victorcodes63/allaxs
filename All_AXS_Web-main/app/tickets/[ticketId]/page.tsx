@@ -8,6 +8,10 @@ import { findTicketById, loadOrderSnapshot, type StoredTicket } from "@/lib/chec
 import { buildTicketQrUrl } from "@/lib/ticket-qr";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
 import { normalizeApiTicketPayload } from "@/lib/tickets-api";
+import {
+  cacheTicketDetail,
+  readCachedTicketDetail,
+} from "@/lib/pwa/offline-store";
 import type { PublicEvent } from "@/lib/types/public-event";
 import { ArrowCtaLink, axsCtaBaseClass } from "@/components/ui/ArrowCta";
 import { downloadTicketPdf } from "@/lib/ticket-pdf";
@@ -94,16 +98,28 @@ export default function TicketDetailPage() {
         if (cancelled) return;
         if (res.ok) {
           const data = await res.json();
+          cacheTicketDetail(ticketId, data);
           const normalized = normalizeApiTicketPayload(data);
           if (normalized) {
             setTicket(normalized);
             return;
           }
         }
+        const cached = readCachedTicketDetail(ticketId);
+        if (cached) {
+          const fromCache = normalizeApiTicketPayload(cached);
+          if (fromCache) {
+            setTicket(fromCache);
+            return;
+          }
+        }
         const local = findTicketById(ticketId);
         setTicket(local);
       } catch {
-        if (!cancelled) setTicket(findTicketById(ticketId));
+        if (cancelled) return;
+        const cached = readCachedTicketDetail(ticketId);
+        const fromCache = cached ? normalizeApiTicketPayload(cached) : null;
+        setTicket(fromCache ?? findTicketById(ticketId));
       }
     })();
 

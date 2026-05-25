@@ -12,12 +12,14 @@ import { AfricasTalkingSmsAdapter } from './adapters/sms-africastalking';
 import { TwilioWhatsAppAdapter } from './adapters/twilio-whatsapp.adapter';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
+import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Notification, PaymentInstallment]),
     AuthModule,
     UsersModule,
+    PushModule,
   ],
   controllers: [NotificationsController],
   providers: [

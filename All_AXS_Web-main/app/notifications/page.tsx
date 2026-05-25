@@ -8,6 +8,10 @@ import { applyHubNotificationMarkAllReadToSnapshot } from "@/lib/notifications-h
 import { NOTIFICATIONS_LAST_VISITED_AT_KEY } from "@/lib/notifications-inbox";
 import { resolveNotificationLink } from "@/lib/notifications-navigation";
 import { loadOrganizerEventSlugIndex } from "@/lib/organizer-event-slug-index";
+import {
+  cacheNotificationsList,
+  readCachedNotificationsList,
+} from "@/lib/pwa/offline-store";
 
 type NotificationItem = {
   id: string;
@@ -81,9 +85,23 @@ export default function NotificationsPage() {
         message?: string;
       };
       if (!res.ok) {
+        const cached = readCachedNotificationsList() as {
+          notifications?: NotificationItem[];
+          unreadCount?: number;
+          total?: number;
+        } | null;
+        if (cached?.notifications?.length) {
+          const list = cached.notifications;
+          setItems((prev) => (append ? [...prev, ...list] : list));
+          setUnreadCount(cached.unreadCount ?? 0);
+          setTotal(cached.total ?? list.length);
+          setError("Offline — showing saved notifications.");
+          return;
+        }
         setError(data.message || "Could not load notifications.");
         return;
       }
+      cacheNotificationsList(data);
       const list = Array.isArray(data.notifications) ? data.notifications : [];
       setItems((prev) => (append ? [...prev, ...list] : list));
       setUnreadCount(typeof data.unreadCount === "number" ? data.unreadCount : 0);
@@ -92,7 +110,20 @@ export default function NotificationsPage() {
         typeof data.offset === "number" ? data.offset + (data.limit ?? list.length) : nextOffset + list.length,
       );
     } catch {
-      setError("Could not load notifications.");
+      const cached = readCachedNotificationsList() as {
+        notifications?: NotificationItem[];
+        unreadCount?: number;
+        total?: number;
+      } | null;
+      if (cached?.notifications?.length) {
+        const list = cached.notifications;
+        setItems((prev) => (append ? [...prev, ...list] : list));
+        setUnreadCount(cached.unreadCount ?? 0);
+        setTotal(cached.total ?? list.length);
+        setError("Offline — showing saved notifications.");
+      } else {
+        setError("Could not load notifications.");
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);

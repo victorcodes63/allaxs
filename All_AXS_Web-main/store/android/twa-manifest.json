@@ -1,0 +1,22 @@
+{
+  "packageId": "com.allaxs.app",
+  "host": "www.axs.africa",
+  "name": "All AXS",
+  "launcherName": "All AXS",
+  "display": "standalone",
+  "themeColor": "#0c0c0f",
+  "navigationColor": "#0c0c0f",
+  "backgroundColor": "#0c0c0f",
+  "enableNotifications": true,
+  "startUrl": "/?source=play-store",
+  "iconUrl": "https://www.axs.africa/favicons/android-chrome-512x512.png",
+  "maskableIconUrl": "https://www.axs.africa/favicons/android-chrome-512x512.png",
+  "webManifestUrl": "https://www.axs.africa/manifest.webmanifest",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "REPLACE_WITH_KEYSTORE_PATH",
+    "alias": "allaxs"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1
+}

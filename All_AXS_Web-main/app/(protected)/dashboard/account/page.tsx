@@ -24,6 +24,7 @@ import {
   saveNotificationPrefs,
   type NotificationPrefs,
 } from "@/lib/fan-notification-prefs";
+import { PushNotificationsToggle } from "@/components/pwa/PushNotificationsToggle";
 
 function formatMemberSince(iso?: string): string | null {
   if (!iso) return null;
@@ -520,6 +521,7 @@ export default function FanAccountPage(): ReactElement {
                 </li>
               ))}
             </ul>
+            <PushNotificationsToggle />
           </section>
 
           <section

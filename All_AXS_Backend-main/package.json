@@ -29,6 +29,7 @@
     "typeorm:test": "cross-env NODE_ENV=test ts-node -r tsconfig-paths/register node_modules/typeorm/cli.js -d src/database/data-source.ts",
     "migrate:create": "npm run typeorm -- migration:create",
     "migrate:gen": "npm run typeorm -- migration:generate -o",
+    "push:vapid": "node -e \"const w=require('web-push');const k=w.generateVAPIDKeys();console.log('WEB_PUSH_VAPID_PUBLIC_KEY='+k.publicKey);console.log('WEB_PUSH_VAPID_PRIVATE_KEY='+k.privateKey);console.log('# optional: WEB_PUSH_VAPID_SUBJECT=mailto:hello@allaxs.com');\"",
     "migrate:run": "npm run typeorm -- migration:run",
     "migrate:revert": "npm run typeorm -- migration:revert",
     "migrate:run:test": "cross-env NODE_ENV=test npm run typeorm -- migration:run",
@@ -81,7 +82,8 @@
     "reflect-metadata": "^0.2.2",
     "resend": "^6.4.1",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.27"
+    "typeorm": "^0.3.27",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -98,6 +100,7 @@
     "@types/nodemailer": "^7.0.3",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",
+    "@types/web-push": "^3.6.4",
     "cross-env": "^7.0.3",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",

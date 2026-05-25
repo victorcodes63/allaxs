@@ -6,6 +6,10 @@ import { loadAllTickets, type StoredTicket } from "@/lib/checkout-storage";
 import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { isApiCheckoutEnabled } from "@/lib/checkout-mode";
 import { mergeTicketsById, normalizeApiTicketsPayload } from "@/lib/tickets-api";
+import {
+  cacheTicketsList,
+  readCachedTicketsList,
+} from "@/lib/pwa/offline-store";
 import { splitTicketsByTime } from "@/lib/tickets-grouping";
 
 type TicketTab = "upcoming" | "past" | "all";
@@ -77,6 +81,7 @@ export function TicketsList() {
   const [mounted, setMounted] = useState(false);
   const [apiTickets, setApiTickets] = useState<StoredTicket[] | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [offlineSnapshot, setOfflineSnapshot] = useState(false);
   const [resendByOrder, setResendByOrder] = useState<Record<string, ResendState>>({});
   const [activeTab, setActiveTab] = useState<TicketTab>("upcoming");
 
@@ -96,17 +101,37 @@ export function TicketsList() {
         if (!res.ok) {
           if (cancelled) return;
           if (res.status === 401) {
+            setOfflineSnapshot(false);
             setApiError("Sign in to load tickets linked to your account.");
           } else {
-            setApiError("Could not load tickets from the server.");
+            const cached = readCachedTicketsList();
+            if (cached) {
+              setApiTickets(normalizeApiTicketsPayload(cached));
+              setOfflineSnapshot(true);
+              setApiError(null);
+            } else {
+              setOfflineSnapshot(false);
+              setApiError("Could not load tickets from the server.");
+            }
           }
           return;
         }
         const data = await res.json();
         if (cancelled) return;
+        cacheTicketsList(data);
+        setOfflineSnapshot(false);
         setApiTickets(normalizeApiTicketsPayload(data));
       } catch {
-        if (!cancelled) setApiError("Could not load tickets.");
+        if (cancelled) return;
+        const cached = readCachedTicketsList();
+        if (cached) {
+          setApiTickets(normalizeApiTicketsPayload(cached));
+          setOfflineSnapshot(true);
+          setApiError(null);
+        } else {
+          setOfflineSnapshot(false);
+          setApiError("Could not load tickets.");
+        }
       }
     })();
     return () => {
@@ -178,6 +203,16 @@ export function TicketsList() {
     );
   }
 
+  const offlineBanner =
+    apiCheckout && offlineSnapshot && tickets.length > 0 ? (
+      <div className="rounded-[var(--radius-panel)] border border-border bg-primary/5 px-5 py-4 text-sm text-muted">
+        <p className="font-medium text-foreground">Offline — saved passes</p>
+        <p className="mt-1 leading-relaxed">
+          Showing tickets saved on this device. Reconnect to sync the latest from your account.
+        </p>
+      </div>
+    ) : null;
+
   const sessionFallbackBanner =
     apiCheckout && apiError && tickets.length > 0 ? (
       <div className="rounded-[var(--radius-panel)] border border-border bg-primary/5 px-5 py-4 text-sm text-muted">
@@ -239,6 +274,7 @@ export function TicketsList() {
 
   return (
     <div className="space-y-6">
+      {offlineBanner}
       {sessionFallbackBanner}
       {resendEmailBanner}
 

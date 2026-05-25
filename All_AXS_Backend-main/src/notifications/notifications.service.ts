@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
@@ -18,6 +23,7 @@ import {
   TICKET_WHATSAPP_TEMPLATE,
 } from './templates/ticket-whatsapp.template';
 import type { TicketWhatsAppPayload } from './dispatch/notification-dispatch.types';
+import { WebPushService } from '../push/web-push.service';
 
 type NotificationPayload = Record<string, unknown>;
 
@@ -143,6 +149,7 @@ export class NotificationsService {
     private readonly smsAdapter: AfricasTalkingSmsAdapter,
     private readonly whatsAppAdapter: TwilioWhatsAppAdapter,
     private readonly configService: ConfigService,
+    @Optional() private readonly webPushService?: WebPushService,
   ) {
     this.maxRetries = Number(
       this.configService.get<string>('NOTIFICATION_MAX_RETRIES', '3'),
@@ -842,7 +849,7 @@ export class NotificationsService {
       payload.link = input.link;
     }
 
-    return this.notificationRepository.save(
+    const saved = await this.notificationRepository.save(
       this.notificationRepository.create({
         channel: NotifyChannel.PUSH,
         template: input.template,
@@ -851,6 +858,15 @@ export class NotificationsService {
         status: NotifyStatus.SENT,
       }),
     );
+
+    void this.webPushService?.notifyUserEmail(input.to, {
+      title: input.title,
+      body: input.body,
+      url: input.link,
+      tag: input.template ?? saved.id,
+    });
+
+    return saved;
   }
 
   private resolveCategory(

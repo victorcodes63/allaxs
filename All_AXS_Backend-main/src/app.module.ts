@@ -13,6 +13,7 @@ import { OrganizersModule } from './organizers/organizers.module';
 import { CheckoutModule } from './checkout/checkout.module';
 import { OrdersModule } from './orders/orders.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PushModule } from './push/push.module';
 import { ScannerModule } from './scanner/scanner.module';
 import { HealthController } from './health.controller';
 import { LoggerModule } from 'nestjs-pino';
@@ -113,6 +114,7 @@ function getTestUtilsModule(): any[] {
     CheckoutModule,
     OrdersModule,
     NotificationsModule,
+    PushModule,
     ScannerModule,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     ...getTestModule(),

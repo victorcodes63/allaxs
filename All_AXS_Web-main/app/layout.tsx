@@ -4,6 +4,8 @@ import { AppChrome } from "@/components/layout/AppChrome";
 import { AuthProvider } from "@/lib/auth-context";
 import { AnalyticsLoader } from "@/components/consent/AnalyticsLoader";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
+import { PwaInstallBanner } from "@/components/pwa/PwaInstallBanner";
+import { PwaRegistration } from "@/components/pwa/PwaRegistration";
 import { buildPageMetadata } from "@/lib/seo/metadata";
 import { SITE_BASE_URL } from "@/lib/seo/site-url";
 import "./globals.css";
@@ -33,7 +35,11 @@ export const metadata: Metadata = {
   },
   description: ROOT_DESCRIPTION,
   applicationName: "All AXS",
-  manifest: "/favicons/site.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "All AXS",
+    statusBarStyle: "black-translucent",
+  },
   icons: {
     icon: [
       { url: "/favicons/favicon-16x16.png", sizes: "16x16", type: "image/png" },
@@ -51,6 +57,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#0c0c0f",
 };
 
 export default function RootLayout({
@@ -66,7 +73,9 @@ export default function RootLayout({
         <AuthProvider>
           <AppChrome>{children}</AppChrome>
         </AuthProvider>
+        <PwaRegistration />
         <CookieConsentBanner />
+        <PwaInstallBanner />
         <AnalyticsLoader />
       </body>
     </html>
