@@ -12,6 +12,7 @@ import { AuthSessionEntryGate } from "@/components/auth/AuthSessionEntryGate";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
 import { AuthLoginAuxiliary } from "@/components/auth/AuthLoginAuxiliary";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
 import {
@@ -91,9 +92,8 @@ function LoginForm() {
               error={errors.email?.message}
             />
 
-            <Input
+            <PasswordInput
               label="Password"
-              type="password"
               autoComplete="current-password"
               placeholder="••••••••"
               {...register("password")}

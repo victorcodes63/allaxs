@@ -50,6 +50,15 @@ export class AdminPayoutBatchesController {
     return { batch: this.serializeBatch(batch) };
   }
 
+  @Get('eligible-organizers')
+  @ApiOperation({
+    summary:
+      'List organizers with available balance for inclusion in a new draft batch',
+  })
+  async listEligibleOrganizers() {
+    return this.payoutBatchesService.listEligibleOrganizers();
+  }
+
   @Get()
   @ApiOperation({ summary: 'List payout batches' })
   async list(

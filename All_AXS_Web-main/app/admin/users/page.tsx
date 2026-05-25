@@ -18,8 +18,13 @@ import {
   type UserActionTarget,
 } from "@/components/admin/UserActionConfirmDialog";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
-
-type UserStatus = "ACTIVE" | "SUSPENDED";
+import {
+  accountStatusChipClass,
+  accountStatusLabel,
+  isClosedAccount,
+  supportRestoreMailto,
+  type AdminUserStatus,
+} from "@/lib/admin-user-account";
 
 interface AdminUserRow {
   id: string;
@@ -27,7 +32,8 @@ interface AdminUserRow {
   name: string | null;
   phone: string | null;
   roles: AdminRole[];
-  status: UserStatus;
+  status: AdminUserStatus;
+  closedAt?: string | null;
   createdAt: string;
 }
 
@@ -49,6 +55,7 @@ const STATUS_FILTERS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "all", label: "All states" },
   { value: "ACTIVE", label: "Active" },
   { value: "SUSPENDED", label: "Suspended" },
+  { value: "CLOSED", label: "Closed" },
 ];
 
 const PAGE_SIZE = 25;
@@ -63,12 +70,6 @@ function roleChipClass(role: AdminRole): string {
     default:
       return "border-white/10 bg-white/[0.06] text-foreground/85";
   }
-}
-
-function statusChipClass(status: UserStatus): string {
-  return status === "ACTIVE"
-    ? "border-emerald-400/25 bg-emerald-500/12 text-emerald-100"
-    : "border-red-400/30 bg-red-500/12 text-red-100";
 }
 
 function formatDate(value: string): string {
@@ -432,7 +433,10 @@ function AdminUserCard({
 }) {
   const display = row.name || row.email;
   const isAdmin = row.roles.includes("ADMIN");
-  const isSuspended = row.status === "SUSPENDED";
+  const isClosed = isClosedAccount(row);
+  const isSuspended = !isClosed && row.status === "SUSPENDED";
+  const statusLabel = accountStatusLabel(row);
+  const statusClass = accountStatusChipClass(row);
 
   return (
     <li className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 transition-[border-color,box-shadow] hover:border-primary/30 sm:flex-row sm:items-start sm:p-5">
@@ -447,9 +451,9 @@ function AdminUserCard({
             {display}
           </h3>
           <span
-            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusChipClass(row.status)}`}
+            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusClass}`}
           >
-            {row.status.toLowerCase()}
+            {statusLabel}
           </span>
           {isSelf ? (
             <span className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
@@ -475,6 +479,9 @@ function AdminUserCard({
         </div>
         <p className="text-xs text-muted tabular-nums">
           Joined {formatDate(row.createdAt)}
+          {isClosed && row.closedAt
+            ? ` · Closed ${formatDate(row.closedAt)}`
+            : null}
         </p>
       </div>
       <div className="flex shrink-0 flex-row flex-wrap items-center justify-start gap-1.5 sm:items-end sm:justify-end sm:self-center">
@@ -485,53 +492,65 @@ function AdminUserCard({
         >
           Details
         </Link>
-        <button
-          type="button"
-          onClick={onManageRoles}
-          className={ROW_ACTION_GHOST}
-        >
-          Manage roles
-        </button>
-        {!isAdmin ? (
-          <button
-            type="button"
-            onClick={onPromote}
+        {isClosed ? (
+          <a
+            href={supportRestoreMailto(row.id)}
             className={ROW_ACTION_GHOST}
-            aria-label={`Promote ${display} to admin`}
+            aria-label={`Contact support to restore ${display}`}
           >
-            Promote to admin
-          </button>
-        ) : null}
-        {!isSuspended && !isSelf ? (
-          <button
-            type="button"
-            onClick={onForceLogout}
-            className={ROW_ACTION_GHOST}
-            aria-label={`Force sign-out ${display}`}
-          >
-            Force sign-out
-          </button>
-        ) : null}
-        {!isSuspended && !isSelf ? (
-          <button
-            type="button"
-            onClick={onSuspend}
-            className={ROW_ACTION_DANGER}
-            aria-label={`Suspend ${display}`}
-          >
-            Suspend
-          </button>
-        ) : null}
-        {isSuspended ? (
-          <button
-            type="button"
-            onClick={onReactivate}
-            className={ROW_ACTION_PRIMARY}
-            aria-label={`Reactivate ${display}`}
-          >
-            Reactivate
-          </button>
-        ) : null}
+            Contact support to restore
+          </a>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onManageRoles}
+              className={ROW_ACTION_GHOST}
+            >
+              Manage roles
+            </button>
+            {!isAdmin ? (
+              <button
+                type="button"
+                onClick={onPromote}
+                className={ROW_ACTION_GHOST}
+                aria-label={`Promote ${display} to admin`}
+              >
+                Promote to admin
+              </button>
+            ) : null}
+            {!isSuspended && !isSelf ? (
+              <button
+                type="button"
+                onClick={onForceLogout}
+                className={ROW_ACTION_GHOST}
+                aria-label={`Force sign-out ${display}`}
+              >
+                Force sign-out
+              </button>
+            ) : null}
+            {!isSuspended && !isSelf ? (
+              <button
+                type="button"
+                onClick={onSuspend}
+                className={ROW_ACTION_DANGER}
+                aria-label={`Suspend ${display}`}
+              >
+                Suspend
+              </button>
+            ) : null}
+            {isSuspended ? (
+              <button
+                type="button"
+                onClick={onReactivate}
+                className={ROW_ACTION_PRIMARY}
+                aria-label={`Reactivate ${display}`}
+              >
+                Reactivate
+              </button>
+            ) : null}
+          </>
+        )}
         <button
           type="button"
           onClick={onOpenAudit}

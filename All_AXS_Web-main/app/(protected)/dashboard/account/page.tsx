@@ -15,6 +15,7 @@ import {
 } from "@/lib/validation/auth";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { userInitials } from "@/lib/hub-user";
 import { userHasRole } from "@/lib/auth/hub-routing";
 import {
@@ -384,26 +385,23 @@ export default function FanAccountPage(): ReactElement {
                   </div>
                 ) : null}
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input
+                  <PasswordInput
                     label="Current password"
-                    type="password"
                     autoComplete="current-password"
                     placeholder="••••••••"
                     {...registerPassword("currentPassword")}
                     error={passwordErrors.currentPassword?.message}
                   />
                   <div />
-                  <Input
+                  <PasswordInput
                     label="New password"
-                    type="password"
                     autoComplete="new-password"
                     placeholder="••••••••"
                     {...registerPassword("newPassword")}
                     error={passwordErrors.newPassword?.message}
                   />
-                  <Input
+                  <PasswordInput
                     label="Confirm new password"
-                    type="password"
                     autoComplete="new-password"
                     placeholder="••••••••"
                     {...registerPassword("confirmNewPassword")}
@@ -547,9 +545,8 @@ export default function FanAccountPage(): ReactElement {
                   </div>
                 ) : null}
                 {requiresPasswordToClose ? (
-                  <Input
+                  <PasswordInput
                     label="Current password"
-                    type="password"
                     autoComplete="current-password"
                     value={closePassword}
                     onChange={(e) => setClosePassword(e.target.value)}

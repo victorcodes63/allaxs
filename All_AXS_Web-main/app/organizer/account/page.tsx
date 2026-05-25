@@ -21,6 +21,7 @@ import {
   type OrganizerPayoutProfileStatus,
 } from "@/lib/organizer-payout-profile";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 export default function OrganizerAccountPage(): ReactElement {
   const router = useRouter();
@@ -205,26 +206,23 @@ export default function OrganizerAccountPage(): ReactElement {
             </div>
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
-            <Input
+            <PasswordInput
               label="Current password"
-              type="password"
               autoComplete="current-password"
               placeholder="••••••••"
               {...register("currentPassword")}
               error={passwordErrors.currentPassword?.message}
             />
             <div />
-            <Input
+            <PasswordInput
               label="New password"
-              type="password"
               autoComplete="new-password"
               placeholder="••••••••"
               {...register("newPassword")}
               error={passwordErrors.newPassword?.message}
             />
-            <Input
+            <PasswordInput
               label="Confirm new password"
-              type="password"
               autoComplete="new-password"
               placeholder="••••••••"
               {...register("confirmNewPassword")}

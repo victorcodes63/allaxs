@@ -103,6 +103,67 @@ export class PayoutBatchesService {
     });
   }
 
+  /**
+   * Organizers with a positive available balance (ledger net minus open batch
+   * reservations). Used by admin UI to pick payout batch lines via checkboxes.
+   */
+  async listEligibleOrganizers(): Promise<{
+    organizers: {
+      id: string;
+      orgName: string;
+      supportEmail: string;
+      userEmail: string | null;
+      payoutMethod: PayoutMethod | null;
+      verified: boolean;
+      availableCents: number;
+      reservedInOpenBatchesCents: number;
+      ledgerNetCents: number;
+      currency: string;
+    }[];
+  }> {
+    const profiles = await this.dataSource.getRepository(OrganizerProfile).find({
+      relations: ['user'],
+      order: { orgName: 'ASC' },
+    });
+
+    const organizers: {
+      id: string;
+      orgName: string;
+      supportEmail: string;
+      userEmail: string | null;
+      payoutMethod: PayoutMethod | null;
+      verified: boolean;
+      availableCents: number;
+      reservedInOpenBatchesCents: number;
+      ledgerNetCents: number;
+      currency: string;
+    }[] = [];
+
+    for (const profile of profiles) {
+      const summary =
+        await this.organizerLedgerService.getEarningsSummary(profile.id);
+      if (summary.availableCents <= 0) {
+        continue;
+      }
+      organizers.push({
+        id: profile.id,
+        orgName: profile.orgName,
+        supportEmail: profile.supportEmail,
+        userEmail: profile.user?.email ?? null,
+        payoutMethod: profile.payoutMethod ?? null,
+        verified: profile.verified,
+        availableCents: summary.availableCents,
+        reservedInOpenBatchesCents: summary.reservedInOpenBatchesCents,
+        ledgerNetCents: summary.ledgerNetCents,
+        currency: normalizeCurrencyCode(summary.currency),
+      });
+    }
+
+    organizers.sort((a, b) => b.availableCents - a.availableCents);
+
+    return { organizers };
+  }
+
   async listBatches(params: { limit: number; offset: number }): Promise<{
     batches: PayoutBatch[];
     total: number;

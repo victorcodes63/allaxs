@@ -12,6 +12,7 @@ import { AuthIntentHint } from "@/components/auth/AuthIntentHint";
 import { AuthSessionEntryGate } from "@/components/auth/AuthSessionEntryGate";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
 import { buildAuthQuery, parseIntent } from "@/lib/auth/post-auth-redirect";
@@ -126,9 +127,8 @@ function RegisterForm() {
               error={errors.email?.message}
             />
 
-            <Input
+            <PasswordInput
               label="Password"
-              type="password"
               autoComplete="new-password"
               placeholder="••••••••"
               {...register("password")}

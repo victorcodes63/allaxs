@@ -52,6 +52,9 @@ interface Event {
   slug: string;
   bannerUrl?: string | null;
   ticketTypes?: TicketType[];
+  metadata?: {
+    rejectionReason?: string;
+  };
   [key: string]: unknown; // Allow additional properties to match child component interfaces
 }
 
@@ -272,6 +275,25 @@ export default function EventEditorPage() {
       </div>
 
       <OrganizerAdminEditBanner eventId={event.id} />
+
+      {event.status === EventStatus.REJECTED &&
+      event.metadata?.rejectionReason ? (
+        <div
+          className="rounded-[var(--radius-panel)] border border-amber-400/35 bg-amber-500/10 p-4 sm:p-5"
+          role="status"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-100/90">
+            Changes requested
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-foreground/90">
+            {event.metadata.rejectionReason}
+          </p>
+          <p className="mt-3 text-xs text-muted">
+            Update the event below, then resubmit for review from the Details
+            tab.
+          </p>
+        </div>
+      ) : null}
 
       <Suspense
         fallback={

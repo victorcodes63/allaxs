@@ -236,16 +236,16 @@ export function EventReviewActions({
       >
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-foreground/85">
-            Optionally share a reason — the organiser will see it on their
-            event editor when they reopen the listing.
+            Explain what must change before this event can be approved. The
+            organiser will see this on their event editor.
           </p>
           <Textarea
-            label="Rejection reason (optional)"
+            label="Note for organiser"
             value={rejectReason}
             onChange={(event) => setRejectReason(event.target.value)}
-            placeholder="e.g. The event description references a venue we don't currently support."
+            placeholder="e.g. Add a complete venue address and refund policy before approval."
             rows={4}
-            aria-label="Rejection reason"
+            aria-label="Note for organiser"
           />
         </div>
       </Dialog>

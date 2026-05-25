@@ -27,6 +27,10 @@ export class User extends BaseEntity {
   @Column({ type: 'enum', enum: UserStatus, default: UserStatus.ACTIVE })
   status!: UserStatus;
 
+  /** Set when the user closes their account (self-service). */
+  @Column({ type: 'timestamptz', nullable: true })
+  closedAt?: Date | null;
+
   /** Set when the account is provisioned during public guest checkout. */
   @Column({ type: 'timestamptz', nullable: true })
   autoCreatedAt?: Date | null;

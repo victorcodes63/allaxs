@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Textarea } from "@/components/ui/Textarea";
 import axios from "axios";
+import { EventStatus } from "@/lib/validation/event";
 import { getEventBannerUrl, shouldUnoptimizeEventImage } from "@/lib/utils/image";
 
 interface Organizer {
@@ -52,12 +53,25 @@ export function ReviewPanel({
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
-  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState("");
+  const [rejectConfirmOpen, setRejectConfirmOpen] = useState(false);
+  const [moderatorNote, setModeratorNote] = useState("");
+  const [noteError, setNoteError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!event) return;
+    setModeratorNote("");
+    setNoteError(null);
+    setError(null);
+    setSuccessMessage(null);
+    setApproveDialogOpen(false);
+    setRejectConfirmOpen(false);
+  }, [event?.id]);
+
   if (!event) return null;
+
+  const canModerate = event.status === EventStatus.PENDING_REVIEW;
 
   const handleApprove = async () => {
     setIsApproving(true);
@@ -97,17 +111,26 @@ export function ReviewPanel({
   };
 
   const handleReject = async () => {
+    const trimmedNote = moderatorNote.trim();
+    if (!trimmedNote) {
+      setNoteError(
+        "Add a note for the organiser explaining what must change before you reject.",
+      );
+      return;
+    }
+
     setIsRejecting(true);
     setError(null);
     setSuccessMessage(null);
+    setNoteError(null);
 
     try {
       await axios.post(`/api/admin/events/${event.id}/reject`, {
-        reason: rejectReason || undefined,
+        reason: trimmedNote,
       });
       setSuccessMessage("Event rejected successfully!");
-      setRejectDialogOpen(false);
-      setRejectReason("");
+      setRejectConfirmOpen(false);
+      setModeratorNote("");
       setTimeout(() => {
         onActionComplete();
         onClose();
@@ -151,6 +174,17 @@ export function ReviewPanel({
     return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
+  const requestReject = () => {
+    if (!moderatorNote.trim()) {
+      setNoteError(
+        "Add a note for the organiser explaining what must change before you reject.",
+      );
+      return;
+    }
+    setNoteError(null);
+    setRejectConfirmOpen(true);
+  };
+
   return (
     <>
       <Dialog
@@ -159,7 +193,7 @@ export function ReviewPanel({
         title="Review Event"
         ariaLabel="Event review panel"
         footer={
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button
               variant="secondary"
               onClick={onClose}
@@ -168,22 +202,26 @@ export function ReviewPanel({
             >
               Close
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setRejectDialogOpen(true)}
-              disabled={isApproving || isRejecting}
-              className="w-auto border-red-400/30 bg-red-500/10 text-red-100 hover:border-red-400/50 hover:bg-red-500/20 hover:text-white"
-            >
-              Reject
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => setApproveDialogOpen(true)}
-              disabled={isApproving || isRejecting}
-              className="w-auto"
-            >
-              {isApproving ? "Approving..." : "Approve"}
-            </Button>
+            {canModerate ? (
+              <>
+                <Button
+                  variant="secondary"
+                  onClick={requestReject}
+                  disabled={isApproving || isRejecting}
+                  className="w-auto border-red-400/30 bg-red-500/10 text-red-100 hover:border-red-400/50 hover:bg-red-500/20 hover:text-white"
+                >
+                  Reject
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => setApproveDialogOpen(true)}
+                  disabled={isApproving || isRejecting}
+                  className="w-auto"
+                >
+                  {isApproving ? "Approving..." : "Approve"}
+                </Button>
+              </>
+            ) : null}
           </div>
         }
       >
@@ -323,6 +361,31 @@ export function ReviewPanel({
               </p>
             </div>
           )}
+
+          {canModerate ? (
+            <div className="rounded-[var(--radius-panel)] border border-border/80 bg-wash/30 p-4">
+              <Textarea
+                label="Note for organiser"
+                value={moderatorNote}
+                onChange={(e) => {
+                  setModeratorNote(e.target.value);
+                  if (noteError) setNoteError(null);
+                }}
+                placeholder="e.g. Add a complete venue address and ticket refund policy before we can approve this listing."
+                rows={4}
+                aria-label="Note for organiser"
+              />
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                Required when rejecting. The organiser sees this on their event
+                editor and in the review notification.
+              </p>
+              {noteError ? (
+                <p className="mt-2 text-sm text-red-200" role="alert">
+                  {noteError}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Dialog>
 
@@ -362,25 +425,18 @@ export function ReviewPanel({
         </p>
       </Dialog>
 
-      {/* Reject Dialog */}
       <Dialog
-        open={rejectDialogOpen}
+        open={rejectConfirmOpen}
         onClose={() => {
-          setRejectDialogOpen(false);
-          setRejectReason("");
-          setError(null);
+          if (!isRejecting) setRejectConfirmOpen(false);
         }}
-        title="Reject Event"
-        ariaLabel="Reject event dialog"
+        title="Reject event?"
+        ariaLabel="Confirm reject event"
         footer={
           <div className="flex gap-3">
             <Button
               variant="secondary"
-              onClick={() => {
-                setRejectDialogOpen(false);
-                setRejectReason("");
-                setError(null);
-              }}
+              onClick={() => setRejectConfirmOpen(false)}
               disabled={isRejecting}
               className="w-auto"
             >
@@ -392,31 +448,25 @@ export function ReviewPanel({
               disabled={isRejecting}
               className="w-auto bg-red-600 text-white hover:bg-red-700"
             >
-              {isRejecting ? "Rejecting..." : "Reject Event"}
+              {isRejecting ? "Rejecting…" : "Reject & notify organiser"}
             </Button>
           </div>
         }
       >
         <div className="space-y-4">
-          {error && (
+          {error ? (
             <div className="rounded-[var(--radius-panel)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100">
               {error}
             </div>
-          )}
-
+          ) : null}
           <p className="text-sm leading-relaxed text-foreground/85">
-            Please provide an optional reason for rejecting this event. The
-            organiser will see it on their event editor.
+            The organiser will receive this feedback and can edit and resubmit{" "}
+            <span className="font-semibold text-foreground">{event.title}</span>
+            .
           </p>
-
-          <Textarea
-            label="Rejection Reason (Optional)"
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="e.g., Event does not meet our guidelines..."
-            rows={4}
-            aria-label="Rejection reason"
-          />
+          <div className="rounded-[var(--radius-panel)] border border-border/80 bg-wash/40 p-3 text-sm leading-relaxed text-foreground/90">
+            {moderatorNote.trim()}
+          </div>
         </div>
       </Dialog>
     </>

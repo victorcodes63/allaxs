@@ -6,6 +6,8 @@ export enum Role {
 export enum UserStatus {
   ACTIVE = 'ACTIVE',
   SUSPENDED = 'SUSPENDED',
+  /** Self-service closed account; credentials and PII are scrubbed. */
+  CLOSED = 'CLOSED',
 }
 
 export enum EventType {

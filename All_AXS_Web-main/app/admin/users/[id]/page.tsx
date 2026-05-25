@@ -19,8 +19,13 @@ import {
   type UserActionTarget,
 } from "@/components/admin/UserActionConfirmDialog";
 import { ADMIN_PAGE_SHELL } from "@/lib/admin-page-shell";
-
-type UserStatus = "ACTIVE" | "SUSPENDED";
+import {
+  accountStatusChipClass,
+  accountStatusLabel,
+  isClosedAccount,
+  supportRestoreMailto,
+  type AdminUserStatus,
+} from "@/lib/admin-user-account";
 
 type AdminPayoutProfileSummary = {
   isComplete: boolean;
@@ -53,7 +58,8 @@ interface AdminUserDetail {
     name: string | null;
     phone: string | null;
     roles: AdminRole[];
-    status: UserStatus;
+    status: AdminUserStatus;
+    closedAt?: string | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -299,7 +305,10 @@ function AdminUserDetailPageContent() {
   const display = user.name || user.email;
   const isSelf = !!currentAdmin && currentAdmin.id === user.id;
   const isAdmin = user.roles.includes("ADMIN");
-  const isSuspended = user.status === "SUSPENDED";
+  const isClosed = isClosedAccount(user);
+  const isSuspended = !isClosed && user.status === "SUSPENDED";
+  const statusLabel = accountStatusLabel(user);
+  const statusClass = accountStatusChipClass(user);
   const hostedTotal = countFromRecord(hostedEvents.byStatus);
 
   return (
@@ -327,11 +336,9 @@ function AdminUserDetailPageContent() {
                   {display}
                 </h1>
                 <span
-                  className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusChipClass(
-                    user.status,
-                  )}`}
+                  className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${statusClass}`}
                 >
-                  {user.status.toLowerCase()}
+                  {statusLabel}
                 </span>
                 {isSelf ? (
                   <span className="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
@@ -360,82 +367,103 @@ function AdminUserDetailPageContent() {
               <p className="mt-3 text-xs text-muted tabular-nums">
                 Joined {formatDate(user.createdAt)} · Updated{" "}
                 {formatDate(user.updatedAt)}
+                {isClosed && user.closedAt
+                  ? ` · Closed ${formatDate(user.closedAt)}`
+                  : null}
               </p>
             </div>
           </div>
           <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end sm:gap-1.5">
-            <button
-              type="button"
-              onClick={() =>
-                setRolesTarget({
-                  id: user.id,
-                  email: user.email,
-                  name: user.name,
-                  roles: user.roles,
-                })
-              }
-              className={ROW_ACTION_PRIMARY}
-            >
-              Manage roles
-            </button>
-            {!isAdmin ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setPendingAction({
-                    kind: "promote",
-                    user: toActionTarget(user),
-                  })
-                }
-                className={ROW_ACTION_GHOST}
-              >
-                Promote to admin
-              </button>
-            ) : null}
-            {!isSuspended && !isSelf ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setPendingAction({
-                    kind: "forceLogout",
-                    user: toActionTarget(user),
-                  })
-                }
-                className={ROW_ACTION_GHOST}
-              >
-                Force sign-out
-              </button>
-            ) : null}
-            {!isSuspended && !isSelf ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setPendingAction({
-                    kind: "suspend",
-                    user: toActionTarget(user),
-                  })
-                }
-                className={ROW_ACTION_DANGER}
-              >
-                Suspend
-              </button>
-            ) : null}
-            {isSuspended ? (
-              <button
-                type="button"
-                onClick={() =>
-                  setPendingAction({
-                    kind: "reactivate",
-                    user: toActionTarget(user),
-                  })
-                }
+            {isClosed ? (
+              <a
+                href={supportRestoreMailto(user.id)}
                 className={ROW_ACTION_PRIMARY}
               >
-                Reactivate
-              </button>
-            ) : null}
+                Contact support to restore
+              </a>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRolesTarget({
+                      id: user.id,
+                      email: user.email,
+                      name: user.name,
+                      roles: user.roles,
+                    })
+                  }
+                  className={ROW_ACTION_PRIMARY}
+                >
+                  Manage roles
+                </button>
+                {!isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPendingAction({
+                        kind: "promote",
+                        user: toActionTarget(user),
+                      })
+                    }
+                    className={ROW_ACTION_GHOST}
+                  >
+                    Promote to admin
+                  </button>
+                ) : null}
+                {!isSuspended && !isSelf ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPendingAction({
+                        kind: "forceLogout",
+                        user: toActionTarget(user),
+                      })
+                    }
+                    className={ROW_ACTION_GHOST}
+                  >
+                    Force sign-out
+                  </button>
+                ) : null}
+                {!isSuspended && !isSelf ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPendingAction({
+                        kind: "suspend",
+                        user: toActionTarget(user),
+                      })
+                    }
+                    className={ROW_ACTION_DANGER}
+                  >
+                    Suspend
+                  </button>
+                ) : null}
+                {isSuspended ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPendingAction({
+                        kind: "reactivate",
+                        user: toActionTarget(user),
+                      })
+                    }
+                    className={ROW_ACTION_PRIMARY}
+                  >
+                    Reactivate
+                  </button>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
+        {isClosed ? (
+          <p className="mt-4 max-w-3xl text-sm leading-relaxed text-muted">
+            This account was closed by the user. Credentials and personal email
+            were removed. Restoring access requires support to re-link the
+            original email and reset sign-in.
+          </p>
+        ) : null}
       </section>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">

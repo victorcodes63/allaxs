@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Role, UserStatus } from 'src/domain/enums';
+import { isClosedAccount } from './account-status.util';
 import {
   DEFAULT_USER_NOTIFICATION_PREFS,
   mergeNotificationPrefs,
@@ -48,6 +49,12 @@ export class UsersService {
 
     const existing = await this.findByEmail(email);
     if (existing) {
+      if (isClosedAccount(existing)) {
+        throw new UnauthorizedException({
+          message: 'This account has been closed.',
+          code: 'accountClosed',
+        });
+      }
       if (existing.status !== UserStatus.ACTIVE) {
         throw new UnauthorizedException({
           message: 'Account suspended. Please contact support.',
@@ -141,7 +148,8 @@ export class UsersService {
 
   async closeAccount(userId: string): Promise<void> {
     const user = await this.findByIdOrFail(userId);
-    user.status = UserStatus.SUSPENDED;
+    user.status = UserStatus.CLOSED;
+    user.closedAt = new Date();
     user.email = `closed.${user.id.replace(/-/g, '')}@closed.allaxs.internal`;
     user.name = 'Closed account';
     user.phone = undefined;
@@ -171,6 +179,12 @@ export class UsersService {
 
     let user = await this.findByEmail(email);
     if (user) {
+      if (isClosedAccount(user)) {
+        throw new UnauthorizedException({
+          message: 'This account has been closed.',
+          code: 'accountClosed',
+        });
+      }
       if (user.status !== UserStatus.ACTIVE) {
         throw new UnauthorizedException({
           message: 'Account suspended. Please contact support.',

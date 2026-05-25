@@ -28,6 +28,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { GetUser } from '../auth/decorators/current-user.decorator';
 import type { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role, EventStatus, OrderStatus, UserStatus } from '../domain/enums';
+import { isClosedAccount } from '../users/account-status.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Event } from '../events/entities/event.entity';
@@ -1085,6 +1086,7 @@ export class AdminController {
         phone: row.phone ?? null,
         roles: row.roles,
         status: row.status,
+        closedAt: row.closedAt?.toISOString() ?? null,
         createdAt: row.createdAt,
       })),
       total,
@@ -1244,6 +1246,7 @@ export class AdminController {
         phone: user.phone ?? null,
         roles: user.roles,
         status: user.status,
+        closedAt: user.closedAt?.toISOString() ?? null,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -1468,7 +1471,22 @@ export class AdminController {
       );
     }
 
-    if (userId === user.id && body.status === UserStatus.SUSPENDED) {
+    if (body.status === UserStatus.CLOSED) {
+      throw new BadRequestException(
+        'Closed status is only set when a user closes their own account.',
+      );
+    }
+
+    if (isClosedAccount(targetUser)) {
+      throw new BadRequestException(
+        'This account was closed by the user. To restore access, contact support with the user id.',
+      );
+    }
+
+    if (
+      userId === user.id &&
+      (body.status === UserStatus.SUSPENDED || body.status === UserStatus.CLOSED)
+    ) {
       throw new BadRequestException('You cannot suspend your own account.');
     }
 

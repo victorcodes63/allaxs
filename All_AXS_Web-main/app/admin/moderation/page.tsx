@@ -512,16 +512,16 @@ function AdminModerationPageContent() {
         <div className="space-y-3">
           <p className="text-sm leading-relaxed text-foreground/85">
             {confirmIds.length > 1
-              ? `The same reason (if provided) will be attached to each of the ${confirmIds.length} events. Organisers will see it on their event editor.`
-              : "Provide an optional reason. The organiser will see it on their event editor."}
+              ? `The same note will be attached to each of the ${confirmIds.length} events. Organisers see it on their event editor.`
+              : "Explain what must change before this event can be approved. The organiser sees this on their event editor."}
           </p>
           <Textarea
-            label="Rejection reason (optional)"
+            label="Note for organiser"
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="e.g., Event does not meet our guidelines…"
+            placeholder="e.g. Add a complete venue address and refund policy before approval."
             rows={4}
-            aria-label="Rejection reason"
+            aria-label="Note for organiser"
           />
         </div>
       </Dialog>

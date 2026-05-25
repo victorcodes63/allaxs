@@ -12,6 +12,7 @@ import {
 import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
 
@@ -152,9 +153,8 @@ function ResetPasswordForm() {
             </div>
           )}
 
-          <Input
+          <PasswordInput
             label="New Password"
-            type="password"
             autoComplete="new-password"
             placeholder="••••••••"
             {...register("newPassword")}
@@ -162,9 +162,8 @@ function ResetPasswordForm() {
             disabled={!token}
           />
 
-          <Input
+          <PasswordInput
             label="Confirm New Password"
-            type="password"
             autoComplete="new-password"
             placeholder="••••••••"
             {...register("confirmNewPassword")}
