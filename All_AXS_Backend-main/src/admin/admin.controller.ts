@@ -1483,10 +1483,7 @@ export class AdminController {
       );
     }
 
-    if (
-      userId === user.id &&
-      (body.status === UserStatus.SUSPENDED || body.status === UserStatus.CLOSED)
-    ) {
+    if (userId === user.id && body.status === UserStatus.SUSPENDED) {
       throw new BadRequestException('You cannot suspend your own account.');
     }
 
