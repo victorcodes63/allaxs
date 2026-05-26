@@ -89,7 +89,7 @@ export function AttendeeEventsExploreToolbar({
               name="q"
               placeholder="Search artist, city, venue, or keyword…"
               defaultValue={defaultQuery}
-              className="min-h-[var(--btn-min-h)] w-full rounded-[var(--radius-button)] border border-border/80 bg-background py-2.5 pl-11 pr-4 text-sm text-foreground placeholder:text-muted/75 focus:border-primary/45 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="min-h-[var(--btn-min-h)] w-full rounded-[var(--radius-button)] border border-border/80 bg-background py-2.5 pl-11 pr-4 text-base text-foreground placeholder:text-muted/75 focus:border-primary/45 focus:outline-none focus:ring-2 focus:ring-primary/20 md:text-sm"
               aria-label="Search events"
             />
           </div>

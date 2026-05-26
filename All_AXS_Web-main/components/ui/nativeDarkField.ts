@@ -2,7 +2,8 @@
  * Styling for native `<input>`, `<select>`, and `<textarea>` on dark hub / organiser pages.
  */
 const shellCore = [
-  "w-full rounded-[var(--radius-button)] border px-4 text-sm text-foreground",
+  /** 16px on mobile avoids iOS Safari/PWA focus zoom; `md:text-sm` keeps desktop density. */
+  "w-full rounded-[var(--radius-button)] border px-4 text-base text-foreground md:text-sm",
   "bg-white/[0.07] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
   "placeholder:text-muted/65 scheme-dark",
   "transition-[border-color,box-shadow,opacity]",

@@ -441,7 +441,7 @@ export function HubTopBar({
                     ? "Search submissions…"
                     : "Search your events…"
               }
-              className="h-10 w-full rounded-[var(--radius-button)] border border-border/80 bg-wash/60 py-2 pl-9 pr-16 text-sm text-foreground placeholder:text-muted/70 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] transition-[border-color,box-shadow,background-color] focus:border-primary/40 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/25"
+              className="h-10 w-full rounded-[var(--radius-button)] border border-border/80 bg-wash/60 py-2 pl-9 pr-16 text-base text-foreground placeholder:text-muted/70 shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] transition-[border-color,box-shadow,background-color] focus:border-primary/40 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/25 md:text-sm"
             />
             <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 select-none rounded border border-border/80 bg-background/80 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted xl:inline">
               ⌘K
@@ -731,7 +731,7 @@ export function HubTopBar({
                   ? "Search submissions…"
                   : "Search your events…"
             }
-            className="h-10 w-full rounded-[var(--radius-button)] border border-border/80 bg-wash/60 py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted/70 focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/25"
+            className="h-10 w-full rounded-[var(--radius-button)] border border-border/80 bg-wash/60 py-2 pl-9 pr-3 text-base text-foreground placeholder:text-muted/70 focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/25 md:text-sm"
           />
         </div>
       </form>
