@@ -197,7 +197,12 @@ export function EventDetailsTab({
             : "You do not have permission to unpublish this event",
         );
       } else if (axiosError.response?.status === 404) {
-        setError("Event not found");
+        setError(
+          axiosError.response?.data?.message ||
+            (action === "publish"
+              ? "Publish endpoint not found — redeploy the API, then try again."
+              : "Unpublish endpoint not found — redeploy the API, then try again."),
+        );
       } else {
         const message =
           axiosError.response?.data?.message ||

@@ -295,6 +295,40 @@ export class EventsController {
     return this.eventsService.submitForReview(id, user.id, user.roles);
   }
 
+  @Post(':id/publish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ORGANIZER, Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Publish an approved event (APPROVED → PUBLISHED)',
+  })
+  @ApiParam({ name: 'id', description: 'Event ID' })
+  @ApiResponse({ status: 200, description: 'Event published', type: Event })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async publish(@Param('id') id: string, @GetUser() user: CurrentUser) {
+    return this.eventsService.publish(id, user.id, user.roles);
+  }
+
+  @Post(':id/unpublish')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ORGANIZER, Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Unpublish a live event (PUBLISHED → ARCHIVED)',
+  })
+  @ApiParam({ name: 'id', description: 'Event ID' })
+  @ApiResponse({ status: 200, description: 'Event unpublished' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async unpublish(@Param('id') id: string, @GetUser() user: CurrentUser) {
+    return this.eventsService.unpublish(id, user.id, user.roles);
+  }
+
   /**
    * Commit banner URL to event
    * POST /events/:id/banner/commit
