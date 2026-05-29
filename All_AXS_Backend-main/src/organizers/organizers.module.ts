@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
 import { User } from '../users/entities/user.entity';
@@ -33,6 +33,21 @@ import { OrganizerCustomersService } from './organizer-customers.service';
 import { OrganizerPayoutRequestsController } from './organizer-payout-requests.controller';
 import { OrganizerPayoutRequestsService } from './organizer-payout-requests.service';
 import { PayoutWithdrawRequest } from './entities/payout-withdraw-request.entity';
+import { EventsModule } from '../events/events.module';
+import { AdminModule } from '../admin/admin.module';
+import { AffiliateCode } from './entities/affiliate-code.entity';
+import { AffiliateConversion } from './entities/affiliate-conversion.entity';
+import { WaitlistEntry } from '../events/entities/waitlist-entry.entity';
+import { RefundRequest } from '../domain/refund-request.entity';
+import { OrganizerStoreService } from './organizer-store.service';
+import { OrganizerStoreController } from './organizer-store.controller';
+import { OrganizerScopeService } from './organizer-scope.service';
+import { OrganizerAffiliatesService } from './organizer-affiliates.service';
+import { OrganizerAffiliatesController } from './organizer-affiliates.controller';
+import { OrganizerWaitlistService } from './organizer-waitlist.service';
+import { OrganizerWaitlistController } from './organizer-waitlist.controller';
+import { OrganizerRefundsService } from './organizer-refunds.service';
+import { OrganizerRefundsController } from './organizer-refunds.controller';
 
 @Module({
   imports: [
@@ -47,11 +62,17 @@ import { PayoutWithdrawRequest } from './entities/payout-withdraw-request.entity
       OrganizationMember,
       OrganizationInvite,
       PayoutWithdrawRequest,
+      AffiliateCode,
+      AffiliateConversion,
+      WaitlistEntry,
+      RefundRequest,
     ]),
     AuthModule,
     ScanModule,
     DomainModule,
     UsersModule,
+    EventsModule,
+    forwardRef(() => AdminModule),
   ],
   controllers: [
     OrganizerProfilesController,
@@ -63,6 +84,10 @@ import { PayoutWithdrawRequest } from './entities/payout-withdraw-request.entity
     OrganizationTeamController,
     OrganizerCustomersController,
     OrganizerPayoutRequestsController,
+    OrganizerStoreController,
+    OrganizerAffiliatesController,
+    OrganizerWaitlistController,
+    OrganizerRefundsController,
   ],
   providers: [
     OrganizerProfilesService,
@@ -75,6 +100,11 @@ import { PayoutWithdrawRequest } from './entities/payout-withdraw-request.entity
     OrganizationTeamService,
     OrganizerCustomersService,
     OrganizerPayoutRequestsService,
+    OrganizerStoreService,
+    OrganizerScopeService,
+    OrganizerAffiliatesService,
+    OrganizerWaitlistService,
+    OrganizerRefundsService,
   ],
   exports: [
     OrganizerProfilesService,

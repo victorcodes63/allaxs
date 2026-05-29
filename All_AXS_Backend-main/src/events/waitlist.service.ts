@@ -248,6 +248,46 @@ export class WaitlistService {
     return this.markPurchased(entryId);
   }
 
+  /** Organizer manual notify for a waiting entry. */
+  async notifyEntryById(entryId: string): Promise<void> {
+    const entry = await this.waitlistRepo.findOne({
+      where: { id: entryId },
+      relations: ['tier', 'tier.event'],
+    });
+    if (!entry) {
+      throw new NotFoundException('Waitlist entry not found');
+    }
+    if (entry.status !== WaitlistStatus.WAITING) {
+      throw new BadRequestException('Only waiting entries can be notified');
+    }
+    const tier =
+      entry.tier ??
+      (await this.ticketTypeRepo.findOne({
+        where: { id: entry.tierId },
+        relations: ['event'],
+      }));
+    if (!tier) {
+      throw new NotFoundException('Ticket tier not found');
+    }
+    await this.notifyEntry(entry, tier);
+  }
+
+  /** Organizer cancel for a non-purchased waitlist entry. */
+  async cancelEntryById(entryId: string): Promise<void> {
+    const entry = await this.waitlistRepo.findOne({ where: { id: entryId } });
+    if (!entry) {
+      throw new NotFoundException('Waitlist entry not found');
+    }
+    if (
+      entry.status === WaitlistStatus.PURCHASED ||
+      entry.status === WaitlistStatus.CANCELLED
+    ) {
+      throw new BadRequestException('This waitlist entry cannot be cancelled');
+    }
+    entry.status = WaitlistStatus.CANCELLED;
+    await this.waitlistRepo.save(entry);
+  }
+
   signPurchaseToken(entryId: string, expiresAt: Date): string {
     const exp = expiresAt.getTime();
     const payload = `${entryId}.${exp}`;

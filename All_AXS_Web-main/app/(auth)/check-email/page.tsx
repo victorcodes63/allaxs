@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import {
   fetchPostAuthSnapshot,
   parseIntent,
+  promoteHostIntentIfNeeded,
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
 import { useSearchParams } from "next/navigation";
@@ -34,10 +35,12 @@ function CheckEmailContent() {
     }
     if (user.emailVerified === true) {
       void (async () => {
+        const intent = parseIntent(searchParams.get("intent"));
+        await promoteHostIntentIfNeeded(intent);
         const snapshot = await fetchPostAuthSnapshot();
         const path = resolvePostAuthRedirect({
           nextParam: searchParams.get("next"),
-          intent: parseIntent(searchParams.get("intent")),
+          intent,
           roles: snapshot.roles,
           hasOrganizerProfile: snapshot.hasOrganizerProfile,
         });
@@ -61,11 +64,13 @@ function CheckEmailContent() {
   };
 
   const continueToApp = async () => {
+    const intent = parseIntent(searchParams.get("intent"));
+    await promoteHostIntentIfNeeded(intent);
     const snapshot = await fetchPostAuthSnapshot();
     await refresh();
     const path = resolvePostAuthRedirect({
       nextParam: searchParams.get("next"),
-      intent: parseIntent(searchParams.get("intent")),
+      intent,
       roles: snapshot.roles,
       hasOrganizerProfile: snapshot.hasOrganizerProfile,
     });

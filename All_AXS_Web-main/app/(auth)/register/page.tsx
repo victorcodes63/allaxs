@@ -15,7 +15,11 @@ import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
-import { buildAuthQuery, parseIntent } from "@/lib/auth/post-auth-redirect";
+import {
+  buildAuthQuery,
+  parseIntent,
+  promoteHostIntentIfNeeded,
+} from "@/lib/auth/post-auth-redirect";
 import { useAuth } from "@/lib/auth";
 
 const AUTH_SUBTITLE = "One account for fans and hosts.";
@@ -50,9 +54,10 @@ function RegisterForm() {
       const response = await axios.post("/api/auth/register", data);
 
       if (response.status === 200 || response.status === 201) {
+        const intent = parseIntent(searchParams.get("intent"));
+        await promoteHostIntentIfNeeded(intent);
         await refreshAuth();
         const next = searchParams.get("next");
-        const intent = parseIntent(searchParams.get("intent"));
         const query = new URLSearchParams();
         if (next) query.set("next", next);
         if (intent) query.set("intent", intent);

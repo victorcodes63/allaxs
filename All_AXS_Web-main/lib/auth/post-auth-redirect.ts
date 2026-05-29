@@ -12,6 +12,18 @@ export function parseIntent(raw: string | null): AuthIntent | null {
   return null;
 }
 
+/** When the user chose "Host" at sign-in/register, grant ORGANIZER if the API allows it. */
+export async function promoteHostIntentIfNeeded(
+  intent: AuthIntent | null,
+): Promise<void> {
+  if (intent !== "host") return;
+  try {
+    await axios.post("/api/auth/promote-organizer");
+  } catch {
+    /* onboarding may retry; production API needs ENABLE_PROMOTE_ORGANIZER_ROLE=true */
+  }
+}
+
 /**
  * When the path picker is omitted, infer a sensible default from JWT roles.
  */
@@ -108,7 +120,7 @@ function hostLandingPath(
   hasOrganizerProfile: boolean,
 ): string {
   if (rolesIncludeAdmin(roles)) return "/admin";
-  if (!roles.includes("ORGANIZER")) return "/dashboard";
+  if (!roles.includes("ORGANIZER")) return "/organizer/onboarding";
   if (!hasOrganizerProfile) return "/organizer/onboarding";
   return "/organizer/dashboard";
 }

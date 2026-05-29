@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminAuditLog } from './entities/admin-audit-log.entity';
 import { AdminAuditService } from './admin-audit.service';
@@ -46,7 +46,7 @@ import { PaymentsModule } from '../payments/payments.module';
     UsersModule,
     DomainModule,
     ScanModule,
-    OrganizersModule,
+    forwardRef(() => OrganizersModule),
     PaymentsModule,
   ],
   controllers: [
@@ -62,6 +62,6 @@ import { PaymentsModule } from '../payments/payments.module';
     PayoutBatchesService,
     RefundRequestsService,
   ],
-  exports: [AdminAuditService, RefundRequestsService],
+  exports: [AdminAuditService, RefundRequestsService, OrderRefundService],
 })
 export class AdminModule {}

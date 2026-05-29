@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import {
   fetchPostAuthSnapshot,
   parseIntent,
+  promoteHostIntentIfNeeded,
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
 
@@ -24,11 +25,13 @@ export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
     let cancelled = false;
     void (async () => {
       try {
+        const intent = parseIntent(searchParams.get("intent"));
+        await promoteHostIntentIfNeeded(intent);
         const snapshot = await fetchPostAuthSnapshot();
         if (cancelled) return;
         const path = resolvePostAuthRedirect({
           nextParam: searchParams.get("next"),
-          intent: parseIntent(searchParams.get("intent")),
+          intent,
           roles: snapshot.roles,
           hasOrganizerProfile: snapshot.hasOrganizerProfile,
         });

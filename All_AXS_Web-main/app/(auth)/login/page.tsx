@@ -19,6 +19,7 @@ import {
   buildAuthQuery,
   fetchPostAuthSnapshot,
   parseIntent,
+  promoteHostIntentIfNeeded,
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
 import { useAuth } from "@/lib/auth";
@@ -53,11 +54,13 @@ function LoginForm() {
       const response = await axios.post("/api/auth/login", data);
 
       if (response.status === 200) {
+        const intent = parseIntent(searchParams.get("intent"));
+        await promoteHostIntentIfNeeded(intent);
         const snapshot = await fetchPostAuthSnapshot();
         await refreshAuth();
         const path = resolvePostAuthRedirect({
           nextParam: searchParams.get("next"),
-          intent: parseIntent(searchParams.get("intent")),
+          intent,
           roles: snapshot.roles,
           hasOrganizerProfile: snapshot.hasOrganizerProfile,
         });

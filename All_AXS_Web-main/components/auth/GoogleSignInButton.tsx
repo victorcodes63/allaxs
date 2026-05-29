@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   fetchPostAuthSnapshot,
   parseIntent,
+  promoteHostIntentIfNeeded,
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
 import { useAuth } from "@/lib/auth";
@@ -88,6 +89,7 @@ export function GoogleSignInButton({ nextParam, intentParam }: GoogleSignInButto
       setError(null);
       try {
         await axios.post("/api/auth/google", { credential: cred.credential });
+        await promoteHostIntentIfNeeded(intent);
         const snapshot = await fetchPostAuthSnapshot();
         await refreshAuth();
         const path = resolvePostAuthRedirect({
