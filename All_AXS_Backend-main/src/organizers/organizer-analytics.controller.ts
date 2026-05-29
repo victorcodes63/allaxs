@@ -37,4 +37,26 @@ export class OrganizerAnalyticsController {
       eventId,
     );
   }
+
+  @Get('analytics/insights')
+  @ApiOperation({
+    summary:
+      'Per-event insights: tier revenue, scan rate, traffic sources, and timeline',
+  })
+  @ApiQuery({ name: 'eventId', required: true })
+  @ApiQuery({ name: 'from', required: false, description: 'ISO start (inclusive)' })
+  @ApiQuery({ name: 'to', required: false, description: 'ISO end (inclusive)' })
+  async analyticsInsights(
+    @GetUser() user: CurrentUser,
+    @Query('eventId') eventId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.organizerAnalyticsService.getEventInsights(
+      user.id,
+      eventId,
+      from,
+      to,
+    );
+  }
 }

@@ -8,7 +8,11 @@ import { Repository } from 'typeorm';
 import { OrganizerProfile } from '../users/entities/organizer-profile.entity';
 import { Event } from '../events/entities/event.entity';
 import { Order } from '../domain/order.entity';
-import { OrderStatus } from '../domain/enums';
+import { OrderItem } from '../domain/order-item.entity';
+import { Ticket } from '../domain/ticket.entity';
+import { TicketType } from '../events/entities/ticket-type.entity';
+import { OrderStatus, TicketStatus } from '../domain/enums';
+import { OrganizerScopeService } from './organizer-scope.service';
 
 const TREND_DAYS = 14;
 
@@ -41,6 +45,37 @@ export type OrganizerAnalyticsSummary = {
   dailySales: OrganizerDailySalesPoint[];
 };
 
+export type OrganizerEventInsights = {
+  rangeStart: string | null;
+  rangeEnd: string | null;
+  scanned: number;
+  totalIssued: number;
+  scanRate: number;
+  totalRevenueCents: number;
+  totalNetCents: number;
+  currency: string;
+  tiers: Array<{
+    tierId: string;
+    name: string;
+    ticketsSold: number;
+    capacity: number;
+    grossCents: number;
+    netCents: number;
+    currency: string;
+  }>;
+  trafficSources: Array<{
+    source: string;
+    visits: number;
+    conversions: number;
+    revenueCents: number;
+  }>;
+  timeline: Array<{
+    date: string;
+    ticketsSold: number;
+    grossCents: number;
+  }>;
+};
+
 @Injectable()
 export class OrganizerAnalyticsService {
   constructor(
@@ -50,6 +85,13 @@ export class OrganizerAnalyticsService {
     private readonly eventRepository: Repository<Event>,
     @InjectRepository(Order)
     private readonly orderRepository: Repository<Order>,
+    @InjectRepository(OrderItem)
+    private readonly orderItemRepository: Repository<OrderItem>,
+    @InjectRepository(Ticket)
+    private readonly ticketRepository: Repository<Ticket>,
+    @InjectRepository(TicketType)
+    private readonly ticketTypeRepository: Repository<TicketType>,
+    private readonly scopeService: OrganizerScopeService,
   ) {}
 
   private async getOrganizerProfileOrThrow(
@@ -208,6 +250,242 @@ export class OrganizerAnalyticsService {
       },
       conversionRate,
       dailySales: this.buildDailyTrend(trendStart, dailyRows),
+    };
+  }
+
+  private parseInsightRange(
+    fromRaw?: string,
+    toRaw?: string,
+  ): { from: Date; to: Date } {
+    const now = new Date();
+    const to = toRaw ? new Date(toRaw) : now;
+    const from = fromRaw
+      ? new Date(fromRaw)
+      : new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new ForbiddenException('Invalid date range');
+    }
+    if (from.getTime() > to.getTime()) {
+      throw new ForbiddenException('`from` must be before `to`');
+    }
+    return { from, to };
+  }
+
+  private trafficSourceLabel(order: Order): string {
+    const utm = order.utmSource?.trim();
+    if (utm) return utm.toLowerCase();
+    const affiliate = order.affiliateCode?.trim();
+    if (affiliate) return `affiliate:${affiliate.toLowerCase()}`;
+    const ref = order.referrer?.trim();
+    if (ref) {
+      try {
+        const host = new URL(ref).hostname.replace(/^www\./, '');
+        if (host) return host;
+      } catch {
+        return ref.slice(0, 80);
+      }
+    }
+    return 'direct';
+  }
+
+  async getEventInsights(
+    userId: string,
+    eventId: string,
+    fromRaw?: string,
+    toRaw?: string,
+  ): Promise<OrganizerEventInsights> {
+    const trimmedEventId = eventId?.trim();
+    if (!trimmedEventId) {
+      throw new NotFoundException('eventId is required');
+    }
+
+    await this.scopeService.assertEventOwned(userId, trimmedEventId);
+    const { from, to } = this.parseInsightRange(fromRaw, toRaw);
+
+    const ticketTypes = await this.ticketTypeRepository.find({
+      where: { eventId: trimmedEventId },
+      order: { createdAt: 'ASC' },
+    });
+    const currency =
+      ticketTypes.find((t) => t.currency)?.currency ?? 'KES';
+
+    const paidOrders = await this.orderRepository
+      .createQueryBuilder('o')
+      .where('o.event_id = :eventId', { eventId: trimmedEventId })
+      .andWhere('o.status = :status', { status: OrderStatus.PAID })
+      .andWhere('o."createdAt" >= :from', { from })
+      .andWhere('o."createdAt" <= :to', { to })
+      .getMany();
+
+    const orderIds = paidOrders.map((o) => o.id);
+    const totalRevenueCents = paidOrders.reduce(
+      (sum, o) => sum + toInt(o.amountCents),
+      0,
+    );
+    const totalNetCents = paidOrders.reduce(
+      (sum, o) => sum + toInt(o.amountCents) - toInt(o.feesCents),
+      0,
+    );
+
+    let totalIssued = 0;
+    let scanned = 0;
+    if (orderIds.length > 0) {
+      const ticketRows = await this.ticketRepository
+        .createQueryBuilder('t')
+        .select('t.status', 'status')
+        .addSelect('COUNT(t.id)', 'count')
+        .where('t.order_id IN (:...orderIds)', { orderIds })
+        .andWhere('t.status <> :void', { void: TicketStatus.VOID })
+        .groupBy('t.status')
+        .getRawMany<{ status: TicketStatus; count: string }>();
+
+      for (const row of ticketRows) {
+        const count = toInt(row.count);
+        totalIssued += count;
+        if (row.status === TicketStatus.CHECKED_IN) {
+          scanned += count;
+        }
+      }
+    }
+
+    const tierStats = new Map<
+      string,
+      { ticketsSold: number; grossCents: number; netCents: number }
+    >();
+    for (const tier of ticketTypes) {
+      tierStats.set(tier.id, {
+        ticketsSold: 0,
+        grossCents: 0,
+        netCents: 0,
+      });
+    }
+
+    if (orderIds.length > 0) {
+      const itemRows = await this.orderItemRepository
+        .createQueryBuilder('i')
+        .innerJoin('i.order', 'o')
+        .select('i.ticket_type_id', 'tierId')
+        .addSelect('SUM(i.qty)', 'qty')
+        .addSelect('SUM(i.qty * i.unit_price_cents)', 'grossCents')
+        .where('i.order_id IN (:...orderIds)', { orderIds })
+        .groupBy('i.ticket_type_id')
+        .getRawMany<{ tierId: string; qty: string; grossCents: string }>();
+
+      for (const row of itemRows) {
+        const slot = tierStats.get(row.tierId) ?? {
+          ticketsSold: 0,
+          grossCents: 0,
+          netCents: 0,
+        };
+        const gross = toInt(row.grossCents);
+        slot.ticketsSold += toInt(row.qty);
+        slot.grossCents += gross;
+        slot.netCents += gross;
+        tierStats.set(row.tierId, slot);
+      }
+    }
+
+    const feeRatio =
+      totalRevenueCents > 0
+        ? (totalRevenueCents - totalNetCents) / totalRevenueCents
+        : 0;
+
+    const tiers = ticketTypes.map((tier) => {
+      const stats = tierStats.get(tier.id) ?? {
+        ticketsSold: 0,
+        grossCents: 0,
+        netCents: 0,
+      };
+      const netCents = Math.round(stats.grossCents * (1 - feeRatio));
+      return {
+        tierId: tier.id,
+        name: tier.name,
+        ticketsSold: stats.ticketsSold,
+        capacity: tier.quantityTotal,
+        grossCents: stats.grossCents,
+        netCents,
+        currency: tier.currency || currency,
+      };
+    });
+
+    const trafficMap = new Map<
+      string,
+      { conversions: number; revenueCents: number }
+    >();
+    for (const order of paidOrders) {
+      const source = this.trafficSourceLabel(order);
+      const slot = trafficMap.get(source) ?? {
+        conversions: 0,
+        revenueCents: 0,
+      };
+      slot.conversions += 1;
+      slot.revenueCents += toInt(order.amountCents);
+      trafficMap.set(source, slot);
+    }
+    const trafficSources = [...trafficMap.entries()]
+      .map(([source, stats]) => ({
+        source,
+        visits: 0,
+        conversions: stats.conversions,
+        revenueCents: stats.revenueCents,
+      }))
+      .sort((a, b) => b.revenueCents - a.revenueCents);
+
+    const dailyRows =
+      orderIds.length === 0
+        ? []
+        : await this.orderRepository
+            .createQueryBuilder('o')
+            .select(
+              `TO_CHAR(DATE_TRUNC('day', o."createdAt"), 'YYYY-MM-DD')`,
+              'date',
+            )
+            .addSelect('COUNT(o.id)', 'orders')
+            .addSelect('COALESCE(SUM(o.amountCents), 0)', 'grossCents')
+            .where('o.id IN (:...orderIds)', { orderIds })
+            .groupBy(`DATE_TRUNC('day', o."createdAt")`)
+            .orderBy(`DATE_TRUNC('day', o."createdAt")`, 'ASC')
+            .getRawMany<{ date: string; orders: string; grossCents: string }>();
+
+    let ticketsByDay: Array<{ date: string; ticketsSold: string }> = [];
+    if (orderIds.length > 0) {
+      ticketsByDay = await this.ticketRepository
+        .createQueryBuilder('t')
+        .innerJoin('t.order', 'o')
+        .select(
+          `TO_CHAR(DATE_TRUNC('day', o."createdAt"), 'YYYY-MM-DD')`,
+          'date',
+        )
+        .addSelect('COUNT(t.id)', 'ticketsSold')
+        .where('t.order_id IN (:...orderIds)', { orderIds })
+        .andWhere('t.status <> :void', { void: TicketStatus.VOID })
+        .groupBy(`DATE_TRUNC('day', o."createdAt")`)
+        .getRawMany<{ date: string; ticketsSold: string }>();
+    }
+
+    const ticketsByDate = new Map(
+      ticketsByDay.map((row) => [row.date, toInt(row.ticketsSold)]),
+    );
+    const timeline = dailyRows.map((row) => ({
+      date: row.date,
+      ticketsSold: ticketsByDate.get(row.date) ?? toInt(row.orders),
+      grossCents: toInt(row.grossCents),
+    }));
+
+    const scanRate = totalIssued > 0 ? scanned / totalIssued : 0;
+
+    return {
+      rangeStart: from.toISOString(),
+      rangeEnd: to.toISOString(),
+      scanned,
+      totalIssued,
+      scanRate,
+      totalRevenueCents,
+      totalNetCents,
+      currency,
+      tiers,
+      trafficSources,
+      timeline,
     };
   }
 }

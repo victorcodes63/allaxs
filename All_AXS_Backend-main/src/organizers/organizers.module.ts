@@ -12,6 +12,7 @@ import { Event } from '../events/entities/event.entity';
 import { Order } from '../domain/order.entity';
 import { OrderItem } from '../domain/order-item.entity';
 import { Ticket } from '../domain/ticket.entity';
+import { TicketType } from '../events/entities/ticket-type.entity';
 import { AuthModule } from '../auth/auth.module';
 import { ScanModule } from '../scan/scan.module';
 import { DomainModule } from '../domain/domain.module';
@@ -58,6 +59,7 @@ import { OrganizerRefundsController } from './organizer-refunds.controller';
       Order,
       OrderItem,
       Ticket,
+      TicketType,
       AdminAuditLog,
       OrganizationMember,
       OrganizationInvite,
