@@ -34,57 +34,59 @@ export function Dialog({
 }: DialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (open) {
-      previousFocusRef.current = document.activeElement as HTMLElement;
+    if (!open) return;
 
-      const firstFocusable = dialogRef.current?.querySelector(
+    previousFocusRef.current = document.activeElement as HTMLElement;
+
+    const firstFocusable = dialogRef.current?.querySelector(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    ) as HTMLElement;
+    firstFocusable?.focus();
+
+    const handleTab = (e: KeyboardEvent) => {
+      if (!dialogRef.current) return;
+
+      const focusableElements = dialogRef.current.querySelectorAll(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      ) as HTMLElement;
-      firstFocusable?.focus();
+      );
+      const firstElement = focusableElements[0] as HTMLElement;
+      const lastElement = focusableElements[
+        focusableElements.length - 1
+      ] as HTMLElement;
 
-      const handleTab = (e: KeyboardEvent) => {
-        if (!dialogRef.current) return;
-
-        const focusableElements = dialogRef.current.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
-        const firstElement = focusableElements[0] as HTMLElement;
-        const lastElement = focusableElements[
-          focusableElements.length - 1
-        ] as HTMLElement;
-
-        if (e.key === "Tab") {
-          if (e.shiftKey) {
-            if (document.activeElement === firstElement) {
-              e.preventDefault();
-              lastElement?.focus();
-            }
-          } else if (document.activeElement === lastElement) {
+      if (e.key === "Tab") {
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
             e.preventDefault();
-            firstElement?.focus();
+            lastElement?.focus();
           }
+        } else if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
         }
-      };
+      }
+    };
 
-      document.addEventListener("keydown", handleTab);
+    document.addEventListener("keydown", handleTab);
 
-      const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-          onClose();
-        }
-      };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onCloseRef.current();
+      }
+    };
 
-      document.addEventListener("keydown", handleEscape);
+    document.addEventListener("keydown", handleEscape);
 
-      return () => {
-        document.removeEventListener("keydown", handleTab);
-        document.removeEventListener("keydown", handleEscape);
-        previousFocusRef.current?.focus();
-      };
-    }
-  }, [open, onClose]);
+    return () => {
+      document.removeEventListener("keydown", handleTab);
+      document.removeEventListener("keydown", handleEscape);
+      previousFocusRef.current?.focus();
+    };
+  }, [open]);
 
   if (!open) return null;
 

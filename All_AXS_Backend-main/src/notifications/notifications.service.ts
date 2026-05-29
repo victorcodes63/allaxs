@@ -228,8 +228,12 @@ export class NotificationsService {
 
   async enqueueTicketEmail(
     input: TicketEmailNotificationInput,
+    options?: { transactional?: boolean },
   ): Promise<Notification | null> {
-    if (!(await this.usersService.shouldSendOrdersEmail(input.buyerEmail))) {
+    if (
+      !options?.transactional &&
+      !(await this.usersService.shouldSendOrdersEmail(input.buyerEmail))
+    ) {
       this.logger.log(
         `Skipping ticket email to ${input.buyerEmail} (ordersEmail preference off)`,
       );
@@ -245,8 +249,9 @@ export class NotificationsService {
 
   async dispatchTicketEmail(
     input: TicketEmailNotificationInput,
+    options?: { transactional?: boolean },
   ): Promise<Notification | null> {
-    const notification = await this.enqueueTicketEmail(input);
+    const notification = await this.enqueueTicketEmail(input, options);
     if (!notification) return null;
     await this.processNotification(notification.id);
     return (
@@ -258,8 +263,12 @@ export class NotificationsService {
 
   async enqueuePaymentReceiptEmail(
     input: PaymentReceiptNotificationInput,
+    options?: { transactional?: boolean },
   ): Promise<Notification | null> {
-    if (!(await this.usersService.shouldSendOrdersEmail(input.buyerEmail))) {
+    if (
+      !options?.transactional &&
+      !(await this.usersService.shouldSendOrdersEmail(input.buyerEmail))
+    ) {
       this.logger.log(
         `Skipping payment receipt to ${input.buyerEmail} (ordersEmail preference off)`,
       );
@@ -275,8 +284,9 @@ export class NotificationsService {
 
   async dispatchPaymentReceiptEmail(
     input: PaymentReceiptNotificationInput,
+    options?: { transactional?: boolean },
   ): Promise<Notification | null> {
-    const notification = await this.enqueuePaymentReceiptEmail(input);
+    const notification = await this.enqueuePaymentReceiptEmail(input, options);
     if (!notification) return null;
     await this.processNotification(notification.id);
     return (

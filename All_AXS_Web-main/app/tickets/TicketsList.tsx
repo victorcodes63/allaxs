@@ -196,6 +196,11 @@ export function TicketsList() {
     return (
       <div className="rounded-[var(--radius-panel)] border border-dashed border-border bg-surface/60 px-8 py-16 text-center space-y-4">
         <p className="text-lg text-muted">No tickets yet—complete checkout on a published event.</p>
+        {apiCheckout ? (
+          <p className="text-sm text-muted max-w-md mx-auto leading-relaxed">
+            Bought tickets recently? Sign in with the <strong className="text-foreground font-medium">same email you used at checkout</strong>—tickets are linked to that address, not necessarily this account.
+          </p>
+        ) : null}
         <ArrowCtaLink href="/dashboard/events" variant="primary">
           Find an event
         </ArrowCtaLink>

@@ -4,100 +4,89 @@ import { useEffect, useState } from "react";
 import axios, { isAxiosError } from "axios";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import {
-  RefundAmountSelector,
-  refundSelectionToPayload,
-  type RefundAmountSelection,
-} from "@/components/admin/RefundAmountSelector";
-import { resolveRefundPreview } from "@/lib/refunds/policy";
 
-export interface RefundOrderTarget {
+export interface ReassignOrderBuyerTarget {
   id: string;
   reference?: string | null;
-  amountCents: number;
-  currency: string;
   email: string;
   status: string;
 }
 
-interface RefundOrderDialogProps {
-  order: RefundOrderTarget | null;
+interface ReassignOrderBuyerDialogProps {
+  order: ReassignOrderBuyerTarget | null;
   onClose: () => void;
-  onRefunded: () => void;
-}
-
-function formatMajor(cents: number): string {
-  return (cents / 100).toFixed(2);
+  onReassigned: (message: string) => void;
 }
 
 /**
- * Admin refund flow for `/admin/orders`. Supports policy (75%), full, or custom
- * amounts via `POST /api/admin/orders/:id/refund`.
+ * Admin flow to correct a typo in the checkout buyer email on a paid order.
+ * Updates order + ticket ownership and optionally resends tickets.
  */
-export function RefundOrderDialog({
+export function ReassignOrderBuyerDialog({
   order,
   onClose,
-  onRefunded,
-}: RefundOrderDialogProps) {
+  onReassigned,
+}: ReassignOrderBuyerDialogProps) {
+  const [newEmail, setNewEmail] = useState("");
   const [reason, setReason] = useState("");
-  const [refundSelection, setRefundSelection] = useState<RefundAmountSelection>({
-    refundMode: "POLICY",
-  });
+  const [resendTickets, setResendTickets] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (order) {
-      setReason("");
-      setRefundSelection({ refundMode: "POLICY" });
-      setError(null);
-    }
+    if (!order) return;
+    setNewEmail("");
+    setReason("");
+    setResendTickets(true);
+    setError(null);
   }, [order?.id]);
 
   if (!order) return null;
 
-  const totalLabel = `${order.currency} ${formatMajor(order.amountCents)}`;
-
   const submit = async () => {
     setError(null);
-
-    const preview = resolveRefundPreview(
-      order.amountCents,
-      refundSelection.refundMode,
-      refundSelection.customAmountCents,
-    );
-    if (
-      refundSelection.refundMode === "CUSTOM" &&
-      (!refundSelection.customAmountCents ||
-        refundSelection.customAmountCents <= 0 ||
-        refundSelection.customAmountCents > order.amountCents)
-    ) {
-      setError("Enter a valid custom refund amount.");
+    const trimmed = newEmail.trim();
+    if (!trimmed) {
+      setError("Enter the corrected buyer email.");
       return;
     }
-    if (preview.refundAmountCents <= 0) {
-      setError("Refund amount must be greater than zero.");
+    if (trimmed.toLowerCase() === order.email.trim().toLowerCase()) {
+      setError("New email must differ from the current buyer email.");
       return;
     }
 
     setSubmitting(true);
     try {
-      await axios.post(`/api/admin/orders/${order.id}/refund`, {
+      const response = await axios.post<{
+        previousEmail: string;
+        newEmail: string;
+        ticketCount: number;
+        ticketsResent: boolean;
+      }>(`/api/admin/orders/${order.id}/reassign-buyer`, {
+        newEmail: trimmed,
         reason: reason.trim() || undefined,
-        ...refundSelectionToPayload(refundSelection),
+        resendTickets,
       });
-      onRefunded();
+
+      const { previousEmail, newEmail: corrected, ticketCount, ticketsResent } =
+        response.data;
+      let message = `Buyer email updated from ${previousEmail} to ${corrected} (${ticketCount} ticket${ticketCount === 1 ? "" : "s"} relinked).`;
+      if (ticketsResent) {
+        message += " Tickets emailed to the corrected address.";
+      }
+      onReassigned(message);
     } catch (err) {
-      const fallback = "Failed to refund order. Please try again.";
+      const fallback = "Failed to reassign buyer email. Please try again.";
       if (isAxiosError(err)) {
         const status = err.response?.status;
         const apiMessage = (err.response?.data as { message?: string } | undefined)
           ?.message;
         if (status === 400) {
-          setError(apiMessage ?? "Order cannot be refunded right now.");
+          setError(apiMessage ?? "This order cannot be reassigned right now.");
         } else if (status === 403) {
-          setError("You do not have permission to refund orders.");
+          setError("You do not have permission to reassign buyer emails.");
         } else if (status === 404) {
           setError("Order not found.");
         } else {
@@ -117,8 +106,8 @@ export function RefundOrderDialog({
       onClose={() => {
         if (!submitting) onClose();
       }}
-      title="Refund order"
-      ariaLabel="Refund order dialog"
+      title="Reassign buyer email"
+      ariaLabel="Reassign buyer email dialog"
       footer={
         <div className="flex gap-3">
           <Button
@@ -133,9 +122,9 @@ export function RefundOrderDialog({
             variant="primary"
             onClick={() => void submit()}
             disabled={submitting}
-            className="w-auto bg-red-600 text-white hover:bg-red-700"
+            className="w-auto"
           >
-            {submitting ? "Refunding…" : "Issue refund"}
+            {submitting ? "Saving…" : "Reassign & relink tickets"}
           </Button>
         </div>
       }
@@ -146,6 +135,11 @@ export function RefundOrderDialog({
             {error}
           </div>
         ) : null}
+
+        <p className="text-sm leading-relaxed text-muted">
+          Use this when checkout captured the wrong email (typo). The order and
+          all tickets move to the corrected address and attendee account.
+        </p>
 
         <dl className="grid grid-cols-1 gap-2 rounded-[var(--radius-panel)] border border-border/70 bg-surface/70 p-3 text-xs sm:grid-cols-2">
           <div>
@@ -158,15 +152,9 @@ export function RefundOrderDialog({
           </div>
           <div>
             <dt className="font-semibold uppercase tracking-[0.14em] text-muted">
-              Buyer
+              Current buyer
             </dt>
             <dd className="mt-0.5 truncate text-foreground/90">{order.email}</dd>
-          </div>
-          <div>
-            <dt className="font-semibold uppercase tracking-[0.14em] text-muted">
-              Order total
-            </dt>
-            <dd className="mt-0.5 text-foreground/90">{totalLabel}</dd>
           </div>
           <div>
             <dt className="font-semibold uppercase tracking-[0.14em] text-muted">
@@ -178,24 +166,38 @@ export function RefundOrderDialog({
           </div>
         </dl>
 
-        <RefundAmountSelector
-          orderAmountCents={order.amountCents}
-          currency={order.currency}
-          value={refundSelection}
-          onChange={setRefundSelection}
+        <Input
+          label="Corrected buyer email"
+          type="email"
+          value={newEmail}
+          onChange={(event) => setNewEmail(event.target.value)}
+          placeholder="buyer@example.com"
+          autoComplete="email"
         />
 
         <Textarea
           label="Reason (optional)"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="e.g. Buyer requested cancellation."
+          placeholder="e.g. Typo at guest checkout — buyer confirmed correct address."
           rows={3}
         />
 
+        <label className="flex cursor-pointer items-start gap-2.5 text-sm text-foreground/90">
+          <input
+            type="checkbox"
+            checked={resendTickets}
+            onChange={(event) => setResendTickets(event.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-border bg-surface text-primary focus:ring-primary/30"
+          />
+          <span>
+            Email tickets to the corrected address after reassignment
+          </span>
+        </label>
+
         <p className="text-xs leading-relaxed text-muted">
-          Paystack is called with the selected refund amount. Demo orders skip the
-          provider. The action is logged in the admin audit trail.
+          Only paid orders with issued tickets can be reassigned. The action is
+          logged in the admin audit trail.
         </p>
       </div>
     </Dialog>

@@ -33,12 +33,15 @@ function escapeLike(raw: string): string {
 }
 
 export type OrganizerCustomerRow = {
+  id: string;
   email: string;
   name: string;
-  totalOrders: number;
+  ordersCount: number;
+  ticketsCount: number;
   totalSpentCents: number;
   currency: string;
-  lastOrderAt: string;
+  firstOrderAt: string | null;
+  lastOrderAt: string | null;
   eventIds: string[];
 };
 
@@ -89,6 +92,18 @@ export class OrganizerCustomersService {
     return profile;
   }
 
+  private paidOrdersBaseQuery(profileId: string) {
+    return this.orderRepository
+      .createQueryBuilder('o')
+      .innerJoin('o.event', 'e')
+      .innerJoin('e.organizer', 'org')
+      .leftJoin('o.items', 'items')
+      .where('org.id = :profileId', { profileId })
+      .andWhere('o.status = :paid', { paid: OrderStatus.PAID })
+      .andWhere('o.email IS NOT NULL')
+      .andWhere("TRIM(o.email) <> ''");
+  }
+
   async listCustomers(
     userId: string,
     opts: { q?: string; limit: number; offset: number },
@@ -100,10 +115,11 @@ export class OrganizerCustomersService {
   }> {
     const profile = await this.getOrganizerProfileOrThrow(userId);
 
-    const baseQb = this.orderRepository
+    const ordersQb = this.orderRepository
       .createQueryBuilder('o')
       .innerJoin('o.event', 'e')
       .innerJoin('e.organizer', 'org')
+      .leftJoinAndSelect('o.items', 'items')
       .where('org.id = :profileId', { profileId: profile.id })
       .andWhere('o.status = :paid', { paid: OrderStatus.PAID })
       .andWhere('o.email IS NOT NULL')
@@ -111,7 +127,7 @@ export class OrganizerCustomersService {
 
     if (opts.q?.trim()) {
       const needle = `%${escapeLike(opts.q.trim())}%`;
-      baseQb.andWhere(
+      ordersQb.andWhere(
         new Brackets((w) => {
           w.where('o.email ILIKE :needle ESCAPE :esc', { needle, esc: '\\' });
           w.orWhere("COALESCE(o.notes, '') ILIKE :needle ESCAPE :esc", {
@@ -122,94 +138,84 @@ export class OrganizerCustomersService {
       );
     }
 
-    const groupedQb = baseQb
-      .clone()
-      .select('LOWER(o.email)', 'emailKey')
-      .addSelect('MAX(o.email)', 'email')
-      .addSelect('COUNT(o.id)', 'totalOrders')
-      .addSelect('SUM(o.amountCents)', 'totalSpentCents')
-      .addSelect('MAX(o.createdAt)', 'lastOrderAt')
-      .addSelect('MAX(o.currency)', 'currency')
-      .groupBy('LOWER(o.email)');
+    const orders = await ordersQb.orderBy('o.createdAt', 'DESC').getMany();
 
-    const totalRows = await this.orderRepository.manager
-      .createQueryBuilder()
-      .select('COUNT(*)', 'count')
-      .from(`(${groupedQb.getQuery()})`, 'sub')
-      .setParameters(groupedQb.getParameters())
-      .getRawOne<{ count: string }>();
-    const total = toInt(totalRows?.count);
+    type Agg = {
+      email: string;
+      emailKey: string;
+      ordersCount: number;
+      ticketsCount: number;
+      totalSpentCents: number;
+      currency: string;
+      firstOrderAt: Date | null;
+      lastOrderAt: Date | null;
+      eventIds: Set<string>;
+      name: string;
+    };
 
-    const rows = await groupedQb
-      .orderBy('MAX(o.createdAt)', 'DESC')
-      .offset(opts.offset)
-      .limit(opts.limit)
-      .getRawMany<{
-        emailKey: string;
-        email: string;
-        totalOrders: string;
-        totalSpentCents: string;
-        lastOrderAt: string;
-        currency: string;
-      }>();
+    const byEmail = new Map<string, Agg>();
 
-    if (rows.length === 0) {
-      return { customers: [], total, limit: opts.limit, offset: opts.offset };
+    for (const order of orders) {
+      const email = order.email.trim();
+      const emailKey = email.toLowerCase();
+      if (!emailKey) continue;
+
+      let agg = byEmail.get(emailKey);
+      if (!agg) {
+        agg = {
+          email,
+          emailKey,
+          ordersCount: 0,
+          ticketsCount: 0,
+          totalSpentCents: 0,
+          currency: normalizeCurrencyCode(order.currency),
+          firstOrderAt: null,
+          lastOrderAt: null,
+          eventIds: new Set<string>(),
+          name: parseBuyerNameFromNotes(order.notes),
+        };
+        byEmail.set(emailKey, agg);
+      }
+
+      agg.ordersCount += 1;
+      agg.ticketsCount += (order.items ?? []).reduce(
+        (sum, item) => sum + (item.qty ?? 0),
+        0,
+      );
+      agg.totalSpentCents += order.amountCents ?? 0;
+      agg.eventIds.add(order.eventId);
+
+      const createdAt = order.createdAt;
+      if (!agg.firstOrderAt || createdAt < agg.firstOrderAt) {
+        agg.firstOrderAt = createdAt;
+      }
+      if (!agg.lastOrderAt || createdAt > agg.lastOrderAt) {
+        agg.lastOrderAt = createdAt;
+        const name = parseBuyerNameFromNotes(order.notes);
+        if (name) agg.name = name;
+      }
     }
 
-    const emailKeys = rows.map((r) => r.emailKey);
+    const sorted = [...byEmail.values()].sort((a, b) => {
+      const aTime = a.lastOrderAt?.getTime() ?? 0;
+      const bTime = b.lastOrderAt?.getTime() ?? 0;
+      return bTime - aTime;
+    });
 
-    // Pull per-buyer event ids + a fallback buyer name from the most
-    // recent order notes (we don't have a normalised customer entity
-    // yet so notes is the canonical place buyer name lives).
-    const eventRows = await this.orderRepository
-      .createQueryBuilder('o')
-      .innerJoin('o.event', 'e')
-      .innerJoin('e.organizer', 'org')
-      .select('LOWER(o.email)', 'emailKey')
-      .addSelect('o.eventId', 'eventId')
-      .where('org.id = :profileId', { profileId: profile.id })
-      .andWhere('o.status = :paid', { paid: OrderStatus.PAID })
-      .andWhere('LOWER(o.email) IN (:...emailKeys)', { emailKeys })
-      .groupBy('LOWER(o.email)')
-      .addGroupBy('o.eventId')
-      .getRawMany<{ emailKey: string; eventId: string }>();
+    const total = sorted.length;
+    const page = sorted.slice(opts.offset, opts.offset + opts.limit);
 
-    const eventIdsByEmail = new Map<string, string[]>();
-    for (const r of eventRows) {
-      const list = eventIdsByEmail.get(r.emailKey) ?? [];
-      if (!list.includes(r.eventId)) list.push(r.eventId);
-      eventIdsByEmail.set(r.emailKey, list);
-    }
-
-    const nameRows = await this.orderRepository
-      .createQueryBuilder('o')
-      .innerJoin('o.event', 'e')
-      .innerJoin('e.organizer', 'org')
-      .select('DISTINCT ON (LOWER(o.email)) LOWER(o.email)', 'emailKey')
-      .addSelect('o.notes', 'notes')
-      .where('org.id = :profileId', { profileId: profile.id })
-      .andWhere('o.status = :paid', { paid: OrderStatus.PAID })
-      .andWhere('LOWER(o.email) IN (:...emailKeys)', { emailKeys })
-      .orderBy('LOWER(o.email)', 'ASC')
-      .addOrderBy('o.createdAt', 'DESC')
-      .getRawMany<{ emailKey: string; notes: string | null }>();
-
-    const nameByEmail = new Map<string, string>();
-    for (const r of nameRows) {
-      nameByEmail.set(r.emailKey, parseBuyerNameFromNotes(r.notes));
-    }
-
-    const customers: OrganizerCustomerRow[] = rows.map((r) => ({
-      email: r.email,
-      name: nameByEmail.get(r.emailKey) ?? '',
-      totalOrders: toInt(r.totalOrders),
-      totalSpentCents: toInt(r.totalSpentCents),
-      currency: normalizeCurrencyCode(r.currency || undefined),
-      lastOrderAt: r.lastOrderAt
-        ? new Date(r.lastOrderAt).toISOString()
-        : new Date(0).toISOString(),
-      eventIds: eventIdsByEmail.get(r.emailKey) ?? [],
+    const customers: OrganizerCustomerRow[] = page.map((agg) => ({
+      id: agg.emailKey,
+      email: agg.email,
+      name: agg.name,
+      ordersCount: agg.ordersCount,
+      ticketsCount: agg.ticketsCount,
+      totalSpentCents: agg.totalSpentCents,
+      currency: agg.currency,
+      firstOrderAt: agg.firstOrderAt?.toISOString() ?? null,
+      lastOrderAt: agg.lastOrderAt?.toISOString() ?? null,
+      eventIds: [...agg.eventIds],
     }));
 
     return { customers, total, limit: opts.limit, offset: opts.offset };
@@ -220,7 +226,17 @@ export class OrganizerCustomersService {
     email: string,
     opts: { limit: number; offset: number },
   ): Promise<{
-    customer: { email: string; name: string };
+    customer: {
+      id: string;
+      email: string;
+      name: string;
+      ordersCount: number;
+      ticketsCount: number;
+      totalSpentCents: number;
+      currency: string;
+      firstOrderAt: string | null;
+      lastOrderAt: string | null;
+    };
     orders: OrganizerCustomerOrderRow[];
     total: number;
     limit: number;
@@ -232,12 +248,14 @@ export class OrganizerCustomersService {
       throw new ForbiddenException('Customer email is required');
     }
 
+    const emailKey = trimmedEmail.toLowerCase();
+
     const base = this.orderRepository
       .createQueryBuilder('o')
       .innerJoinAndSelect('o.event', 'e')
       .innerJoin('e.organizer', 'org')
       .where('org.id = :profileId', { profileId: profile.id })
-      .andWhere('LOWER(o.email) = LOWER(:email)', { email: trimmedEmail });
+      .andWhere('LOWER(o.email) = :emailKey', { emailKey });
 
     const total = await base.clone().getCount();
 
@@ -249,6 +267,23 @@ export class OrganizerCustomersService {
       .skip(opts.offset)
       .take(opts.limit)
       .getMany();
+
+    const rollup = await this.paidOrdersBaseQuery(profile.id)
+      .select('COUNT(DISTINCT o.id)', 'ordersCount')
+      .addSelect('COALESCE(SUM(items.qty), 0)', 'ticketsCount')
+      .addSelect('SUM(o.amountCents)', 'totalSpentCents')
+      .addSelect('MIN(o.createdAt)', 'firstOrderAt')
+      .addSelect('MAX(o.createdAt)', 'lastOrderAt')
+      .addSelect('MAX(o.currency)', 'currency')
+      .andWhere('LOWER(o.email) = :emailKey', { emailKey })
+      .getRawOne<{
+        ordersCount: string;
+        ticketsCount: string;
+        totalSpentCents: string;
+        firstOrderAt: string | null;
+        lastOrderAt: string | null;
+        currency: string;
+      }>();
 
     const orders: OrganizerCustomerOrderRow[] = rows.map((o) => {
       const items = o.items ?? [];
@@ -280,10 +315,25 @@ export class OrganizerCustomersService {
       };
     });
 
-    const name = rows.length > 0 ? parseBuyerNameFromNotes(rows[0].notes) : '';
+    const name =
+      rows.length > 0 ? parseBuyerNameFromNotes(rows[0].notes) : '';
 
     return {
-      customer: { email: trimmedEmail, name },
+      customer: {
+        id: emailKey,
+        email: trimmedEmail,
+        name,
+        ordersCount: toInt(rollup?.ordersCount),
+        ticketsCount: toInt(rollup?.ticketsCount),
+        totalSpentCents: toInt(rollup?.totalSpentCents),
+        currency: normalizeCurrencyCode(rollup?.currency || undefined),
+        firstOrderAt: rollup?.firstOrderAt
+          ? new Date(rollup.firstOrderAt).toISOString()
+          : null,
+        lastOrderAt: rollup?.lastOrderAt
+          ? new Date(rollup.lastOrderAt).toISOString()
+          : null,
+      },
       orders,
       total,
       limit: opts.limit,

@@ -41,6 +41,8 @@ import { AdminAuditLog } from './entities/admin-audit-log.entity';
 import { AdminAuditService } from './admin-audit.service';
 import { OrderRefundService } from './order-refund.service';
 import { RefundOrderDto } from './dto/refund-order.dto';
+import { ReassignOrderBuyerDto } from './dto/reassign-order-buyer.dto';
+import { AdminOrderBuyerService } from './admin-order-buyer.service';
 import { AdminAction } from './decorators/admin-action.decorator';
 import { AdminAuditInterceptor } from './interceptors/admin-audit.interceptor';
 import { EventsService } from '../events/events.service';
@@ -75,6 +77,7 @@ export class AdminController {
     private readonly authService: AuthService,
     private readonly orderRefundService: OrderRefundService,
     private readonly organizerProfilesService: OrganizerProfilesService,
+    private readonly adminOrderBuyerService: AdminOrderBuyerService,
   ) {}
 
   @Get('ping')
@@ -1027,6 +1030,47 @@ export class AdminController {
         isPartialRefund: o.isPartialRefund,
       },
     };
+  }
+
+  @Post('orders/:id/reassign-buyer')
+  @ApiOperation({
+    summary:
+      'Correct the buyer email on a paid order and re-link tickets (typo support)',
+  })
+  @ApiParam({ name: 'id', description: 'Order UUID' })
+  async reassignOrderBuyer(
+    @Param('id') orderId: string,
+    @Body() body: ReassignOrderBuyerDto,
+    @GetUser() user: CurrentUser,
+    @Req() request: Request,
+  ) {
+    const result = await this.adminOrderBuyerService.reassignBuyerEmail(
+      orderId,
+      body,
+    );
+
+    await this.adminAuditService.logAction({
+      adminUserId: user.id,
+      action: 'REASSIGN_ORDER_BUYER',
+      resourceType: 'order',
+      resourceId: result.orderId,
+      metadata: {
+        previousEmail: result.previousEmail,
+        newEmail: result.newEmail,
+        userId: result.userId,
+        ticketCount: result.ticketCount,
+        ticketsResent: result.ticketsResent,
+        reason: body.reason?.trim() || null,
+      },
+      ipAddress:
+        request.ip ||
+        (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+        (request.headers['x-real-ip'] as string) ||
+        null,
+      userAgent: (request.headers['user-agent'] as string) || null,
+    });
+
+    return result;
   }
 
   /**

@@ -44,16 +44,26 @@ export function shouldOfferOrganizerHub(roles: string[]): boolean {
 }
 
 /**
- * Fan ↔ host switch in the hub top bar: only for accounts that are both a
- * ticket buyer (ATTENDEE) and a listed host (ORGANIZER). Uses strict array
- * checks so malformed `roles` payloads never show the control.
+ * Fan ↔ host switch in the hub top bar: only when the account is an active
+ * attendee buyer **and** a host with a completed organizer profile (not
+ * mid-onboarding). Platform admins never see this control.
  */
 export function userCanSwitchAttendeeOrganizerHub(
-  user: { roles?: RoleLike[] | null } | null | undefined,
+  user:
+    | {
+        roles?: RoleLike[] | null;
+        status?: string | null;
+        hasOrganizerProfile?: boolean;
+      }
+    | null
+    | undefined,
 ): boolean {
   if (!user) return false;
   const r = normalizeWebUserRoles(user.roles);
-  return r.includes("ATTENDEE") && r.includes("ORGANIZER");
+  if (rolesIncludeAdmin(r)) return false;
+  if (user.status && user.status !== "ACTIVE") return false;
+  if (!r.includes("ATTENDEE") || !r.includes("ORGANIZER")) return false;
+  return user.hasOrganizerProfile === true;
 }
 
 /**

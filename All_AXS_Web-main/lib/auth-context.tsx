@@ -25,6 +25,8 @@ export interface AuthUser {
   emailVerified?: boolean;
   hasPassword?: boolean;
   createdAt?: string;
+  /** True after organizer onboarding profile is saved (enables fan ↔ host switch). */
+  hasOrganizerProfile?: boolean;
 }
 
 export interface AuthState {
@@ -82,6 +84,8 @@ async function fetchAuthUser(): Promise<AuthUser | null> {
       hasPassword:
         typeof o.hasPassword === "boolean" ? o.hasPassword : undefined,
       createdAt: typeof o.createdAt === "string" ? o.createdAt : undefined,
+      hasOrganizerProfile:
+        typeof o.hasOrganizerProfile === "boolean" ? o.hasOrganizerProfile : undefined,
     };
   };
 

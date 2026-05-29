@@ -19,7 +19,7 @@ type Step = 1 | 2;
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refresh } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -133,7 +133,7 @@ export default function OnboardingPage() {
       await axios.post("/api/auth/promote-organizer");
       const response = await axios.post("/api/organizer/profile", data);
       if (response.status === 200 || response.status === 201) {
-        // Redirect to organizer dashboard with welcome banner trigger
+        await refresh();
         router.push("/organizer/dashboard?hostWelcome=1");
       }
     } catch (err) {

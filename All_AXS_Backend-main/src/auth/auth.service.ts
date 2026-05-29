@@ -648,6 +648,8 @@ export class AuthService {
     const user = await this.usersService.findByIdOrFail(userId);
     const emailVerified =
       await this.emailVerificationService.isUserVerified(userId);
+    const hasOrganizerProfile =
+      await this.usersService.hasOrganizerProfile(userId);
     return {
       id: user.id,
       email: user.email,
@@ -659,6 +661,7 @@ export class AuthService {
       hasPassword: Boolean(user.passwordHash),
       autoCreatedAt: user.autoCreatedAt?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
+      hasOrganizerProfile,
     };
   }
 

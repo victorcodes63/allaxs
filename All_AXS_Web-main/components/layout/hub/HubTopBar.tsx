@@ -33,7 +33,7 @@ type HubTopBarProps = {
   hubEyebrow: string;
   hubEyebrowTone: "muted" | "accent";
   title: string;
-  user: { name?: string; email: string; roles?: string[] };
+  user: { name?: string; email: string; roles?: string[]; status?: string; hasOrganizerProfile?: boolean };
   drawerOpen: boolean;
   onDrawerToggle: () => void;
   onLogout: () => void | Promise<void>;

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   findTicketsByOrderId,
   loadOrderSnapshot,
@@ -36,6 +37,61 @@ function buildWhatsAppDemoLink(phone: string, message: string): string | null {
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
+type ApiOrderPayload = {
+  order: {
+    id: string;
+    status: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED" | "DRAFT";
+    eventId: string;
+    totalCents: number;
+    subtotalCents?: number;
+    discountCents?: number;
+    feesCents?: number;
+    currency: string;
+    eventTitle: string;
+    eventSlug: string;
+    buyerName: string;
+    buyerEmail: string;
+    guestCheckout?: boolean;
+    accountAutoCreated?: boolean;
+    coupon?: { code: string; discountCents: number } | null;
+    lineItems: {
+      ticketTypeId: string;
+      name: string;
+      quantity: number;
+      unitPriceCents: number;
+      currency: string;
+    }[];
+  };
+};
+
+function mapApiOrderToStored(o: ApiOrderPayload["order"]): StoredOrder {
+  return {
+    orderId: o.id,
+    createdAt: new Date().toISOString(),
+    eventId: o.eventId,
+    eventSlug: o.eventSlug,
+    eventTitle: o.eventTitle,
+    buyerName: o.buyerName,
+    buyerEmail: o.buyerEmail,
+    lineItems: o.lineItems.map((li) => ({
+      ticketTypeId: li.ticketTypeId,
+      name: li.name,
+      quantity: li.quantity,
+      unitPriceCents: li.unitPriceCents,
+      currency: li.currency,
+    })),
+    totalCents: o.totalCents,
+    currency: o.currency,
+    ...(typeof o.feesCents === "number" && o.feesCents > 0 ? { feesCents: o.feesCents } : {}),
+    ...(typeof o.subtotalCents === "number" ? { subtotalCents: o.subtotalCents } : {}),
+    ...(typeof o.discountCents === "number" && o.discountCents > 0
+      ? { discountCents: o.discountCents }
+      : {}),
+    ...(o.coupon ? { coupon: o.coupon } : {}),
+    ...(o.guestCheckout === true ? { guestCheckout: true } : {}),
+  };
+}
+
 export function OrderConfirmation({
   orderId,
   hubContext = false,
@@ -43,8 +99,11 @@ export function OrderConfirmation({
   orderId: string;
   hubContext?: boolean;
 }) {
+  const searchParams = useSearchParams();
+  const paymentReference = searchParams.get("reference")?.trim() || null;
   const [order, setOrder] = useState<StoredOrder | null | undefined>(undefined);
   const [orderStatus, setOrderStatus] = useState<string | null>(null);
+  const [accountAutoCreated, setAccountAutoCreated] = useState<boolean | null>(null);
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
   const [resendInFlight, setResendInFlight] = useState(false);
@@ -73,67 +132,34 @@ export function OrderConfirmation({
     }
 
     void (async () => {
-      try {
-        const res = await fetch(`/api/checkout/orders/${orderId}`, {
-          credentials: "same-origin",
-        });
-        if (!res.ok) {
-          if (!cancelled) setOrder(null);
-          return;
-        }
-        const data = (await res.json()) as {
-          order: {
-            id: string;
-            status: "PENDING" | "PAID" | "FAILED" | "CANCELLED" | "REFUNDED" | "DRAFT";
-            eventId: string;
-            totalCents: number;
-            subtotalCents?: number;
-            discountCents?: number;
-            feesCents?: number;
-            currency: string;
-            eventTitle: string;
-            eventSlug: string;
-            buyerName: string;
-            buyerEmail: string;
-            guestCheckout?: boolean;
-            coupon?: { code: string; discountCents: number } | null;
-            lineItems: {
-              ticketTypeId: string;
-              name: string;
-              quantity: number;
-              unitPriceCents: number;
-              currency: string;
-            }[];
-          };
-        };
+      const applyApiOrder = (data: ApiOrderPayload) => {
         if (cancelled) return;
         const o = data.order;
         setOrderStatus(o.status);
-        setOrder({
-          orderId: o.id,
-          createdAt: new Date().toISOString(),
-          eventId: o.eventId,
-          eventSlug: o.eventSlug,
-          eventTitle: o.eventTitle,
-          buyerName: o.buyerName,
-          buyerEmail: o.buyerEmail,
-          lineItems: o.lineItems.map((li) => ({
-            ticketTypeId: li.ticketTypeId,
-            name: li.name,
-            quantity: li.quantity,
-            unitPriceCents: li.unitPriceCents,
-            currency: li.currency,
-          })),
-          totalCents: o.totalCents,
-          currency: o.currency,
-          ...(typeof o.feesCents === "number" && o.feesCents > 0 ? { feesCents: o.feesCents } : {}),
-          ...(typeof o.subtotalCents === "number" ? { subtotalCents: o.subtotalCents } : {}),
-          ...(typeof o.discountCents === "number" && o.discountCents > 0
-            ? { discountCents: o.discountCents }
-            : {}),
-          ...(o.coupon ? { coupon: o.coupon } : {}),
-          ...(o.guestCheckout === true ? { guestCheckout: true } : {}),
+        setAccountAutoCreated(o.accountAutoCreated ?? null);
+        setOrder(mapApiOrderToStored(o));
+      };
+
+      try {
+        if (paymentReference) {
+          const publicRes = await fetch(
+            `/api/checkout/orders/${orderId}/public?reference=${encodeURIComponent(paymentReference)}`
+          );
+          if (publicRes.ok) {
+            applyApiOrder((await publicRes.json()) as ApiOrderPayload);
+            return;
+          }
+        }
+
+        const res = await fetch(`/api/checkout/orders/${orderId}`, {
+          credentials: "same-origin",
         });
+        if (res.ok) {
+          applyApiOrder((await res.json()) as ApiOrderPayload);
+          return;
+        }
+
+        if (!cancelled) setOrder(null);
       } catch {
         if (!cancelled) setOrder(null);
       }
@@ -142,7 +168,7 @@ export function OrderConfirmation({
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [orderId, paymentReference]);
 
   const passes: StoredTicket[] = useMemo(
     () => (order != null ? findTicketsByOrderId(order.orderId) : []),
@@ -183,9 +209,18 @@ export function OrderConfirmation({
   const resendTicketEmail = useCallback(async (): Promise<boolean> => {
     setResendInFlight(true);
     try {
-      const res = await fetch(`/api/checkout/orders/${orderId}/resend-tickets`, {
+      const endpoint = paymentReference
+        ? `/api/checkout/orders/${orderId}/resend-tickets-by-reference`
+        : `/api/checkout/orders/${orderId}/resend-tickets`;
+      const res = await fetch(endpoint, {
         method: "POST",
         credentials: "same-origin",
+        ...(paymentReference
+          ? {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ reference: paymentReference }),
+            }
+          : {}),
       });
       if (!res.ok) {
         setResendState("failed");
@@ -199,7 +234,7 @@ export function OrderConfirmation({
     } finally {
       setResendInFlight(false);
     }
-  }, [orderId]);
+  }, [orderId, paymentReference]);
 
   useEffect(() => {
     if (!order) return;
@@ -234,13 +269,27 @@ export function OrderConfirmation({
   if (!order) {
     return (
       <div className="max-w-lg mx-auto text-center py-20 space-y-6">
-        <h1 className="font-display text-2xl text-foreground">Order not found</h1>
-        <p className="text-muted">
-          This confirmation link may have expired in your browser, or the order id is invalid.
+        <h1 className="font-display text-2xl text-foreground">We couldn&apos;t load this order</h1>
+        <p className="text-muted leading-relaxed">
+          {paymentReference ? (
+            <>
+              Your payment may still be processing, or this link has expired. Check your email for
+              your ticket PDF, or sign in with the email you used at checkout to view My tickets.
+            </>
+          ) : (
+            <>
+              Open this page from the link after payment, or sign in to view your order history.
+            </>
+          )}
         </p>
-        <ArrowCtaLink href={hubContext ? "/dashboard/orders" : browseHref} variant="primary">
-          {hubContext ? "My orders" : "Browse events"}
-        </ArrowCtaLink>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <ArrowCtaLink href="/login" variant="primary">
+            Sign in
+          </ArrowCtaLink>
+          <ArrowCtaLink href={browseHref} variant="secondary">
+            Browse events
+          </ArrowCtaLink>
+        </div>
       </div>
     );
   }
@@ -268,19 +317,36 @@ export function OrderConfirmation({
           {apiCheckout ? "has been confirmed." : "is confirmed (demo—no real card / payment charge)."}
           {apiCheckout ? (
             guest ? (
-              <>
-                We created an account for{" "}
-                <span className="text-foreground font-medium">{order.buyerEmail}</span> when you
-                purchased—your tickets are already linked. We&apos;ve emailed your tickets as a{" "}
-                <strong className="font-medium text-foreground">PDF attachment</strong> (QR codes are
-                not shown inline in the email body). Open{" "}
-                <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
-                  My tickets
-                </Link>{" "}
-                to view passes or download a PDF. Didn&apos;t receive the email? Use{" "}
-                <strong className="font-medium text-foreground">Resend ticket email</strong> below, or
-                use the secure link in that message to sign in on another device.
-              </>
+              accountAutoCreated === false ? (
+                <>
+                  Your payment is confirmed and tickets were emailed to{" "}
+                  <span className="text-foreground font-medium">{order.buyerEmail}</span> as a{" "}
+                  <strong className="font-medium text-foreground">PDF attachment</strong>.{" "}
+                  <Link href={`/login?email=${encodeURIComponent(order.buyerEmail)}`} className="text-primary font-semibold hover:underline">
+                    Sign in
+                  </Link>{" "}
+                  with that email to view passes in{" "}
+                  <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
+                    My tickets
+                  </Link>
+                  . Didn&apos;t receive the email? Use{" "}
+                  <strong className="font-medium text-foreground">Resend ticket email</strong> below.
+                </>
+              ) : (
+                <>
+                  We created an account for{" "}
+                  <span className="text-foreground font-medium">{order.buyerEmail}</span> when you
+                  purchased—your tickets are already linked. We&apos;ve emailed your tickets as a{" "}
+                  <strong className="font-medium text-foreground">PDF attachment</strong> (QR codes are
+                  not shown inline in the email body). Open{" "}
+                  <Link href={ticketsHref} className="text-primary font-semibold hover:underline">
+                    My tickets
+                  </Link>{" "}
+                  to view passes or download a PDF. Didn&apos;t receive the email? Use{" "}
+                  <strong className="font-medium text-foreground">Resend ticket email</strong> below, or
+                  use the secure link in that message to sign in on another device.
+                </>
+              )
             ) : (
               <>
                 We&apos;ve emailed your tickets to{" "}
@@ -337,7 +403,7 @@ export function OrderConfirmation({
         </p>
       </div>
 
-      {apiCheckout && guest ? (
+      {apiCheckout && guest && accountAutoCreated !== false ? (
         <div className="rounded-[var(--radius-panel)] border border-primary/25 bg-wash p-6 md:p-8 space-y-4">
           <h2 className="font-display text-lg font-semibold text-foreground">Your account is ready</h2>
           <p className="text-sm text-muted leading-relaxed">
@@ -563,9 +629,18 @@ export function OrderConfirmation({
         >
           {apiCheckout ? "Open My tickets" : "View all tickets"}
         </ArrowCtaLink>
-        {apiCheckout && guest ? (
+        {apiCheckout && guest && accountAutoCreated !== false ? (
           <ArrowCtaLink href={forgotPasswordHref} variant="primary" className="justify-center">
             Set a password
+          </ArrowCtaLink>
+        ) : null}
+        {apiCheckout && guest && accountAutoCreated === false ? (
+          <ArrowCtaLink
+            href={`/login?email=${encodeURIComponent(order.buyerEmail)}`}
+            variant="primary"
+            className="justify-center"
+          >
+            Sign in to view tickets
           </ArrowCtaLink>
         ) : null}
         <ArrowCtaLink

@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { Ticket } from '../domain/ticket.entity';
 import { normalizeCurrencyCode } from '../common/currency';
 import { UsersService } from '../users/users.service';
@@ -61,11 +61,19 @@ export class TicketsService {
         .execute();
     }
 
-    const rows = await this.ticketRepository.find({
-      where: { ownerUserId: userId },
-      relations: ['order', 'order.event', 'ticketType'],
-      order: { createdAt: 'DESC' },
-    });
+    const rows = await this.ticketRepository
+      .createQueryBuilder('t')
+      .innerJoinAndSelect('t.order', 'order')
+      .leftJoinAndSelect('order.event', 'event')
+      .leftJoinAndSelect('t.ticketType', 'ticketType')
+      .where(
+        new Brackets((w) => {
+          w.where('t.ownerUserId = :userId', { userId });
+          w.orWhere('order.userId = :userId', { userId });
+        }),
+      )
+      .orderBy('t.createdAt', 'DESC')
+      .getMany();
 
     const tickets: TicketMineRow[] = rows.map((t) => this.toTicketRow(t));
 

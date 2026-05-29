@@ -24,8 +24,11 @@ import { AdminPayoutBatchesController } from './admin-payout-batches.controller'
 import { AdminRefundRequestsController } from './admin-refund-requests.controller';
 import { RefundRequestsService } from './refund-requests.service';
 import { RefundRequest } from '../domain/refund-request.entity';
+import { Ticket } from '../domain/ticket.entity';
 import { OrganizersModule } from '../organizers/organizers.module';
 import { PaymentsModule } from '../payments/payments.module';
+import { CheckoutModule } from '../checkout/checkout.module';
+import { AdminOrderBuyerService } from './admin-order-buyer.service';
 
 @Module({
   imports: [
@@ -40,12 +43,14 @@ import { PaymentsModule } from '../payments/payments.module';
       PayoutBatch,
       PayoutBatchLine,
       RefundRequest,
+      Ticket,
     ]),
     AuthModule,
     EventsModule,
     UsersModule,
     DomainModule,
     ScanModule,
+    CheckoutModule,
     forwardRef(() => OrganizersModule),
     PaymentsModule,
   ],
@@ -61,6 +66,7 @@ import { PaymentsModule } from '../payments/payments.module';
     OrderRefundService,
     PayoutBatchesService,
     RefundRequestsService,
+    AdminOrderBuyerService,
   ],
   exports: [AdminAuditService, RefundRequestsService, OrderRefundService],
 })

@@ -30,6 +30,7 @@ import {
   installmentTierForCart,
 } from "@/lib/checkout-installments";
 import { isCheckoutEmailNotVerifiedError } from "@/lib/auth/email-verification-gate";
+import { isCheckoutSignInRequiredError } from "@/lib/auth/checkout-gates";
 import { EmailVerificationCheckoutGate } from "@/components/checkout/EmailVerificationCheckoutGate";
 import { ArrowButton } from "@/components/ui/ArrowCta";
 
@@ -66,6 +67,7 @@ export function PublicGuestCheckout({
     undefined,
   );
   const [error, setError] = useState<string | null>(null);
+  const [signInRequired, setSignInRequired] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [couponInput, setCouponInput] = useState("");
@@ -324,6 +326,7 @@ export function PublicGuestCheckout({
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSignInRequired(false);
     setEmailTouched(true);
     if (!validateCart()) return;
     if (!name.trim()) {
@@ -392,6 +395,12 @@ export function PublicGuestCheckout({
         if (!res.ok) {
           if (isCheckoutEmailNotVerifiedError(data)) {
             setEmailVerified(false);
+            setError(null);
+            setSignInRequired(false);
+            return;
+          }
+          if (isCheckoutSignInRequiredError(data)) {
+            setSignInRequired(true);
             setError(null);
             return;
           }
@@ -708,6 +717,28 @@ export function PublicGuestCheckout({
             </Link>
             .
           </section>
+
+          {signInRequired ? (
+            <div
+              className="rounded-[var(--radius-card)] border border-primary/30 bg-wash px-4 py-4 text-sm space-y-3"
+              role="alert"
+            >
+              <p className="text-foreground font-medium">
+                An account already exists for{" "}
+                <span className="font-semibold">{email.trim()}</span>.
+              </p>
+              <p className="text-muted leading-relaxed">
+                Sign in to complete checkout — your tickets will be linked to that account and
+                emailed after payment.
+              </p>
+              <Link
+                href={`/login?email=${encodeURIComponent(email.trim())}&next=${encodeURIComponent(eventDetailPath + "/checkout")}`}
+                className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] bg-primary px-4 text-sm font-semibold text-white shadow-[var(--btn-shadow-primary)] transition-opacity hover:opacity-92"
+              >
+                Sign in to continue
+              </Link>
+            </div>
+          ) : null}
 
           {error ? (
             <div className="rounded-[var(--radius-card)] border border-primary/30 bg-wash px-4 py-3 text-sm text-primary-dark" role="alert">

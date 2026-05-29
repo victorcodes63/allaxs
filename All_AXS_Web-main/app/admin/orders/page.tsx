@@ -10,6 +10,10 @@ import {
   type RefundOrderTarget,
 } from "@/components/admin/RefundOrderDialog";
 import {
+  ReassignOrderBuyerDialog,
+  type ReassignOrderBuyerTarget,
+} from "@/components/admin/ReassignOrderBuyerDialog";
+import {
   BULK_REFUND_MAX,
   BulkRefundDialog,
   type BulkRefundOrder,
@@ -133,6 +137,8 @@ function AdminOrdersPageContent() {
   const [refundTarget, setRefundTarget] = useState<RefundOrderTarget | null>(
     null,
   );
+  const [reassignTarget, setReassignTarget] =
+    useState<ReassignOrderBuyerTarget | null>(null);
   // null = closed; non-empty array = open with payload
   const [bulkRefundTargets, setBulkRefundTargets] = useState<
     BulkRefundOrder[] | null
@@ -277,6 +283,13 @@ function AdminOrdersPageContent() {
     void load();
   };
 
+  const onReassigned = (message: string) => {
+    setReassignTarget(null);
+    setActionMessage(message);
+    setTimeout(() => setActionMessage(null), 8000);
+    void load();
+  };
+
   const openBulkRefund = () => {
     if (selection.size === 0) return;
     const selectedSet = new Set(selection.ids);
@@ -322,7 +335,7 @@ function AdminOrdersPageContent() {
           </h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
             Every order on the platform across events, organisers, and statuses.
-            Issue refunds with full audit trail.
+            Issue refunds or reassign buyer emails with full audit trail.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted sm:shrink-0">
@@ -495,6 +508,7 @@ function AdminOrdersPageContent() {
                 disableSelection={refundable && atCap && !isSelected}
                 onToggleSelected={() => selection.toggle(order.id)}
                 onRefund={(target) => setRefundTarget(target)}
+                onReassignBuyer={(target) => setReassignTarget(target)}
               />
             );
           })}
@@ -534,6 +548,12 @@ function AdminOrdersPageContent() {
         order={refundTarget}
         onClose={() => setRefundTarget(null)}
         onRefunded={onRefunded}
+      />
+
+      <ReassignOrderBuyerDialog
+        order={reassignTarget}
+        onClose={() => setReassignTarget(null)}
+        onReassigned={onReassigned}
       />
 
       <BulkRefundDialog
@@ -619,6 +639,7 @@ function BulkRefundActionBar({
 const ROW_ACTION_BASE =
   "inline-flex h-8 items-center gap-1 rounded-full px-3 text-xs font-semibold tracking-tight transition-[color,background-color,border-color,box-shadow] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2";
 const ROW_ACTION_DANGER = `${ROW_ACTION_BASE} border border-red-400/40 bg-red-500/10 text-red-100 hover:border-red-400/60 hover:bg-red-500/20 hover:text-white`;
+const ROW_ACTION_PRIMARY = `${ROW_ACTION_BASE} border border-primary/40 bg-primary/15 text-foreground hover:border-primary/60 hover:bg-primary/25`;
 const ROW_ACTION_GHOST = `${ROW_ACTION_BASE} border border-transparent text-muted hover:border-border hover:bg-wash/40 hover:text-foreground`;
 
 function AdminOrderCard({
@@ -628,6 +649,7 @@ function AdminOrderCard({
   disableSelection,
   onToggleSelected,
   onRefund,
+  onReassignBuyer,
 }: {
   order: AdminOrderRow;
   refundable: boolean;
@@ -635,6 +657,7 @@ function AdminOrderCard({
   disableSelection: boolean;
   onToggleSelected: () => void;
   onRefund: (target: RefundOrderTarget) => void;
+  onReassignBuyer: (target: ReassignOrderBuyerTarget) => void;
 }) {
   const eventLabel = order.event?.title ?? "Event not found";
   const organizerLabel = order.event?.organizer?.orgName ?? "Unknown organiser";
@@ -714,6 +737,22 @@ function AdminOrderCard({
         </div>
       </div>
       <div className="flex w-full shrink-0 flex-row flex-wrap items-stretch justify-start gap-2 sm:w-auto sm:items-end sm:justify-end sm:self-center">
+        {order.status === "PAID" ? (
+          <button
+            type="button"
+            onClick={() =>
+              onReassignBuyer({
+                id: order.id,
+                reference: order.reference,
+                email: order.email,
+                status: order.status,
+              })
+            }
+            className={ROW_ACTION_PRIMARY}
+          >
+            Reassign buyer
+          </button>
+        ) : null}
         {refundable ? (
           <button
             type="button"

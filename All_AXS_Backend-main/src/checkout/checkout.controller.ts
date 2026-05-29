@@ -110,6 +110,33 @@ export class CheckoutController {
     return this.checkoutService.confirmPaystackByReference(reference);
   }
 
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Get('orders/:orderId/public')
+  async orderSummaryByReference(
+    @Param('orderId') orderId: string,
+    @Query('reference') reference: string,
+  ) {
+    return this.checkoutService.getOrderSummaryByPaymentReference(
+      orderId,
+      reference,
+    );
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
+  @Post('orders/:orderId/resend-tickets-by-reference')
+  @HttpCode(HttpStatus.OK)
+  async resendTicketsByReference(
+    @Param('orderId') orderId: string,
+    @Body('reference') reference: string,
+  ) {
+    return this.checkoutService.resendTicketsByPaymentReference(
+      orderId,
+      reference,
+    );
+  }
+
   @Post('orders/:orderId/resend-tickets')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)

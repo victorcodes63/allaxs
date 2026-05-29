@@ -15,6 +15,7 @@ type ApiUser = {
   hasPassword?: boolean;
   autoCreatedAt?: string | null;
   createdAt?: string;
+  hasOrganizerProfile?: boolean;
 };
 
 function mapUser(raw: ApiUser | null | undefined) {
@@ -38,6 +39,8 @@ function mapUser(raw: ApiUser | null | undefined) {
     autoCreatedAt:
       typeof raw.autoCreatedAt === "string" ? raw.autoCreatedAt : undefined,
     createdAt: typeof raw.createdAt === "string" ? raw.createdAt : undefined,
+    hasOrganizerProfile:
+      typeof raw.hasOrganizerProfile === "boolean" ? raw.hasOrganizerProfile : undefined,
   };
 }
 

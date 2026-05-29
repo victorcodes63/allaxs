@@ -45,14 +45,28 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function normalizeCustomerRow(raw: unknown): CustomerRow | null {
   if (!isRecord(raw)) return null;
-  const id = typeof raw.id === "string" ? raw.id : null;
+  const email = typeof raw.email === "string" ? raw.email : "";
+  const id =
+    typeof raw.id === "string"
+      ? raw.id
+      : email
+        ? email.trim().toLowerCase()
+        : null;
   if (!id) return null;
+  const ordersCount =
+    typeof raw.ordersCount === "number"
+      ? raw.ordersCount
+      : typeof raw.totalOrders === "number"
+        ? raw.totalOrders
+        : 0;
+  const ticketsCount =
+    typeof raw.ticketsCount === "number" ? raw.ticketsCount : 0;
   return {
     id,
-    email: typeof raw.email === "string" ? raw.email : "",
+    email,
     name: typeof raw.name === "string" ? raw.name : "",
-    ordersCount: typeof raw.ordersCount === "number" ? raw.ordersCount : 0,
-    ticketsCount: typeof raw.ticketsCount === "number" ? raw.ticketsCount : 0,
+    ordersCount,
+    ticketsCount,
     totalSpentCents:
       typeof raw.totalSpentCents === "number" ? raw.totalSpentCents : 0,
     currency: normalizeCurrencyCode(

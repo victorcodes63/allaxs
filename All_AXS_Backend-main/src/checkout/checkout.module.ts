@@ -36,5 +36,6 @@ import { UsersModule } from '../users/users.module';
   ],
   controllers: [CheckoutController, PaystackWebhookController, TicketsController],
   providers: [CheckoutService, TicketsService, WalletPassService],
+  exports: [CheckoutService],
 })
 export class CheckoutModule {}

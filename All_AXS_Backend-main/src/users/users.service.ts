@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { User } from './entities/user.entity';
+import { OrganizerProfile } from './entities/organizer-profile.entity';
 import { Role, UserStatus } from 'src/domain/enums';
 import { isClosedAccount } from './account-status.util';
 import {
@@ -22,6 +25,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(OrganizerProfile)
+    private readonly organizerProfileRepository: Repository<OrganizerProfile>,
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
@@ -117,6 +122,79 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
     return user;
+  }
+
+  /** True when the user has completed organizer onboarding (org profile row exists). */
+  async hasOrganizerProfile(userId: string): Promise<boolean> {
+    const count = await this.organizerProfileRepository.count({
+      where: { userId },
+    });
+    return count > 0;
+  }
+
+  /**
+   * Resolve the attendee account that should own an order after admin
+   * corrects a checkout email typo. Creates an active attendee when the
+   * corrected address is new.
+   */
+  async ensureActiveAttendeeBuyer(
+    email: string,
+    options?: { name?: string },
+  ): Promise<User> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) {
+      throw new BadRequestException('Email is required');
+    }
+
+    const existing = await this.findByEmail(normalized);
+    if (existing) {
+      if (isClosedAccount(existing)) {
+        throw new UnauthorizedException({
+          message: 'Target account is closed.',
+          code: 'accountClosed',
+        });
+      }
+      if (existing.status !== UserStatus.ACTIVE) {
+        throw new UnauthorizedException({
+          message: 'Target account is suspended.',
+          code: 'accountSuspended',
+        });
+      }
+      const roleSet = new Set(existing.roles ?? []);
+      roleSet.add(Role.ATTENDEE);
+      const nextRoles = [...roleSet];
+      const rolesChanged =
+        nextRoles.length !== (existing.roles ?? []).length ||
+        !(existing.roles ?? []).includes(Role.ATTENDEE);
+      if (rolesChanged) {
+        existing.roles = nextRoles;
+      }
+      const name = options?.name?.trim();
+      if (name && (!existing.name || !existing.name.trim())) {
+        existing.name = name;
+        await this.userRepository.save(existing);
+      } else if (rolesChanged) {
+        await this.userRepository.save(existing);
+      }
+      return existing;
+    }
+
+    const name =
+      options?.name?.trim() ||
+      normalized.split('@')[0] ||
+      'Guest';
+    const passwordHash = await bcrypt.hash(
+      crypto.randomBytes(32).toString('hex'),
+      10,
+    );
+    const user = this.userRepository.create({
+      email: normalized,
+      name,
+      passwordHash,
+      roles: [Role.ATTENDEE],
+      status: UserStatus.ACTIVE,
+    });
+    return this.userRepository.save(user);
   }
 
   async updatePassword(userId: string, passwordHash: string): Promise<void> {
