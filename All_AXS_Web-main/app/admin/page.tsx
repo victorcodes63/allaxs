@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import axios, { isAxiosError } from "axios";
@@ -406,18 +406,29 @@ export default function AdminOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const hasDataRef = useRef(false);
 
   const load = useCallback(async () => {
     setError(null);
     try {
       const response = await axios.get<AdminOverview>("/api/admin/overview");
       setData(response.data);
+      hasDataRef.current = true;
     } catch (err) {
-      const message = isAxiosError(err)
+      const status = isAxiosError(err) ? err.response?.status : undefined;
+      const raw = isAxiosError(err)
         ? (err.response?.data as { message?: string } | undefined)?.message ||
           err.message
         : "Failed to load admin overview.";
-      setError(message);
+      if (status === 401) {
+        setError(
+          hasDataRef.current
+            ? "Session expired while this tab was idle. Refresh or sign in again."
+            : "Your session expired. Please sign in again.",
+        );
+      } else {
+        setError(raw);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

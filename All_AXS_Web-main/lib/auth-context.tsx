@@ -11,9 +11,8 @@ import {
 } from "react";
 import axios from "axios";
 import { normalizeWebUserRoles } from "@/lib/auth/hub-routing";
-import {
-  refreshSessionOnce,
-} from "@/lib/auth/session-refresh-client";
+import { refreshSessionOnce } from "@/lib/auth/session-refresh-client";
+import { installAuthInterceptors } from "@/lib/auth/install-auth-interceptors";
 
 export interface AuthUser {
   id: string;
@@ -172,6 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setUser]);
 
   useEffect(() => {
+    installAuthInterceptors();
     void refresh();
   }, [refresh]);
 
@@ -185,6 +185,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }, intervalMs);
     return () => window.clearInterval(id);
+  }, [user, refresh]);
+
+  /** Idle / background tabs: renew the access JWT as soon as the user returns. */
+  useEffect(() => {
+    if (!user) return;
+    const renewIfVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void refreshSessionOnce().then((ok) => {
+        if (ok) void refresh();
+      });
+    };
+    document.addEventListener("visibilitychange", renewIfVisible);
+    window.addEventListener("focus", renewIfVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", renewIfVisible);
+      window.removeEventListener("focus", renewIfVisible);
+    };
   }, [user, refresh]);
 
   useEffect(() => {
