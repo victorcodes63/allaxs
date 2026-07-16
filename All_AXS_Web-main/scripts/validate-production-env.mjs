@@ -55,6 +55,12 @@ if (!siteUrl) {
   errors.push(`NEXT_PUBLIC_SITE_URL must be HTTPS in production (got ${siteUrl}).`);
 }
 
+if (!env("NEXT_PUBLIC_TURNSTILE_SITE_KEY")) {
+  errors.push(
+    "NEXT_PUBLIC_TURNSTILE_SITE_KEY is required in production (Cloudflare Turnstile). See docs/TURNSTILE_SETUP.md.",
+  );
+}
+
 if (errors.length > 0) {
   console.error("\n[validate-production-env] Production environment check failed:\n");
   for (const message of errors) {

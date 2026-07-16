@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   forgotPasswordSchema,
@@ -14,6 +14,8 @@ import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
+import { TurnstileField, getTurnstileSiteKey } from "@/components/auth/TurnstileField";
+import { captchaErrorMessage, isCaptchaErrorCode } from "@/lib/auth/captcha-errors";
 
 function ForgotPasswordForm() {
   const searchParams = useSearchParams();
@@ -21,6 +23,13 @@ function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
+  const turnstileRequired = !!getTurnstileSiteKey();
+
+  const onTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   const {
     register,
@@ -34,17 +43,33 @@ function ForgotPasswordForm() {
   const onSubmit = async (data: ForgotPasswordInput) => {
     setError(null);
     setSuccess(false);
+
+    if (turnstileRequired && !turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const response = await axios.post("/api/auth/forgot-password", data);
+      const response = await axios.post("/api/auth/forgot-password", {
+        ...data,
+        turnstileToken,
+      });
 
       if (response.status === 200) {
         setSuccess(true);
       }
-    } catch {
-      // Even on error, show success message for security
-      setSuccess(true);
+    } catch (err) {
+      const responseData = (err as { response?: { data?: { message?: string; code?: string } } })
+        .response?.data;
+      if (isCaptchaErrorCode(responseData?.code)) {
+        setError(captchaErrorMessage(responseData?.code, responseData?.message));
+        setTurnstileToken(null);
+        setTurnstileReset((n) => n + 1);
+      } else {
+        setSuccess(true);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -85,7 +110,17 @@ function ForgotPasswordForm() {
             error={errors.email?.message}
           />
 
-          <Button type="submit" disabled={isSubmitting}>
+          <TurnstileField
+            onToken={onTurnstileToken}
+            onExpire={() => setTurnstileToken(null)}
+            onError={() => setTurnstileToken(null)}
+            resetSignal={turnstileReset}
+          />
+
+          <Button
+            type="submit"
+            disabled={isSubmitting || (turnstileRequired && !turnstileToken)}
+          >
             {isSubmitting ? "Sending..." : prefilledEmail ? "Send set-password link" : "Send Reset Link"}
           </Button>
         </form>

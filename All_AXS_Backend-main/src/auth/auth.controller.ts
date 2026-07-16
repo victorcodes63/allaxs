@@ -161,6 +161,7 @@ export class AuthController {
     const result = await this.authService.forgotPassword(
       dto.email,
       metadata.ipAddress,
+      dto.turnstileToken,
     );
     this.logger.log(
       `Forgot password request completed for email: ${dto.email}`,
@@ -207,8 +208,13 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
-  async resendVerification(@Body() dto: ResendVerificationDto) {
-    return this.authService.resendVerification(dto.email);
+  async resendVerification(@Body() dto: ResendVerificationDto, @Req() req: Request) {
+    const metadata = this.extractMetadata(req);
+    return this.authService.resendVerification(
+      dto.email,
+      metadata.ipAddress,
+      dto.turnstileToken,
+    );
   }
 
   @Public()

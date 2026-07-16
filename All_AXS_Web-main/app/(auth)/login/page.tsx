@@ -24,6 +24,7 @@ import {
 } from "@/lib/auth/post-auth-redirect";
 import { validateSignInIntentAgainstDbRoles } from "@/lib/auth/intent-access";
 import { TurnstileField, getTurnstileSiteKey } from "@/components/auth/TurnstileField";
+import { captchaErrorMessage, isCaptchaErrorCode } from "@/lib/auth/captcha-errors";
 import { useAuth } from "@/lib/auth";
 
 const AUTH_SUBTITLE = "One account for fans and hosts.";
@@ -35,6 +36,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
   const turnstileRequired = !!getTurnstileSiteKey();
   const registerHref = `/register${buildAuthQuery({
     next: searchParams.get("next"),
@@ -94,7 +96,9 @@ function LoginForm() {
       const responseData = (err as { response?: { data?: { message?: string; code?: string } } })
         .response?.data;
       let message = responseData?.message || "An error occurred during login";
-      if (responseData?.code === "noHostAccount") {
+      if (isCaptchaErrorCode(responseData?.code)) {
+        message = captchaErrorMessage(responseData?.code, message);
+      } else if (responseData?.code === "noHostAccount") {
         message =
           "No host account exists for the email address provided. Use the Fan tab for tickets, or sign up as a host to create an organizer account.";
       } else if (responseData?.code === "noFanAccount") {
@@ -105,6 +109,9 @@ function LoginForm() {
           "Please verify your email before signing in. Check your inbox or resend the verification link.";
       }
       setError(message);
+      if (isCaptchaErrorCode(responseData?.code)) {
+        setTurnstileReset((n) => n + 1);
+      }
       setTurnstileToken(null);
     } finally {
       setIsSubmitting(false);
@@ -142,6 +149,7 @@ function LoginForm() {
               onToken={onTurnstileToken}
               onExpire={() => setTurnstileToken(null)}
               onError={() => setTurnstileToken(null)}
+              resetSignal={turnstileReset}
             />
 
             <Button

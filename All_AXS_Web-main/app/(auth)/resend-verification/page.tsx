@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import {
   resendVerificationSchema,
@@ -13,6 +13,8 @@ import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
+import { TurnstileField, getTurnstileSiteKey } from "@/components/auth/TurnstileField";
+import { captchaErrorMessage, isCaptchaErrorCode } from "@/lib/auth/captcha-errors";
 
 const SUCCESS_MESSAGE =
   "If an account with that email exists and is not verified, a verification email has been sent.";
@@ -21,6 +23,13 @@ export default function ResendVerificationPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
+  const turnstileRequired = !!getTurnstileSiteKey();
+
+  const onTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   const {
     register,
@@ -33,16 +42,33 @@ export default function ResendVerificationPage() {
   const onSubmit = async (data: ResendVerificationInput) => {
     setError(null);
     setSuccess(false);
+
+    if (turnstileRequired && !turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const response = await axios.post("/api/auth/resend-verification", data);
+      const response = await axios.post("/api/auth/resend-verification", {
+        ...data,
+        turnstileToken,
+      });
 
       if (response.status === 200) {
         setSuccess(true);
       }
-    } catch {
-      setSuccess(true);
+    } catch (err) {
+      const responseData = (err as { response?: { data?: { message?: string; code?: string } } })
+        .response?.data;
+      if (isCaptchaErrorCode(responseData?.code)) {
+        setError(captchaErrorMessage(responseData?.code, responseData?.message));
+        setTurnstileToken(null);
+        setTurnstileReset((n) => n + 1);
+      } else {
+        setSuccess(true);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -80,7 +106,17 @@ export default function ResendVerificationPage() {
               error={errors.email?.message}
             />
 
-            <Button type="submit" disabled={isSubmitting}>
+            <TurnstileField
+              onToken={onTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+              resetSignal={turnstileReset}
+            />
+
+            <Button
+              type="submit"
+              disabled={isSubmitting || (turnstileRequired && !turnstileToken)}
+            >
               {isSubmitting ? "Sending..." : "Resend Verification Email"}
             </Button>
           </form>

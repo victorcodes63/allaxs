@@ -9,6 +9,7 @@ declare global {
         container: HTMLElement,
         options: {
           sitekey: string;
+          theme?: "light" | "dark" | "auto";
           callback: (token: string) => void;
           "expired-callback"?: () => void;
           "error-callback"?: () => void;
@@ -62,9 +63,16 @@ type TurnstileFieldProps = {
   onToken: (token: string) => void;
   onExpire?: () => void;
   onError?: () => void;
+  /** Increment to destroy and re-render the widget (e.g. after a failed submit). */
+  resetSignal?: number;
 };
 
-export function TurnstileField({ onToken, onExpire, onError }: TurnstileFieldProps) {
+export function TurnstileField({
+  onToken,
+  onExpire,
+  onError,
+  resetSignal = 0,
+}: TurnstileFieldProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const siteKey = getTurnstileSiteKey();
@@ -86,6 +94,7 @@ export function TurnstileField({ onToken, onExpire, onError }: TurnstileFieldPro
         if (cancelled || !containerRef.current || !window.turnstile) return;
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
+          theme: "dark",
           callback: stableOnToken,
           "expired-callback": () => onExpire?.(),
           "error-callback": () => onError?.(),
@@ -100,7 +109,7 @@ export function TurnstileField({ onToken, onExpire, onError }: TurnstileFieldPro
         widgetIdRef.current = null;
       }
     };
-  }, [siteKey, stableOnToken, onExpire, onError]);
+  }, [siteKey, stableOnToken, onExpire, onError, resetSignal]);
 
   if (!siteKey) {
     if (process.env.NODE_ENV === "production") {

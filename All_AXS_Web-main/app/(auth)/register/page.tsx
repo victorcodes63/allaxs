@@ -17,6 +17,7 @@ import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
 import { buildAuthQuery, parseIntent } from "@/lib/auth/post-auth-redirect";
+import { captchaErrorMessage, isCaptchaErrorCode } from "@/lib/auth/captcha-errors";
 
 const AUTH_SUBTITLE = "One account for fans and hosts.";
 
@@ -27,6 +28,7 @@ function RegisterForm() {
   const [guestAccountHintEmail, setGuestAccountHintEmail] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
   const turnstileRequired = !!getTurnstileSiteKey();
   const loginHref = `/login${buildAuthQuery({
     next: searchParams.get("next"),
@@ -83,7 +85,14 @@ function RegisterForm() {
         setGuestAccountHintEmail(data.email);
         setError(null);
       } else {
-        setError(message);
+        setError(
+          isCaptchaErrorCode(responseData?.code)
+            ? captchaErrorMessage(responseData?.code, message)
+            : message,
+        );
+      }
+      if (isCaptchaErrorCode(responseData?.code)) {
+        setTurnstileReset((n) => n + 1);
       }
       setTurnstileToken(null);
     } finally {
@@ -154,6 +163,7 @@ function RegisterForm() {
               onToken={onTurnstileToken}
               onExpire={() => setTurnstileToken(null)}
               onError={() => setTurnstileToken(null)}
+              resetSignal={turnstileReset}
             />
 
             <Button

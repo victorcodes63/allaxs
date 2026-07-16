@@ -21,7 +21,7 @@ export class TurnstileService {
     if (!secret) {
       if (this.configService.get<string>('NODE_ENV') === 'production') {
         this.logger.warn(
-          'TURNSTILE_SECRET_KEY is not set — auth captcha checks are disabled.',
+          'TURNSTILE_SECRET_KEY is not set — auth captcha checks are disabled until configured.',
         );
       }
       return;

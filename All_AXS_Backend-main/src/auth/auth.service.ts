@@ -588,7 +588,10 @@ export class AuthService {
   async forgotPassword(
     email: string,
     ipAddress?: string,
+    turnstileToken?: string,
   ): Promise<{ message: string }> {
+    await this.turnstileService.assertValidToken(turnstileToken, ipAddress);
+
     const user = await this.usersService.findByEmail(email);
 
     // Always return success to prevent email enumeration
@@ -695,7 +698,13 @@ export class AuthService {
    * Only sends if user exists and is not verified
    * Always returns success to prevent email enumeration
    */
-  async resendVerification(email: string): Promise<{ message: string }> {
+  async resendVerification(
+    email: string,
+    ipAddress?: string,
+    turnstileToken?: string,
+  ): Promise<{ message: string }> {
+    await this.turnstileService.assertValidToken(turnstileToken, ipAddress);
+
     const user = await this.usersService.findByEmail(email);
 
     // Always return success to prevent email enumeration
