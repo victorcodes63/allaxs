@@ -11,6 +11,7 @@ declare global {
           sitekey: string;
           theme?: "light" | "dark" | "auto";
           appearance?: "always" | "execute" | "interaction-only";
+          size?: "normal" | "compact" | "flexible";
           callback: (token: string) => void;
           "expired-callback"?: () => void;
           "error-callback"?: () => void;
@@ -85,20 +86,34 @@ export function TurnstileField({
   const onTokenRef = useRef(onToken);
   const onExpireRef = useRef(onExpire);
   const onErrorRef = useRef(onError);
+  const stuckTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const verifiedRef = useRef(false);
   const [stuckHint, setStuckHint] = useState(false);
+  const [verified, setVerified] = useState(false);
   const siteKey = getTurnstileSiteKey();
 
   onTokenRef.current = onToken;
   onExpireRef.current = onExpire;
   onErrorRef.current = onError;
 
-  // Mount once per site key. Callbacks use refs so parent re-renders do not
-  // destroy/recreate the widget (that caused endless "Verifying…" loops).
+  const clearStuckTimer = () => {
+    if (stuckTimerRef.current) {
+      clearTimeout(stuckTimerRef.current);
+      stuckTimerRef.current = undefined;
+    }
+  };
+
+  const armStuckTimer = () => {
+    clearStuckTimer();
+    stuckTimerRef.current = setTimeout(() => {
+      if (!verifiedRef.current) setStuckHint(true);
+    }, STUCK_HINT_MS);
+  };
+
   useEffect(() => {
     if (!siteKey || !containerRef.current) return;
 
     let cancelled = false;
-    let stuckTimer: ReturnType<typeof setTimeout> | undefined;
 
     void loadTurnstileScript()
       .then(() => {
@@ -107,19 +122,31 @@ export function TurnstileField({
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           theme: "dark",
-          appearance: "always",
+          // Invisible unless Cloudflare needs a challenge — keeps auth UI clean.
+          appearance: "interaction-only",
+          size: "flexible",
           callback: (token) => {
+            clearStuckTimer();
+            verifiedRef.current = true;
             setStuckHint(false);
+            setVerified(true);
             onTokenRef.current(token);
           },
-          "expired-callback": () => onExpireRef.current?.(),
+          "expired-callback": () => {
+            verifiedRef.current = false;
+            setVerified(false);
+            armStuckTimer();
+            onExpireRef.current?.();
+          },
           "error-callback": () => {
+            verifiedRef.current = false;
+            setVerified(false);
             setStuckHint(true);
             onErrorRef.current?.();
           },
         });
 
-        stuckTimer = setTimeout(() => setStuckHint(true), STUCK_HINT_MS);
+        armStuckTimer();
       })
       .catch(() => {
         setStuckHint(true);
@@ -128,18 +155,23 @@ export function TurnstileField({
 
     return () => {
       cancelled = true;
-      if (stuckTimer) clearTimeout(stuckTimer);
+      clearStuckTimer();
       if (widgetIdRef.current && window.turnstile) {
         window.turnstile.remove(widgetIdRef.current);
         widgetIdRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once per site key
   }, [siteKey]);
 
   useEffect(() => {
     if (resetSignal <= 0 || !widgetIdRef.current || !window.turnstile) return;
     window.turnstile.reset(widgetIdRef.current);
+    verifiedRef.current = false;
+    setVerified(false);
     setStuckHint(false);
+    armStuckTimer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetSignal]);
 
   if (!siteKey) {
@@ -156,8 +188,17 @@ export function TurnstileField({
 
   return (
     <div className="space-y-1">
-      <div ref={containerRef} className="flex min-h-[65px] justify-center py-1" />
-      {stuckHint ? (
+      {/* Keep mounted so the widget is not torn down; collapse after success. */}
+      <div
+        ref={containerRef}
+        className={
+          verified
+            ? "pointer-events-none h-0 overflow-hidden opacity-0"
+            : "flex min-h-0 justify-center py-0.5"
+        }
+        aria-hidden={verified}
+      />
+      {stuckHint && !verified ? (
         <p className="text-center text-xs text-neutral-400">
           Security check is taking longer than usual. Refresh the page or try disabling ad
           blockers.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import {
@@ -16,20 +16,40 @@ import axios from "axios";
  * When a session already exists on entry-only routes (`/login`, `/register`),
  * send the user to the same destination they would land on after a fresh sign-in
  * (honours `next`, `intent`, organizer onboarding, etc.).
+ *
+ * Only runs for sessions that were already present on first load — not when the
+ * user just signed in on this page (that was causing the "already signed in"
+ * bounce flash before dashboard).
  */
 export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
   const { user, loading, setUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  /** null until first auth settle; then whether they arrived with a session */
+  const arrivedSignedInRef = useRef<boolean | null>(null);
+  const [handoff, setHandoff] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (arrivedSignedInRef.current === null) {
+      arrivedSignedInRef.current = !!user;
+      if (!user) return;
+      setHandoff(true);
+    }
+  }, [loading, user]);
 
   useEffect(() => {
     if (loading || !user) return;
+    if (arrivedSignedInRef.current !== true) return;
+
     let cancelled = false;
     void (async () => {
       try {
         const me = await axios.get("/api/auth/me");
         if (cancelled || !me.data?.user) {
           setUser(null);
+          setHandoff(false);
+          arrivedSignedInRef.current = false;
           return;
         }
 
@@ -62,6 +82,8 @@ export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
       } catch {
         if (!cancelled) {
           setUser(null);
+          setHandoff(false);
+          arrivedSignedInRef.current = false;
         }
       }
     })();
@@ -70,7 +92,7 @@ export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
     };
   }, [loading, user, router, searchParams, setUser]);
 
-  if (loading) return "checking";
-  if (user) return "handoff";
+  if (loading && arrivedSignedInRef.current === null) return "checking";
+  if (handoff) return "handoff";
   return "ready";
 }

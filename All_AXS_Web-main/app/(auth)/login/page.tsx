@@ -80,21 +80,8 @@ function LoginForm() {
       });
 
       if (response.status === 200) {
-        const loginUser = response.data?.user;
-        if (loginUser && typeof loginUser === "object") {
-          const u = loginUser as Record<string, unknown>;
-          setUser({
-            id: typeof u.id === "string" ? u.id : "",
-            email: typeof u.email === "string" ? u.email : "",
-            name: typeof u.name === "string" ? u.name : undefined,
-            roles: Array.isArray(u.roles)
-              ? u.roles.filter((r): r is string => typeof r === "string")
-              : undefined,
-          });
-        }
-
-        // Confirm cookies are readable by the Next route before navigating.
-        // A soft client transition can race Set-Cookie and bounce back to /login.
+        // Confirm cookies are readable before leaving /login. Do not setUser
+        // first — that used to flip the entry gate to "already signed in".
         await refreshAuth();
         const snapshot = await fetchPostAuthSnapshot();
         const roleCheck = validateSignInIntentAgainstDbRoles(intent, snapshot.roles);
@@ -102,6 +89,7 @@ function LoginForm() {
           await axios.post("/api/auth/logout").catch(() => undefined);
           setUser(null);
           setError(roleCheck.message);
+          setIsSubmitting(false);
           return;
         }
         const path = resolvePostAuthRedirect({
@@ -110,6 +98,7 @@ function LoginForm() {
           roles: snapshot.roles,
           hasOrganizerProfile: snapshot.hasOrganizerProfile,
         });
+        // Keep submitting=true so the form stays on "Signing in…" until unload.
         window.location.assign(path);
         return;
       }
@@ -134,7 +123,6 @@ function LoginForm() {
         setTurnstileReset((n) => n + 1);
       }
       setTurnstileToken(null);
-    } finally {
       setIsSubmitting(false);
     }
   };
