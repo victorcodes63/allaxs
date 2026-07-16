@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeWebUserRoles } from "@/lib/auth/hub-routing";
-
-const API_URL = process.env.API_URL || "http://localhost:8080";
+import { getServerApiBaseUrl } from "@/lib/server/api-url";
+import { setAuthCookiesOnResponse } from "@/lib/server/auth-cookies";
 
 type ApiUser = {
   id?: string;
@@ -49,27 +49,8 @@ async function readAccessToken() {
   return cookieStore.get("accessToken")?.value;
 }
 
-function setAuthCookies(
-  response: NextResponse,
-  tokens: { accessToken: string; refreshToken: string },
-) {
-  response.cookies.set("accessToken", tokens.accessToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 15,
-  });
-  response.cookies.set("refreshToken", tokens.refreshToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
-}
-
 export async function GET() {
+  const API_URL = getServerApiBaseUrl();
   try {
     const accessToken = await readAccessToken();
     if (!accessToken) {
@@ -102,6 +83,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  const API_URL = getServerApiBaseUrl();
   try {
     const accessToken = await readAccessToken();
     if (!accessToken) {
@@ -132,7 +114,7 @@ export async function PATCH(request: NextRequest) {
     const user = mapUser(data.user);
     const next = NextResponse.json({ user });
     if (data.tokens?.accessToken && data.tokens?.refreshToken) {
-      setAuthCookies(next, data.tokens);
+      setAuthCookiesOnResponse(next, data.tokens);
     }
     return next;
   } catch (error) {

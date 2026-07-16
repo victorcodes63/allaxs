@@ -73,6 +73,15 @@ export async function POST(request: NextRequest) {
     }
 
     const { accessToken, refreshToken } = extractAuthTokens(data);
+    if (!accessToken || !refreshToken) {
+      return NextResponse.json(
+        {
+          message: "Login succeeded but session cookies could not be created",
+          code: "missingTokens",
+        },
+        { status: 502 },
+      );
+    }
     const res = NextResponse.json({ user: data.user });
     setAuthCookiesOnResponse(res, { accessToken, refreshToken });
     return res;

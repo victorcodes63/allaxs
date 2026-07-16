@@ -93,11 +93,15 @@ function LoginForm() {
               : undefined,
           });
         }
+
+        // Confirm cookies are readable by the Next route before navigating.
+        // A soft client transition can race Set-Cookie and bounce back to /login.
         await refreshAuth();
         const snapshot = await fetchPostAuthSnapshot();
         const roleCheck = validateSignInIntentAgainstDbRoles(intent, snapshot.roles);
         if (!roleCheck.ok) {
           await axios.post("/api/auth/logout").catch(() => undefined);
+          setUser(null);
           setError(roleCheck.message);
           return;
         }
@@ -107,7 +111,8 @@ function LoginForm() {
           roles: snapshot.roles,
           hasOrganizerProfile: snapshot.hasOrganizerProfile,
         });
-        router.push(path);
+        window.location.assign(path);
+        return;
       }
     } catch (err) {
       const responseData = (err as { response?: { data?: { message?: string; code?: string } } })

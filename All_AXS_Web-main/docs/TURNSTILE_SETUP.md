@@ -76,6 +76,7 @@ Restart `npm run dev` on both after adding keys.
 | Symptom | Fix |
 |---------|-----|
 | Widget blank / error | Domain not listed on the Turnstile widget (add `axs.africa` / `localhost`) |
+| Widget invisible / only stuck hint | Ad blocker, domain mismatch, or site key wrong — refresh; confirm hostname on the Turnstile widget |
 | Spinner stuck on "Verifying…" | Usually a re-render loop (fixed in `TurnstileField`) or ad blocker / domain mismatch — refresh once; add hostname to widget if prod |
 | “Security verification failed” | Site key and secret key are from **different** widgets, or secret not on API |
 | Widget missing in prod | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` not set or deploy happened before env save |

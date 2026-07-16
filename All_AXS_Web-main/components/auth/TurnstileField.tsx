@@ -24,7 +24,7 @@ declare global {
 
 const SCRIPT_ID = "cloudflare-turnstile-script";
 const READY_TIMEOUT_MS = 10_000;
-const STUCK_HINT_MS = 20_000;
+const STUCK_HINT_MS = 25_000;
 
 function waitForTurnstile(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -92,6 +92,8 @@ export function TurnstileField({
   onExpireRef.current = onExpire;
   onErrorRef.current = onError;
 
+  // Mount once per site key. Callbacks use refs so parent re-renders do not
+  // destroy/recreate the widget (that caused endless "Verifying…" loops).
   useEffect(() => {
     if (!siteKey || !containerRef.current) return;
 
@@ -105,16 +107,14 @@ export function TurnstileField({
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           theme: "dark",
-          // Hide the widget unless Cloudflare needs user interaction — avoids
-          // an endless "Verifying…" spinner for most real users.
-          appearance: "interaction-only",
+          appearance: "always",
           callback: (token) => {
             setStuckHint(false);
             onTokenRef.current(token);
           },
           "expired-callback": () => onExpireRef.current?.(),
           "error-callback": () => {
-            setStuckHint(false);
+            setStuckHint(true);
             onErrorRef.current?.();
           },
         });
@@ -156,7 +156,7 @@ export function TurnstileField({
 
   return (
     <div className="space-y-1">
-      <div ref={containerRef} className="flex min-h-0 justify-center py-1" />
+      <div ref={containerRef} className="flex min-h-[65px] justify-center py-1" />
       {stuckHint ? (
         <p className="text-center text-xs text-neutral-400">
           Security check is taking longer than usual. Refresh the page or try disabling ad
