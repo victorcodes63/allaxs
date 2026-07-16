@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { buildHubLegalLinks } from "@/lib/legal/hub-paths";
 import { HELP_FAQ_SECTIONS } from "@/lib/marketing/help-faq";
+import {
+  PLATFORM_SUPPORT_EMAIL,
+  platformSupportMailto,
+} from "@/lib/site-contact";
 
 const FAQ_SECTIONS = HELP_FAQ_SECTIONS;
 
@@ -36,10 +40,10 @@ export default function FanSupportPage() {
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <a
-            href="mailto:hello@allaxs.com?subject=All%20AXS%20fan%20support"
+            href={platformSupportMailto({ subject: "All AXS fan support" })}
             className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] bg-primary px-6 text-sm font-semibold text-white"
           >
-            Email hello@allaxs.com
+            Email {PLATFORM_SUPPORT_EMAIL}
           </a>
           <Link
             href="/dashboard/refunds"

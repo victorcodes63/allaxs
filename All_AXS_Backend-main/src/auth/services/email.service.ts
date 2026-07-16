@@ -8,6 +8,7 @@ import {
   type TicketEmailTicketInput,
 } from '../../tickets/ticket-email.util';
 import { TicketPdfService } from '../../tickets/ticket-pdf.service';
+import { resolvePlatformSupportEmail } from '../../common/site-contact';
 
 type ResendSendResult = {
   data?: { id?: string } | null;
@@ -1140,7 +1141,7 @@ export class EmailService {
       '',
     );
     const supportEmail =
-      input.organizerSupportEmail?.trim() || 'hello@allaxs.com';
+      input.organizerSupportEmail?.trim() || resolvePlatformSupportEmail();
     const supportUrl = `mailto:${supportEmail}`;
     const amountLabel = this.formatMoney(input.amountCents, input.currency);
     const paidAtLabel = input.paidAt.toLocaleString('en-GB', {
@@ -1386,7 +1387,7 @@ export class EmailService {
       '',
     );
     const ticketsUrl = `${homeUrl}/tickets`;
-    const supportEmail = 'hello@allaxs.com';
+    const supportEmail = resolvePlatformSupportEmail();
     const supportUrl = `mailto:${supportEmail}`;
     const greeting = input.buyerName?.trim()
       ? `Hello ${input.buyerName.trim()},`

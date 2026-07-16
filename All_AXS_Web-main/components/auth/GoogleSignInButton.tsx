@@ -9,7 +9,9 @@ import {
   parseIntent,
   promoteHostIntentIfNeeded,
   resolvePostAuthRedirect,
+  type AuthIntent,
 } from "@/lib/auth/post-auth-redirect";
+import { validateSignInIntentAgainstDbRoles } from "@/lib/auth/intent-access";
 import { useAuth } from "@/lib/auth";
 import { getGoogleOAuthWebClientId } from "@/lib/google-oauth-web-client";
 
@@ -70,15 +72,24 @@ export function GoogleOAuthDisabledPlaceholder() {
 type GoogleSignInButtonProps = {
   nextParam: string | null;
   intentParam: string | null;
+  /** Host self-promotion after OAuth — only for register / check-email, not login. */
+  promoteHostOnSuccess?: boolean;
 };
 
-export function GoogleSignInButton({ nextParam, intentParam }: GoogleSignInButtonProps) {
+export function GoogleSignInButton({
+  nextParam,
+  intentParam,
+  promoteHostOnSuccess = false,
+}: GoogleSignInButtonProps) {
   const clientId = getGoogleOAuthWebClientId();
   const router = useRouter();
   const { refresh: refreshAuth } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
-  const intent = useMemo(() => parseIntent(intentParam), [intentParam]);
+  const intent = useMemo(
+    (): AuthIntent => parseIntent(intentParam) ?? "attend",
+    [intentParam],
+  );
 
   const onSuccess = useCallback(
     async (cred: CredentialResponse) => {
@@ -88,10 +99,22 @@ export function GoogleSignInButton({ nextParam, intentParam }: GoogleSignInButto
       }
       setError(null);
       try {
-        await axios.post("/api/auth/google", { credential: cred.credential });
-        await promoteHostIntentIfNeeded(intent);
-        const snapshot = await fetchPostAuthSnapshot();
+        await axios.post("/api/auth/google", {
+          credential: cred.credential,
+          intent,
+        });
+        if (promoteHostOnSuccess) {
+          await promoteHostIntentIfNeeded(intent);
+        }
         await refreshAuth();
+        const snapshot = await fetchPostAuthSnapshot();
+        const roleCheck = validateSignInIntentAgainstDbRoles(intent, snapshot.roles);
+        if (!roleCheck.ok) {
+          await axios.post("/api/auth/logout").catch(() => undefined);
+          await refreshAuth();
+          setError(roleCheck.message);
+          return;
+        }
         const path = resolvePostAuthRedirect({
           nextParam,
           intent,
@@ -100,13 +123,21 @@ export function GoogleSignInButton({ nextParam, intentParam }: GoogleSignInButto
         });
         router.push(path);
       } catch (err) {
-        const msg = isAxiosError(err)
-          ? (err.response?.data as { message?: string } | undefined)?.message
+        const responseData = isAxiosError(err)
+          ? (err.response?.data as { message?: string; code?: string } | undefined)
           : undefined;
-        setError(msg || "Google sign-in failed. Try again or use email and password.");
+        let message = responseData?.message || "Google sign-in failed. Try again or use email and password.";
+        if (responseData?.code === "noHostAccount") {
+          message =
+            "No host account exists for the email address provided. Use the Fan tab for tickets, or sign up as a host to create an organizer account.";
+        } else if (responseData?.code === "noFanAccount") {
+          message =
+            "No fan account exists for the email address provided. Use the Host tab if you are an organizer.";
+        }
+        setError(message);
       }
     },
-    [intent, nextParam, refreshAuth, router],
+    [intent, nextParam, promoteHostOnSuccess, refreshAuth, router],
   );
 
   if (!clientId) {
@@ -161,6 +192,7 @@ export function AuthGoogleSection({
   intentParam,
   layout = "oauthAfterDivider",
   emailFormDividerLabel,
+  promoteHostOnSuccess = false,
 }: {
   nextParam: string | null;
   intentParam: string | null;
@@ -168,6 +200,7 @@ export function AuthGoogleSection({
   layout?: "oauthAfterDivider" | "oauthFirst";
   /** When `layout` is `oauthFirst`, shown between the lines under the Google button (e.g. "Sign in with email"). */
   emailFormDividerLabel?: string;
+  promoteHostOnSuccess?: boolean;
 }) {
   const configured = !!getGoogleOAuthWebClientId();
 
@@ -184,7 +217,11 @@ export function AuthGoogleSection({
     return (
       <div className="space-y-4">
         {configured ? (
-          <GoogleSignInButton nextParam={nextParam} intentParam={intentParam} />
+          <GoogleSignInButton
+            nextParam={nextParam}
+            intentParam={intentParam}
+            promoteHostOnSuccess={promoteHostOnSuccess}
+          />
         ) : (
           <GoogleOAuthDisabledPlaceholder />
         )}
@@ -204,7 +241,11 @@ export function AuthGoogleSection({
   return (
     <div className="space-y-4">
       {orRule}
-      <GoogleSignInButton nextParam={nextParam} intentParam={intentParam} />
+      <GoogleSignInButton
+        nextParam={nextParam}
+        intentParam={intentParam}
+        promoteHostOnSuccess={promoteHostOnSuccess}
+      />
     </div>
   );
 }

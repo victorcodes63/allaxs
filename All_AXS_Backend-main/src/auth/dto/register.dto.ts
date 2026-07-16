@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -13,4 +13,9 @@ export class RegisterDto {
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
   @IsNotEmpty()
   password!: string;
+
+  /** Cloudflare Turnstile token — required when TURNSTILE_SECRET_KEY is set. */
+  @IsOptional()
+  @IsString()
+  turnstileToken?: string;
 }

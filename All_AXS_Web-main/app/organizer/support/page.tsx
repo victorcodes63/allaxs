@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { buildHubLegalLinks } from "@/lib/legal/hub-paths";
 import { HOST_FAQ_SECTIONS } from "@/lib/marketing/host-faq";
+import {
+  PLATFORM_SUPPORT_EMAIL,
+  platformSupportMailto,
+} from "@/lib/site-contact";
 
 export default function OrganizerSupportPage() {
   const legalLinks = buildHubLegalLinks("/organizer");
@@ -34,10 +38,10 @@ export default function OrganizerSupportPage() {
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <a
-            href="mailto:hello@allaxs.com?subject=All%20AXS%20organizer%20support"
+            href={platformSupportMailto({ subject: "All AXS organizer support" })}
             className="inline-flex min-h-[var(--btn-min-h)] items-center justify-center rounded-[var(--radius-button)] bg-primary px-6 text-sm font-semibold text-white"
           >
-            Email hello@allaxs.com
+            Email {PLATFORM_SUPPORT_EMAIL}
           </a>
           <Link
             href="/organizer/refunds"

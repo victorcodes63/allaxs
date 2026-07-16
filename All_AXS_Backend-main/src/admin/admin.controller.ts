@@ -42,6 +42,7 @@ import { AdminAuditService } from './admin-audit.service';
 import { OrderRefundService } from './order-refund.service';
 import { RefundOrderDto } from './dto/refund-order.dto';
 import { ReassignOrderBuyerDto } from './dto/reassign-order-buyer.dto';
+import { AdminBotCleanupService } from './admin-bot-cleanup.service';
 import { AdminOrderBuyerService } from './admin-order-buyer.service';
 import { AdminAction } from './decorators/admin-action.decorator';
 import { AdminAuditInterceptor } from './interceptors/admin-audit.interceptor';
@@ -78,6 +79,7 @@ export class AdminController {
     private readonly orderRefundService: OrderRefundService,
     private readonly organizerProfilesService: OrganizerProfilesService,
     private readonly adminOrderBuyerService: AdminOrderBuyerService,
+    private readonly adminBotCleanupService: AdminBotCleanupService,
   ) {}
 
   @Get('ping')
@@ -1667,6 +1669,46 @@ export class AdminController {
       },
       revokedSessions,
     };
+  }
+
+  @Post('users/bulk-suspend-bots')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Suspend likely bot accounts (Gmail dot aliases + random names)',
+  })
+  async bulkSuspendLikelyBots(
+    @Body() body: { dryRun?: boolean; limit?: number },
+    @GetUser() user: CurrentUser,
+    @Req() request: Request,
+  ) {
+    const dryRun = body?.dryRun !== false;
+    const result = await this.adminBotCleanupService.suspendLikelyBots({
+      dryRun,
+      limit: body?.limit,
+    });
+
+    if (!dryRun) {
+      await this.adminAuditService.logAction({
+        adminUserId: user.id,
+        action: 'BULK_SUSPEND_BOTS',
+        resourceType: 'user',
+        resourceId: 'bulk',
+        metadata: {
+          matched: result.matched,
+          suspended: result.suspended,
+        },
+        ipAddress:
+          request.ip ||
+          (request.headers['x-forwarded-for'] as string)
+            ?.split(',')[0]
+            ?.trim() ||
+          (request.headers['x-real-ip'] as string) ||
+          null,
+        userAgent: (request.headers['user-agent'] as string) || null,
+      });
+    }
+
+    return result;
   }
 
   @Patch('users/:id/roles')

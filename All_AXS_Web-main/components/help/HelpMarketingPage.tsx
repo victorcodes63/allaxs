@@ -14,6 +14,10 @@ import { ArrowCtaLink } from "@/components/ui/ArrowCta";
 import { shouldUnoptimizeEventImage } from "@/lib/utils/image";
 import { marketingImages } from "@/lib/marketing-images";
 import { HELP_FAQ_SECTIONS } from "@/lib/marketing/help-faq";
+import {
+  PLATFORM_SUPPORT_EMAIL,
+  platformSupportMailto,
+} from "@/lib/site-contact";
 
 /** Vertical rhythm between major page sections — matches `OrganizersMarketingPage`. */
 const SECTION = "mb-16 md:mb-24";
@@ -110,11 +114,11 @@ function HelpParallaxHero() {
                   className="flex flex-wrap gap-4 pt-2"
                 >
                   <ArrowCtaLink
-                    href="mailto:hello@allaxs.com?subject=All%20AXS%20fan%20support"
+                    href={platformSupportMailto({ subject: "All AXS fan support" })}
                     variant="primary"
                     className="justify-center"
                   >
-                    Email hello@allaxs.com
+                    Email {PLATFORM_SUPPORT_EMAIL}
                   </ArrowCtaLink>
                   <ArrowCtaLink href="/login" variant="outline" className="justify-center">
                     Sign in to your account
@@ -145,7 +149,7 @@ const QUICK_LINKS = [
   {
     title: "Payment trouble",
     body: "If a charge succeeded but no passes arrived, contact us with your payment reference — we'll trace it fast.",
-    href: "mailto:hello@allaxs.com?subject=Payment%20issue",
+    href: platformSupportMailto({ subject: "Payment issue" }),
     cta: "Email support",
   },
 ] as const;
@@ -248,10 +252,10 @@ function FaqAccordion({ reduce }: { reduce: boolean }) {
             >
               These cover refunds, tickets, accounts, and payments. Anything missing? Drop us a line at{" "}
               <a
-                href="mailto:hello@allaxs.com"
+                href={platformSupportMailto()}
                 className="font-semibold text-primary hover:underline"
               >
-                hello@allaxs.com
+                {PLATFORM_SUPPORT_EMAIL}
               </a>
               .
             </motion.p>
@@ -395,11 +399,11 @@ function ContactBand({ reduce }: { reduce: boolean }) {
               className="flex shrink-0 flex-col gap-3 sm:flex-row"
             >
               <ArrowCtaLink
-                href="mailto:hello@allaxs.com?subject=All%20AXS%20fan%20support"
+                href={platformSupportMailto({ subject: "All AXS fan support" })}
                 variant="primary"
                 className="justify-center"
               >
-                hello@allaxs.com
+                {PLATFORM_SUPPORT_EMAIL}
               </ArrowCtaLink>
               <ArrowCtaLink href="/contact" variant="outline" className="justify-center">
                 Contact form

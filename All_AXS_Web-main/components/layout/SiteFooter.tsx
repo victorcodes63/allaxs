@@ -5,6 +5,7 @@ import { FooterBackToTop } from "@/components/layout/FooterBackToTop";
 import { FooterStayInTheLoop } from "@/components/layout/FooterStayInTheLoop";
 import { FooterLegalLinks } from "@/components/legal/FooterLegalLinks";
 import { withPublicBrowseIntent } from "@/lib/auth/guest-only-public-routes";
+import { PLATFORM_SUPPORT_EMAIL } from "@/lib/site-contact";
 
 const FOOTER_NAV = [
   ["/", "Home"],
@@ -24,8 +25,6 @@ const AUTH_COMPACT_NAV = [
   ["/organizers", "Organizers"],
   ["/help", "Help"],
 ] as const;
-
-const CONTACT_EMAIL = "hello@allaxs.com";
 
 /** Served from `public/brand/logo-on-dark.png` (use `/brand/…` in `next/image`). */
 const FOOTER_LOGO_SRC = "/brand/logo-on-dark.png" as const;
@@ -58,10 +57,10 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
               Contact
             </p>
             <a
-              href={`mailto:${CONTACT_EMAIL}`}
+              href={`mailto:${PLATFORM_SUPPORT_EMAIL}`}
               className="truncate text-sm font-medium text-white/90 transition-colors hover:text-primary"
             >
-              {CONTACT_EMAIL}
+              {PLATFORM_SUPPORT_EMAIL}
             </a>
           </div>
           <nav
@@ -120,10 +119,10 @@ export function SiteFooter({ authContinuation }: { authContinuation?: boolean })
                   </p>
                   <div className="mt-3 border-b border-foreground/25 pb-2">
                     <a
-                      href={`mailto:${CONTACT_EMAIL}`}
+                      href={`mailto:${PLATFORM_SUPPORT_EMAIL}`}
                       className="text-sm font-medium text-foreground/70 transition-colors hover:text-primary/90 md:text-base"
                     >
-                      {CONTACT_EMAIL}
+                      {PLATFORM_SUPPORT_EMAIL}
                     </a>
                   </div>
                 </div>

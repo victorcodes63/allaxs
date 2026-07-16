@@ -1,18 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import {
+  authRateLimitResponse,
+  checkAuthRouteRateLimit,
+  clientIpFromRequest,
+} from "@/lib/server/auth-rate-limit";
+import {
   getServerApiBaseUrl,
   upstreamUnreachableMessage,
 } from "@/lib/server/api-url";
 import { extractAuthTokens } from "@/lib/server/auth-tokens";
-import { formatUpstreamErrorMessage } from "@/lib/server/format-upstream-error-message";
+import {
+  extractUpstreamErrorCode,
+  formatUpstreamErrorMessage,
+} from "@/lib/server/format-upstream-error-message";
 
 export async function POST(request: NextRequest) {
   const API_URL = getServerApiBaseUrl();
+  const ip = clientIpFromRequest(request);
+  if (!checkAuthRouteRateLimit(`auth-google:${ip}`)) {
+    return authRateLimitResponse();
+  }
 
   try {
     const body = await request.json();
     const credential = typeof body?.credential === "string" ? body.credential : "";
+    const intent =
+      body?.intent === "host" || body?.intent === "attend" ? body.intent : undefined;
+    const turnstileToken =
+      typeof body?.turnstileToken === "string" ? body.turnstileToken : undefined;
 
     if (!credential.trim()) {
       return NextResponse.json({ message: "Google credential is required" }, { status: 400 });
@@ -23,7 +39,11 @@ export async function POST(request: NextRequest) {
       response = await fetch(`${API_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify({
+          credential,
+          turnstileToken,
+          ...(intent ? { intent } : {}),
+        }),
       });
     } catch (err) {
       const unreachable = upstreamUnreachableMessage(err, API_URL);
@@ -49,7 +69,10 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { message: formatUpstreamErrorMessage(data) ?? "Google sign-in failed" },
+        {
+          message: formatUpstreamErrorMessage(data) ?? "Google sign-in failed",
+          code: extractUpstreamErrorCode(data),
+        },
         { status: response.status },
       );
     }
@@ -84,6 +107,9 @@ export async function POST(request: NextRequest) {
     if (unreachable) {
       return NextResponse.json({ message: unreachable }, { status: 503 });
     }
-    return NextResponse.json({ message: "An error occurred during Google sign-in" }, { status: 500 });
+    return NextResponse.json(
+      { message: "An error occurred during Google sign-in" },
+      { status: 500 },
+    );
   }
 }

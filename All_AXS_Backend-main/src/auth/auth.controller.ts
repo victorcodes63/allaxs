@@ -225,6 +225,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async googleAuth(@Body() dto: GoogleAuthDto, @Req() req: Request) {
     const metadata = this.extractMetadata(req);
-    return this.authService.signInWithGoogle(dto.credential, metadata);
+    return this.authService.signInWithGoogle(
+      dto.credential,
+      metadata,
+      dto.intent,
+      dto.turnstileToken,
+    );
   }
 }

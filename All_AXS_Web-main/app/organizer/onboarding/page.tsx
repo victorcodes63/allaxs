@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth";
-import { rolesIncludeAdmin } from "@/lib/auth/hub-routing";
+import { rolesIncludeAdmin, userHasRole } from "@/lib/auth/hub-routing";
 
 type Step = 1 | 2;
 
@@ -43,12 +43,20 @@ export default function OnboardingPage() {
     if (authLoading) return;
     if (user && rolesIncludeAdmin(user.roles ?? [])) {
       router.replace("/admin");
+      return;
+    }
+    if (user && !userHasRole(user, "ORGANIZER")) {
+      router.replace("/dashboard");
     }
   }, [authLoading, user, router]);
 
-  // Check if profile already exists on mount
+  // Check if profile already exists on mount (organizer accounts only)
   useEffect(() => {
-    if (authLoading || (user && rolesIncludeAdmin(user.roles ?? []))) return;
+    if (authLoading || !user || rolesIncludeAdmin(user.roles ?? [])) return;
+    if (!userHasRole(user, "ORGANIZER")) {
+      setIsChecking(false);
+      return;
+    }
     let cancelled = false;
     const checkProfile = async () => {
       try {
@@ -146,7 +154,7 @@ export default function OnboardingPage() {
     }
   };
 
-  if (isChecking) {
+  if (authLoading || isChecking) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <div className="text-center">
@@ -154,6 +162,10 @@ export default function OnboardingPage() {
         </div>
       </div>
     );
+  }
+
+  if (user && !userHasRole(user, "ORGANIZER") && !rolesIncludeAdmin(user.roles ?? [])) {
+    return null;
   }
 
   if (hasProfile) {

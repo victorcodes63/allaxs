@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { contactFormSchema } from "@/lib/marketing/contact";
+import { PLATFORM_SUPPORT_EMAIL } from "@/lib/site-contact";
 
 const SUCCESS_MESSAGE = "Thanks — your message reached our team.";
-const FALLBACK_FROM = "All AXS Website <hello@allaxs.com>";
-const FALLBACK_TO = "hello@allaxs.com";
+const FALLBACK_FROM = `All AXS Website <${PLATFORM_SUPPORT_EMAIL}>`;
+const FALLBACK_TO = PLATFORM_SUPPORT_EMAIL;
 
 function escapeHtml(value: string): string {
   return value
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
       {
         ok: false,
         message:
-          "We couldn't deliver that just now. Please email hello@allaxs.com directly.",
+          `We couldn't deliver that just now. Please email ${PLATFORM_SUPPORT_EMAIL} directly.`,
       },
       { status: 502 },
     );
@@ -111,7 +112,7 @@ export async function POST(request: NextRequest) {
       {
         ok: false,
         message:
-          "We couldn't deliver that just now. Please email hello@allaxs.com directly.",
+          `We couldn't deliver that just now. Please email ${PLATFORM_SUPPORT_EMAIL} directly.`,
       },
       { status: 500 },
     );

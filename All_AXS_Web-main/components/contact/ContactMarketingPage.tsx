@@ -18,6 +18,10 @@ import {
   contactFormSchema,
   type ContactFormInput,
 } from "@/lib/marketing/contact";
+import {
+  PLATFORM_SUPPORT_EMAIL,
+  platformSupportMailto,
+} from "@/lib/site-contact";
 
 /** Vertical rhythm between major sections — matches `OrganizersMarketingPage`. */
 const SECTION = "mb-16 md:mb-24";
@@ -166,14 +170,14 @@ function ContactFormSection({ reduce }: { reduce: boolean }) {
           kind: "error",
           message:
             body.message ??
-            "We couldn't deliver that just now. Please email hello@allaxs.com directly.",
+            `We couldn't deliver that just now. Please email ${PLATFORM_SUPPORT_EMAIL} directly.`,
         });
       }
     } catch {
       setStatus({
         kind: "error",
         message:
-          "We couldn't reach the server. Please email hello@allaxs.com directly.",
+          `We couldn't reach the server. Please email ${PLATFORM_SUPPORT_EMAIL} directly.`,
       });
     }
   };
@@ -327,10 +331,10 @@ function ContactFormSection({ reduce }: { reduce: boolean }) {
                 </p>
                 <p className="mt-3 font-display text-lg font-semibold text-foreground">
                   <a
-                    href="mailto:hello@allaxs.com"
+                    href={platformSupportMailto()}
                     className="hover:text-primary hover:underline"
                   >
-                    hello@allaxs.com
+                    {PLATFORM_SUPPORT_EMAIL}
                   </a>
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-muted">

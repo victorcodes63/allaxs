@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import webpush from 'web-push';
 import { WebPushSubscription } from './entities/web-push-subscription.entity';
 import { User } from 'src/users/entities/user.entity';
+import { resolvePlatformSupportEmail } from '../common/site-contact';
 
 export type WebPushPayload = {
   title: string;
@@ -36,7 +37,7 @@ export class WebPushService implements OnModuleInit {
     const privateKey = this.config.get<string>('WEB_PUSH_VAPID_PRIVATE_KEY');
     const subject =
       this.config.get<string>('WEB_PUSH_VAPID_SUBJECT') ||
-      'mailto:hello@allaxs.com';
+      `mailto:${resolvePlatformSupportEmail()}`;
 
     if (!publicKey || !privateKey) {
       this.logger.warn(

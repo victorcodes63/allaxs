@@ -1,18 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import {
+  authRateLimitResponse,
+  checkAuthRouteRateLimit,
+  clientIpFromRequest,
+} from "@/lib/server/auth-rate-limit";
+import {
   getServerApiBaseUrl,
   upstreamUnreachableMessage,
 } from "@/lib/server/api-url";
 import { extractAuthTokens } from "@/lib/server/auth-tokens";
-import { formatUpstreamErrorMessage } from "@/lib/server/format-upstream-error-message";
+import {
+  formatUpstreamErrorMessage,
+  extractUpstreamErrorCode,
+} from "@/lib/server/format-upstream-error-message";
 
 export async function POST(request: NextRequest) {
   const API_URL = getServerApiBaseUrl();
+  const ip = clientIpFromRequest(request);
+  if (!checkAuthRouteRateLimit(`auth-login:${ip}`)) {
+    return authRateLimitResponse();
+  }
 
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { email, password, intent, turnstileToken } = body;
 
     let response: Response;
     try {
@@ -21,7 +33,12 @@ export async function POST(request: NextRequest) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+          turnstileToken,
+          ...(intent === "attend" || intent === "host" ? { intent } : {}),
+        }),
       });
     } catch (err) {
       const unreachable = upstreamUnreachableMessage(err, API_URL);
@@ -41,15 +58,15 @@ export async function POST(request: NextRequest) {
       try {
         data = JSON.parse(rawBody) as typeof data;
       } catch {
-        /* non-JSON (e.g. HTML from a proxy); leave data empty */
+        /* non-JSON */
       }
     }
 
     if (!response.ok) {
       return NextResponse.json(
         {
-          message:
-            formatUpstreamErrorMessage(data) ?? "Login failed",
+          message: formatUpstreamErrorMessage(data) ?? "Login failed",
+          code: extractUpstreamErrorCode(data),
         },
         { status: response.status },
       );

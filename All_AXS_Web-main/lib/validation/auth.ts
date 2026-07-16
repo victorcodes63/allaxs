@@ -1,10 +1,14 @@
 import { z } from "zod";
+import { isPlausibleHumanName } from "@/lib/validation/human-name";
 
 export const registerSchema = z.object({
   name: z
     .string()
     .min(2, "Name must be at least 2 characters")
-    .max(100, "Name must be less than 100 characters"),
+    .max(100, "Name must be less than 100 characters")
+    .refine(isPlausibleHumanName, {
+      message: "Please enter your real name (first and last name).",
+    }),
   email: z.string().email("Please enter a valid email address"),
   password: z
     .string()

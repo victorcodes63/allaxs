@@ -4,11 +4,12 @@ import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import {
+  buildAuthQuery,
   fetchPostAuthSnapshot,
   parseIntent,
-  promoteHostIntentIfNeeded,
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
+import { validateSignInIntentAgainstDbRoles } from "@/lib/auth/intent-access";
 
 /**
  * When a session already exists on entry-only routes (`/login`, `/register`),
@@ -25,10 +26,25 @@ export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
     let cancelled = false;
     void (async () => {
       try {
-        const intent = parseIntent(searchParams.get("intent"));
-        await promoteHostIntentIfNeeded(intent);
+        const intent = parseIntent(searchParams.get("intent")) ?? "attend";
         const snapshot = await fetchPostAuthSnapshot();
         if (cancelled) return;
+
+        const roleCheck = validateSignInIntentAgainstDbRoles(intent, snapshot.roles);
+        if (!roleCheck.ok) {
+          if (roleCheck.code === "noHostAccount") {
+            router.replace("/dashboard?notice=noHostAccount");
+          } else {
+            router.replace(
+              `/login${buildAuthQuery({
+                next: searchParams.get("next"),
+                intent,
+              })}&error=noFanAccount`,
+            );
+          }
+          return;
+        }
+
         const path = resolvePostAuthRedirect({
           nextParam: searchParams.get("next"),
           intent,

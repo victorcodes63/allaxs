@@ -24,9 +24,13 @@ import {
 import { EmailVerificationService } from './services/email-verification.service';
 import { PasswordResetService } from './services/password-reset.service';
 import { EmailService } from './services/email.service';
+import { TurnstileService } from './services/turnstile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateNotificationPrefsDto } from './dto/update-notification-prefs.dto';
 import { CloseAccountDto } from './dto/close-account.dto';
+import { canonicalizeEmail } from '../common/email-normalization';
+import { isDisposableEmailDomain } from '../common/disposable-email';
+import { isPlausibleHumanName } from '../common/human-name-validation';
 
 export interface AuthTokens {
   accessToken: string;
@@ -43,6 +47,16 @@ export interface AuthResponse {
   tokens: AuthTokens;
 }
 
+export interface RegisterPendingResponse {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    roles: Role[];
+  };
+  requiresEmailVerification: true;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -55,36 +69,81 @@ export class AuthService {
     private readonly emailVerificationService: EmailVerificationService,
     private readonly passwordResetService: PasswordResetService,
     private readonly emailService: EmailService,
+    private readonly turnstileService: TurnstileService,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepository: Repository<RefreshToken>,
   ) {}
 
+  /**
+   * Host sign-in requires an existing organizer account. Fans must use the
+   * Fan tab or complete host registration first — we never mint a session
+   * for host intent when the email is attendee-only.
+   */
+  private assertHostLoginAllowed(user: User): void {
+    const roles = user.roles ?? [];
+    if (roles.includes(Role.ADMIN) || roles.includes(Role.ORGANIZER)) {
+      return;
+    }
+    throw new UnauthorizedException({
+      message: 'No host account exists for the email address provided.',
+      code: 'noHostAccount',
+    });
+  }
+
+  private assertAttendLoginAllowed(user: User): void {
+    const roles = user.roles ?? [];
+    if (
+      roles.includes(Role.ADMIN) ||
+      roles.includes(Role.ATTENDEE) ||
+      roles.includes(Role.ORGANIZER)
+    ) {
+      return;
+    }
+    throw new UnauthorizedException({
+      message: 'No fan account exists for the email address provided.',
+      code: 'noFanAccount',
+    });
+  }
+
   async register(
     dto: RegisterDto,
     metadata?: TokenMetadata,
-  ): Promise<AuthResponse> {
-    // Hash password
+  ): Promise<RegisterPendingResponse> {
+    await this.turnstileService.assertValidToken(
+      dto.turnstileToken,
+      metadata?.ipAddress,
+    );
+
+    const name = dto.name.trim();
+    if (!isPlausibleHumanName(name)) {
+      throw new BadRequestException({
+        message: 'Please enter your real name (first and last name).',
+        code: 'invalidName',
+      });
+    }
+
+    const email = canonicalizeEmail(dto.email);
+    if (isDisposableEmailDomain(email)) {
+      throw new BadRequestException({
+        message: 'Disposable email addresses are not allowed.',
+        code: 'disposableEmail',
+      });
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    // Create user (UsersService handles uniqueness check)
     const user = await this.usersService.createUser({
-      email: dto.email,
-      name: dto.name,
+      email,
+      name,
       passwordHash,
       roles: [Role.ATTENDEE],
     });
 
-    // Create and send verification email
     try {
       await this.emailVerificationService.createAndSendVerificationEmail(user);
     } catch (error) {
-      // Log error but don't fail registration if email fails
-      // The user can request a resend later
       console.error('Failed to send verification email:', error);
     }
-
-    // Issue tokens with device fingerprint
-    const tokens = await this.issueTokensForUser(user, metadata);
 
     return {
       user: {
@@ -93,7 +152,7 @@ export class AuthService {
         name: user.name || '',
         roles: user.roles,
       },
-      tokens,
+      requiresEmailVerification: true,
     };
   }
 
@@ -121,6 +180,15 @@ export class AuthService {
       );
     }
 
+    const verified =
+      await this.emailVerificationService.isUserVerified(userId);
+    if (!verified) {
+      throw new ForbiddenException({
+        message: 'Verify your email before setting up a host account.',
+        code: 'emailNotVerified',
+      });
+    }
+
     await this.usersService.addOrganizerRole(userId);
     const user = await this.usersService.findByIdOrFail(userId);
     const tokens = await this.issueTokensForUser(user, metadata);
@@ -137,7 +205,11 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, metadata?: TokenMetadata): Promise<AuthResponse> {
-    // Find user
+    await this.turnstileService.assertValidToken(
+      dto.turnstileToken,
+      metadata?.ipAddress,
+    );
+
     const user = await this.usersService.findByEmail(dto.email);
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid credentials');
@@ -163,6 +235,20 @@ export class AuthService {
       });
     }
 
+    const verified = await this.emailVerificationService.isUserVerified(user.id);
+    if (!verified && !user.autoCreatedAt) {
+      throw new UnauthorizedException({
+        message: 'Please verify your email before signing in.',
+        code: 'emailNotVerified',
+      });
+    }
+
+    if (dto.intent === 'host') {
+      this.assertHostLoginAllowed(user);
+    } else if (dto.intent === 'attend') {
+      this.assertAttendLoginAllowed(user);
+    }
+
     // Issue tokens with device fingerprint
     const tokens = await this.issueTokensForUser(user, metadata);
 
@@ -180,10 +266,24 @@ export class AuthService {
   async signInWithGoogle(
     credential: string,
     metadata?: TokenMetadata,
+    intent?: 'attend' | 'host',
+    turnstileToken?: string,
   ): Promise<AuthResponse> {
+    await this.turnstileService.assertValidToken(
+      turnstileToken,
+      metadata?.ipAddress,
+    );
+
     const { email, name } = await this.verifyGoogleIdToken(credential);
     const user = await this.usersService.upsertGoogleOAuthUser({ email, name });
     await this.emailVerificationService.markEmailVerified(user);
+
+    if (intent === 'host') {
+      this.assertHostLoginAllowed(user);
+    } else if (intent === 'attend') {
+      this.assertAttendLoginAllowed(user);
+    }
+
     const tokens = await this.issueTokensForUser(user, metadata);
 
     return {

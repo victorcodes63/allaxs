@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useId, useState, type FormEvent } from "react";
 
-const CONTACT_EMAIL = "hello@allaxs.com";
+import { PLATFORM_SUPPORT_EMAIL } from "@/lib/site-contact";
 
 /** Optional social URLs — set in Vercel when accounts exist; omitted links are not shown. */
 const SOCIAL_LINKS = [
@@ -22,7 +22,7 @@ const SOCIAL_LINKS = [
 ].filter((item): item is { label: string; href: string } => Boolean(item.href));
 
 const STATIC_LINKS: { href: string; label: string; external?: boolean }[] = [
-  { href: `mailto:${CONTACT_EMAIL}`, label: "Email", external: true },
+  { href: `mailto:${PLATFORM_SUPPORT_EMAIL}`, label: "Email", external: true },
   { href: "/events", label: "Events" },
   { href: "/organizers", label: "For organizers" },
 ];

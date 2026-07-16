@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import {
+  authRateLimitResponse,
+  checkAuthRouteRateLimit,
+  clientIpFromRequest,
+} from "@/lib/server/auth-rate-limit";
 import {
   getServerApiBaseUrl,
   upstreamUnreachableMessage,
 } from "@/lib/server/api-url";
-import { extractAuthTokens } from "@/lib/server/auth-tokens";
 
 export async function POST(request: NextRequest) {
   const API_URL = getServerApiBaseUrl();
+  const ip = clientIpFromRequest(request);
+  if (!checkAuthRouteRateLimit(`auth-register:${ip}`)) {
+    return authRateLimitResponse();
+  }
 
   try {
     const body = await request.json();
-    const { email, name, password } = body;
+    const { email, name, password, turnstileToken } = body;
 
     let response: Response;
     try {
@@ -20,7 +27,7 @@ export async function POST(request: NextRequest) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, name, password }),
+        body: JSON.stringify({ email, name, password, turnstileToken }),
       });
     } catch (err) {
       const unreachable = upstreamUnreachableMessage(err, API_URL);
@@ -33,8 +40,9 @@ export async function POST(request: NextRequest) {
     const contentType = response.headers.get("content-type") || "";
     let data: {
       message?: string;
-      tokens?: { accessToken?: string; refreshToken?: string };
+      code?: string;
       user?: unknown;
+      requiresEmailVerification?: boolean;
     } = {};
     if (contentType.includes("application/json")) {
       try {
@@ -46,36 +54,15 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { message: data.message || "Registration failed" },
+        { message: data.message || "Registration failed", code: data.code },
         { status: response.status },
       );
     }
 
-    // Set cookies for tokens (auto-login after register)
-    const { accessToken, refreshToken } = extractAuthTokens(data);
-    const cookieStore = await cookies();
-
-    if (accessToken) {
-      cookieStore.set("accessToken", accessToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 15 * 60, // 15 minutes
-      });
-    }
-
-    if (refreshToken) {
-      cookieStore.set("refreshToken", refreshToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 7 * 24 * 60 * 60, // 7 days
-      });
-    }
-
-    return NextResponse.json({ user: data.user });
+    return NextResponse.json({
+      user: data.user,
+      requiresEmailVerification: data.requiresEmailVerification ?? true,
+    });
   } catch (error) {
     console.error("Register error:", error);
     const unreachable = upstreamUnreachableMessage(error, API_URL);
@@ -88,4 +75,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

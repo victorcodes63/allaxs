@@ -8,7 +8,8 @@ import {
   normalizeOrganizerProfilePayload,
   type OrganizerProfileDisplay,
 } from "@/lib/organizer-profile-display";
-import { rolesIncludeAdmin, shouldOfferOrganizerHub } from "@/lib/auth/hub-routing";
+import { rolesIncludeAdmin } from "@/lib/auth/hub-routing";
+import { userHasHostAccountInDb } from "@/lib/auth/intent-access";
 
 type HostingState =
   | "loading"
@@ -30,9 +31,9 @@ function modelForState(state: HostingState, profile: OrganizerProfileDisplay | n
     case "attendee_only":
       return {
         state,
-        label: "Become a host",
-        href: "/organizer/onboarding",
-        hint: "Set up your organizer profile in two steps, then open your host workspace.",
+        label: "Sign up as a host",
+        href: "/register?intent=host",
+        hint: "This account is for buying tickets. Create a host account at sign-up to publish events.",
       };
     case "organizer_no_profile":
       return {
@@ -68,9 +69,9 @@ function modelForState(state: HostingState, profile: OrganizerProfileDisplay | n
     default:
       return {
         state,
-        label: "Open organizer setup",
-        href: "/organizer/onboarding",
-        hint: "We could not confirm your hosting status, but you can continue setup here.",
+        label: "Contact support",
+        href: "/dashboard/support",
+        hint: "We could not confirm your hosting status. Our team can help.",
       };
   }
 }
@@ -78,7 +79,7 @@ function modelForState(state: HostingState, profile: OrganizerProfileDisplay | n
 export function DashboardHostingCard() {
   const { user, loading } = useAuth();
   const roles = user?.roles ?? [];
-  const hasOrganizerRole = shouldOfferOrganizerHub(roles);
+  const hasOrganizerRole = userHasHostAccountInDb(roles);
   const hideForAdmin = rolesIncludeAdmin(roles);
   const [state, setState] = useState<HostingState>("loading");
   const [profile, setProfile] = useState<OrganizerProfileDisplay | null>(null);
@@ -89,7 +90,6 @@ export function DashboardHostingCard() {
     let cancelled = false;
     void (async () => {
       try {
-        await axios.post("/api/auth/promote-organizer").catch(() => undefined);
         const res = await axios.get("/api/organizer/profile");
         if (cancelled) return;
         const normalized = normalizeOrganizerProfilePayload(res.data);

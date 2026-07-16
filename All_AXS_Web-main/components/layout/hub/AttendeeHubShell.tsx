@@ -4,9 +4,9 @@ import { useMemo } from "react";
 import { HubAppShell, type HubNavSection } from "@/components/layout/hub/HubAppShell";
 import {
   normalizeWebUserRoles,
-  shouldOfferOrganizerHub,
   userHasRole,
 } from "@/lib/auth/hub-routing";
+import { userHasHostAccountInDb } from "@/lib/auth/intent-access";
 import { hubLegalPageTitle } from "@/lib/legal/hub-paths";
 
 function attendeePageTitle(pathname: string): string {
@@ -125,7 +125,7 @@ export function AttendeeHubShell({
         ],
       },
     ];
-    if (shouldOfferOrganizerHub(normalizeWebUserRoles(user.roles))) {
+    if (userHasHostAccountInDb(normalizeWebUserRoles(user.roles))) {
       base.push({
         title: "Host",
         items: [

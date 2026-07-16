@@ -19,6 +19,7 @@ import {
   normalizeNotificationPrefs,
   type UserNotificationPrefs,
 } from './user-notification-prefs.types';
+import { canonicalizeEmail } from '../common/email-normalization';
 
 @Injectable()
 export class UsersService {
@@ -30,7 +31,17 @@ export class UsersService {
   ) {}
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { email } });
+    const canonical = canonicalizeEmail(email);
+    const byCanonical = await this.userRepository.findOne({
+      where: { email: canonical },
+    });
+    if (byCanonical) return byCanonical;
+
+    const raw = email.trim().toLowerCase();
+    if (raw !== canonical) {
+      return this.userRepository.findOne({ where: { email: raw } });
+    }
+    return null;
   }
 
   async findById(id: string): Promise<User | null> {
@@ -48,7 +59,7 @@ export class UsersService {
     phone?: string;
     passwordHash: string;
   }): Promise<{ user: User; created: boolean }> {
-    const email = data.email.trim().toLowerCase();
+    const email = canonicalizeEmail(data.email);
     const name = data.name.trim();
     const phone = data.phone?.trim() || undefined;
 
@@ -107,8 +118,8 @@ export class UsersService {
     }
 
     const user = this.userRepository.create({
-      email: data.email,
-      name: data.name,
+      email: canonicalizeEmail(data.email),
+      name: data.name.trim(),
       passwordHash: data.passwordHash,
       roles: data.roles || [Role.ATTENDEE],
     });
@@ -141,7 +152,7 @@ export class UsersService {
     email: string,
     options?: { name?: string },
   ): Promise<User> {
-    const normalized = email.trim().toLowerCase();
+    const normalized = canonicalizeEmail(email);
     if (!normalized) {
       throw new BadRequestException('Email is required');
     }
@@ -250,7 +261,7 @@ export class UsersService {
     email: string;
     name: string;
   }): Promise<User> {
-    const email = params.email.trim().toLowerCase();
+    const email = canonicalizeEmail(params.email);
     if (!email) {
       throw new ConflictException('Email is required');
     }

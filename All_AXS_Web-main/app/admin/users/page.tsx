@@ -123,6 +123,11 @@ function AdminUsersPageContent() {
     kind: UserActionKind;
     user: UserActionTarget;
   } | null>(null);
+  const [botCleanup, setBotCleanup] = useState<{
+    loading: boolean;
+    preview: { matched: number; items: Array<{ email: string; name: string | null }> } | null;
+    message: string | null;
+  }>({ loading: false, preview: null, message: null });
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(searchInput), 250);
@@ -162,6 +167,44 @@ function AdminUsersPageContent() {
       setLoading(false);
     }
   }, [queryString]);
+
+  const runBotCleanup = useCallback(async (dryRun: boolean) => {
+    setBotCleanup((prev) => ({ ...prev, loading: true, message: null }));
+    try {
+      const response = await axios.post("/api/admin/users/bulk-suspend-bots", {
+        dryRun,
+        limit: 500,
+      });
+      const payload = response.data as {
+        matched: number;
+        suspended: number;
+        dryRun: boolean;
+        items: Array<{ email: string; name: string | null }>;
+      };
+      if (dryRun) {
+        setBotCleanup({
+          loading: false,
+          preview: { matched: payload.matched, items: payload.items.slice(0, 8) },
+          message:
+            payload.matched > 0
+              ? `Found ${payload.matched} likely bot account(s). Review the sample below, then suspend.`
+              : "No likely bot accounts matched the current rules.",
+        });
+      } else {
+        setBotCleanup({
+          loading: false,
+          preview: null,
+          message: `Suspended ${payload.suspended} account(s) and revoked their sessions.`,
+        });
+        void load();
+      }
+    } catch (err) {
+      const message = isAxiosError(err)
+        ? (err.response?.data as { message?: string } | undefined)?.message || err.message
+        : "Bot cleanup failed.";
+      setBotCleanup({ loading: false, preview: null, message });
+    }
+  }, [load]);
 
   useEffect(() => {
     void load();
@@ -207,15 +250,61 @@ function AdminUsersPageContent() {
             changes are recorded in the admin audit trail.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted sm:shrink-0">
-          <span className="rounded-full border border-border/70 bg-surface/80 px-3 py-1">
-            {total} total
-          </span>
-          <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-amber-100">
-            {items.filter((u) => u.roles.includes("ADMIN")).length} admins on page
-          </span>
+        <div className="flex flex-col gap-2 sm:shrink-0 sm:items-end">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted">
+            <span className="rounded-full border border-border/70 bg-surface/80 px-3 py-1">
+              {total} total
+            </span>
+            <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-amber-100">
+              {items.filter((u) => u.roles.includes("ADMIN")).length} admins on page
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={botCleanup.loading}
+              onClick={() => void runBotCleanup(true)}
+              className="rounded-[var(--radius-button)] border border-border/80 bg-surface px-3 py-2 text-xs font-medium text-foreground hover:border-primary/40 disabled:opacity-50"
+            >
+              {botCleanup.loading ? "Scanning…" : "Scan for bots"}
+            </button>
+            <button
+              type="button"
+              disabled={botCleanup.loading || !botCleanup.preview?.matched}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    `Suspend ${botCleanup.preview?.matched ?? 0} likely bot account(s)? This revokes their sessions.`,
+                  )
+                ) {
+                  void runBotCleanup(false);
+                }
+              }}
+              className="rounded-[var(--radius-button)] border border-red-400/40 bg-red-500/15 px-3 py-2 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+            >
+              Suspend matched bots
+            </button>
+          </div>
         </div>
       </header>
+
+      {botCleanup.message ? (
+        <div className="rounded-[var(--radius-panel)] border border-border/80 bg-surface/80 px-4 py-3 text-sm text-foreground">
+          {botCleanup.message}
+          {botCleanup.preview?.items.length ? (
+            <ul className="mt-2 space-y-1 text-xs text-muted">
+              {botCleanup.preview.items.map((item) => (
+                <li key={item.email}>
+                  {item.name ?? "—"} · {item.email}
+                </li>
+              ))}
+              {botCleanup.preview.matched > botCleanup.preview.items.length ? (
+                <li>…and {botCleanup.preview.matched - botCleanup.preview.items.length} more</li>
+              ) : null}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">

@@ -29,6 +29,7 @@ import { OrganizersModule } from '../organizers/organizers.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { CheckoutModule } from '../checkout/checkout.module';
 import { AdminOrderBuyerService } from './admin-order-buyer.service';
+import { AdminBotCleanupService } from './admin-bot-cleanup.service';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { AdminOrderBuyerService } from './admin-order-buyer.service';
     PayoutBatchesService,
     RefundRequestsService,
     AdminOrderBuyerService,
+    AdminBotCleanupService,
   ],
   exports: [AdminAuditService, RefundRequestsService, OrderRefundService],
 })

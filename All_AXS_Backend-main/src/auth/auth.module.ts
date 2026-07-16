@@ -18,6 +18,7 @@ import { EmailVerificationService } from './services/email-verification.service'
 import { PasswordResetService } from './services/password-reset.service';
 import { TokenCleanupTask } from './tasks/token-cleanup.task';
 import { EmailService } from './services/email.service';
+import { TurnstileService } from './services/turnstile.service';
 import { TicketPdfService } from '../tickets/ticket-pdf.service';
 
 @Module({
@@ -42,12 +43,13 @@ import { TicketPdfService } from '../tickets/ticket-pdf.service';
     EmailVerificationService,
     PasswordResetService,
     EmailService,
+    TurnstileService,
     TicketPdfService,
     TokenCleanupTask,
     JwtStrategy,
     JwtAuthGuard,
     RolesGuard,
   ],
-  exports: [AuthService, JwtAuthGuard, RolesGuard, EmailService],
+  exports: [AuthService, JwtAuthGuard, RolesGuard, EmailService, EmailVerificationService],
 })
 export class AuthModule {}

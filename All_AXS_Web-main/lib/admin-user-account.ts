@@ -33,10 +33,12 @@ export function accountStatusChipClass(user: AdminUserAccountFields): string {
     : "border-red-400/30 bg-red-500/12 text-red-100";
 }
 
+import { platformSupportMailto } from "@/lib/site-contact";
+
 export function supportRestoreMailto(userId: string): string {
   const subject = encodeURIComponent("Restore closed All AXS account");
   const body = encodeURIComponent(
     `Please restore access for user id: ${userId}\n\nOriginal email (if known):\n\nReason for restore:\n`,
   );
-  return `mailto:hello@allaxs.com?subject=${subject}&body=${body}`;
+  return `${platformSupportMailto()}?subject=${subject}&body=${body}`;
 }

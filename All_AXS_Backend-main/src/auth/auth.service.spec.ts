@@ -9,6 +9,7 @@ import { RefreshTokenService } from './services/refresh-token.service';
 import { EmailVerificationService } from './services/email-verification.service';
 import { PasswordResetService } from './services/password-reset.service';
 import { EmailService } from './services/email.service';
+import { TurnstileService } from './services/turnstile.service';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -93,6 +94,7 @@ describe('AuthService', () => {
             createAndSendVerificationEmail: jest.fn(),
             verifyEmail: jest.fn(),
             findUnusedTokenForUser: jest.fn(),
+            isUserVerified: jest.fn().mockResolvedValue(true),
           },
         },
         {
@@ -109,6 +111,12 @@ describe('AuthService', () => {
             sendWelcomeEmail: jest.fn(),
             sendPasswordResetConfirmationEmail: jest.fn(),
             sendPasswordChangeConfirmationEmail: jest.fn(),
+          },
+        },
+        {
+          provide: TurnstileService,
+          useValue: {
+            assertValidToken: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -150,10 +158,8 @@ describe('AuthService', () => {
       const result = await service.register(registerDto);
 
       expect(result).toHaveProperty('user');
-      expect(result).toHaveProperty('tokens');
+      expect(result).toHaveProperty('requiresEmailVerification', true);
       expect(result.user.email).toBe(mockUser.email);
-      expect(result.tokens).toHaveProperty('accessToken');
-      expect(result.tokens).toHaveProperty('refreshToken');
       expect(usersService.createUser).toHaveBeenCalled();
     });
   });

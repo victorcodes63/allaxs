@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useState, Suspense, useCallback } from "react";
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthPageShell } from "@/components/auth/AuthPageShell";
@@ -19,9 +19,11 @@ import {
   buildAuthQuery,
   fetchPostAuthSnapshot,
   parseIntent,
-  promoteHostIntentIfNeeded,
   resolvePostAuthRedirect,
+  type AuthIntent,
 } from "@/lib/auth/post-auth-redirect";
+import { validateSignInIntentAgainstDbRoles } from "@/lib/auth/intent-access";
+import { TurnstileField, getTurnstileSiteKey } from "@/components/auth/TurnstileField";
 import { useAuth } from "@/lib/auth";
 
 const AUTH_SUBTITLE = "One account for fans and hosts.";
@@ -32,6 +34,8 @@ function LoginForm() {
   const { refresh: refreshAuth } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRequired = !!getTurnstileSiteKey();
   const registerHref = `/register${buildAuthQuery({
     next: searchParams.get("next"),
     intent: parseIntent(searchParams.get("intent")),
@@ -46,18 +50,38 @@ function LoginForm() {
     mode: "onBlur",
   });
 
+  const onTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
+
   const onSubmit = async (data: LoginInput) => {
     setError(null);
+
+    if (turnstileRequired && !turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
     setIsSubmitting(true);
 
+    const intent: AuthIntent = parseIntent(searchParams.get("intent")) ?? "attend";
+
     try {
-      const response = await axios.post("/api/auth/login", data);
+      const response = await axios.post("/api/auth/login", {
+        ...data,
+        intent,
+        turnstileToken,
+      });
 
       if (response.status === 200) {
-        const intent = parseIntent(searchParams.get("intent"));
-        await promoteHostIntentIfNeeded(intent);
-        const snapshot = await fetchPostAuthSnapshot();
         await refreshAuth();
+        const snapshot = await fetchPostAuthSnapshot();
+        const roleCheck = validateSignInIntentAgainstDbRoles(intent, snapshot.roles);
+        if (!roleCheck.ok) {
+          await axios.post("/api/auth/logout").catch(() => undefined);
+          setError(roleCheck.message);
+          return;
+        }
         const path = resolvePostAuthRedirect({
           nextParam: searchParams.get("next"),
           intent,
@@ -67,10 +91,21 @@ function LoginForm() {
         router.push(path);
       }
     } catch (err) {
-      const message =
-        (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
-        "An error occurred during login";
+      const responseData = (err as { response?: { data?: { message?: string; code?: string } } })
+        .response?.data;
+      let message = responseData?.message || "An error occurred during login";
+      if (responseData?.code === "noHostAccount") {
+        message =
+          "No host account exists for the email address provided. Use the Fan tab for tickets, or sign up as a host to create an organizer account.";
+      } else if (responseData?.code === "noFanAccount") {
+        message =
+          "No fan account exists for the email address provided. Use the Host tab if you are an organizer.";
+      } else if (responseData?.code === "emailNotVerified") {
+        message =
+          "Please verify your email before signing in. Check your inbox or resend the verification link.";
+      }
       setError(message);
+      setTurnstileToken(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -103,7 +138,17 @@ function LoginForm() {
               error={errors.password?.message}
             />
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <TurnstileField
+              onToken={onTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+            />
+
+            <Button
+              type="submit"
+              disabled={isSubmitting || (turnstileRequired && !turnstileToken)}
+              className="w-full"
+            >
               {isSubmitting ? "Signing in…" : "Sign In"}
             </Button>
           </form>

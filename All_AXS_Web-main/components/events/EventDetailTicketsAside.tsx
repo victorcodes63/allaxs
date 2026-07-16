@@ -8,6 +8,7 @@ import {
   isTierSoldOut,
 } from "@/lib/events/event-detail-format";
 import { resolveCurrencyFromTiers } from "@/lib/currency";
+import { platformSupportMailto } from "@/lib/site-contact";
 
 type EventDetailTicketsAsideProps = {
   event: PublicEvent;
@@ -22,7 +23,7 @@ export function EventDetailTicketsAside({
   checkoutHref,
   minPrice,
   refundPolicyHref = "/refund-policy",
-  supportHref = "mailto:hello@allaxs.com?subject=Event%20support",
+  supportHref = platformSupportMailto({ subject: "Event support" }),
 }: EventDetailTicketsAsideProps) {
   const currency = resolveCurrencyFromTiers(event.ticketTypes);
   const displayTiers = event.ticketTypes?.filter(isTierOnDisplay) ?? [];

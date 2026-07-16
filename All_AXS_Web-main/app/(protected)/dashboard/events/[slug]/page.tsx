@@ -20,6 +20,7 @@ import {
   mapsSearchUrl,
 } from "@/lib/events/event-detail-format";
 import { resolveCurrencyFromTiers } from "@/lib/currency";
+import { platformSupportMailto } from "@/lib/site-contact";
 
 export const revalidate = 300;
 
@@ -240,7 +241,7 @@ export default async function DashboardEventDetailPage({ params }: Props) {
               <li>
                 Questions about this event?{" "}
                 <a
-                  href="mailto:hello@allaxs.com?subject=Question%20about%20event"
+                  href={platformSupportMailto({ subject: "Question about event" })}
                   className="font-medium text-primary hover:underline"
                 >
                   Email support

@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, Suspense } from "react";
+import { useCallback, useState, Suspense } from "react";
 import Link from "next/link";
 import { registerSchema, type RegisterInput } from "@/lib/validation/auth";
 import { AuthCard } from "@/components/auth/AuthCard";
@@ -11,26 +11,23 @@ import { AuthPageShell } from "@/components/auth/AuthPageShell";
 import { AuthIntentHint } from "@/components/auth/AuthIntentHint";
 import { AuthSessionEntryGate } from "@/components/auth/AuthSessionEntryGate";
 import { AuthSplitLayout } from "@/components/auth/AuthSplitLayout";
+import { TurnstileField, getTurnstileSiteKey } from "@/components/auth/TurnstileField";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Button } from "@/components/ui/Button";
 import axios from "axios";
-import {
-  buildAuthQuery,
-  parseIntent,
-  promoteHostIntentIfNeeded,
-} from "@/lib/auth/post-auth-redirect";
-import { useAuth } from "@/lib/auth";
+import { buildAuthQuery, parseIntent } from "@/lib/auth/post-auth-redirect";
 
 const AUTH_SUBTITLE = "One account for fans and hosts.";
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refresh: refreshAuth } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [guestAccountHintEmail, setGuestAccountHintEmail] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRequired = !!getTurnstileSiteKey();
   const loginHref = `/login${buildAuthQuery({
     next: searchParams.get("next"),
     intent: parseIntent(searchParams.get("intent")),
@@ -45,37 +42,50 @@ function RegisterForm() {
     mode: "onBlur",
   });
 
+  const onTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
+
   const onSubmit = async (data: RegisterInput) => {
     setError(null);
     setGuestAccountHintEmail(null);
+
+    if (turnstileRequired && !turnstileToken) {
+      setError("Please complete the security check.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const response = await axios.post("/api/auth/register", data);
+      const response = await axios.post("/api/auth/register", {
+        ...data,
+        turnstileToken,
+      });
 
       if (response.status === 200 || response.status === 201) {
         const intent = parseIntent(searchParams.get("intent"));
-        await promoteHostIntentIfNeeded(intent);
-        await refreshAuth();
         const next = searchParams.get("next");
         const query = new URLSearchParams();
         if (next) query.set("next", next);
         if (intent) query.set("intent", intent);
+        query.set("email", data.email);
         const suffix = query.toString() ? `?${query.toString()}` : "";
         router.push(`/check-email${suffix}`);
       }
     } catch (err) {
-      const status = (err as { response?: { status?: number; data?: { message?: string } } })
+      const status = (err as { response?: { status?: number; data?: { message?: string; code?: string } } })
         .response?.status;
-      const message =
-        (err as { response?: { data?: { message?: string } } }).response?.data?.message ||
-        "An error occurred during registration";
+      const responseData = (err as { response?: { data?: { message?: string; code?: string } } })
+        .response?.data;
+      const message = responseData?.message || "An error occurred during registration";
       if (status === 409 || /already exists/i.test(message)) {
         setGuestAccountHintEmail(data.email);
         setError(null);
       } else {
         setError(message);
       }
+      setTurnstileToken(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -140,7 +150,17 @@ function RegisterForm() {
               error={errors.password?.message}
             />
 
-            <Button type="submit" disabled={isSubmitting} className="mt-0.5 w-full">
+            <TurnstileField
+              onToken={onTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+            />
+
+            <Button
+              type="submit"
+              disabled={isSubmitting || (turnstileRequired && !turnstileToken)}
+              className="mt-0.5 w-full"
+            >
               {isSubmitting ? "Creating…" : "Sign Up"}
             </Button>
           </form>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { buildHubLegalLinks, hubLegalPrefixFromPathname } from "@/lib/legal/hub-paths";
+import { platformSupportMailto } from "@/lib/site-contact";
 
 type HubLegalLinksProps = {
   collapsed?: boolean;
@@ -28,7 +29,7 @@ export function HubLegalLinks({ collapsed, compact }: HubLegalLinksProps) {
       </p>
       <nav className="flex flex-col gap-1" aria-label="Help and legal">
         <a
-          href="mailto:hello@allaxs.com?subject=All%20AXS%20support"
+          href={platformSupportMailto({ subject: "All AXS support" })}
           className="rounded-md px-2 py-1.5 text-xs text-foreground/60 transition-colors hover:bg-wash hover:text-foreground"
         >
           Contact support

@@ -5,6 +5,7 @@ import { FanAccountSummaryCard } from "@/components/dashboard/FanAccountSummaryC
 import { DashboardWelcomeHeader } from "@/components/dashboard/DashboardWelcomeHeader";
 import { DashboardTicketsOverview } from "./DashboardTicketsOverview";
 import { DashboardHostingCard } from "./DashboardHostingCard";
+import { NoHostAccountNotice } from "@/components/dashboard/NoHostAccountNotice";
 
 const modules: {
   title: string;
@@ -44,6 +45,7 @@ export default function DashboardPage() {
     <div className="space-y-10">
       <DashboardWelcomeHeader />
 
+      <NoHostAccountNotice />
       <EmailVerificationBanner />
       <AutoCreatedAccountBanner />
 

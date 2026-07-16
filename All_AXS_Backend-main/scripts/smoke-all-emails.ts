@@ -122,7 +122,7 @@ async function main() {
           buyerEmail: to,
           buyerName: user.name ?? 'Guest',
           organizerName: 'All AXS Demo',
-          organizerSupportEmail: 'hello@allaxs.com',
+          organizerSupportEmail: 'tech@youthplusafrica.com',
           eventTitle: 'Smoke Test Concert',
           paymentReference: 'pay_smoke_receipt_001',
           orderReference: 'pay_smoke_receipt_001',

@@ -1,4 +1,5 @@
 import type { LegalDocument } from "@/lib/legal/types";
+import { PLATFORM_SUPPORT_EMAIL } from "@/lib/site-contact";
 
 export const TERMS_AND_CONDITIONS: LegalDocument = {
   slug: "terms",
@@ -903,7 +904,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       blocks: [
         {
           type: "paragraph",
-          text: "For privacy-related inquiries or data subject requests, contact All AXS Africa at hello@allaxs.com.",
+          text: `For privacy-related inquiries or data subject requests, contact All AXS Africa at ${PLATFORM_SUPPORT_EMAIL}.`,
         },
       ],
     },

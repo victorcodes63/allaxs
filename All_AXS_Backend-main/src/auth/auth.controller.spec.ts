@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
+import { AuthService, type RegisterPendingResponse } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Role } from '../domain/enums';
@@ -10,6 +10,16 @@ import type { Request } from 'express';
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: jest.Mocked<AuthService>;
+
+  const mockRegisterResponse: RegisterPendingResponse = {
+    user: {
+      id: '123e4567-e89b-12d3-a456-426614174000',
+      email: 'test@example.com',
+      name: 'Test User',
+      roles: [Role.ATTENDEE],
+    },
+    requiresEmailVerification: true as const,
+  };
 
   const mockAuthResponse = {
     user: {
@@ -63,11 +73,11 @@ describe('AuthController', () => {
         password: 'password123',
       };
 
-      authService.register.mockResolvedValue(mockAuthResponse);
+      authService.register.mockResolvedValue(mockRegisterResponse);
 
       const result = await controller.register(registerDto, mockRequest);
 
-      expect(result).toEqual(mockAuthResponse);
+      expect(result).toEqual(mockRegisterResponse);
       expect(authService.register).toHaveBeenCalledWith(registerDto, {
         ipAddress: '127.0.0.1',
         userAgent: 'Test Agent',

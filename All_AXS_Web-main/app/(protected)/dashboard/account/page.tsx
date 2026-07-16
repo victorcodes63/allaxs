@@ -25,6 +25,7 @@ import {
   type NotificationPrefs,
 } from "@/lib/fan-notification-prefs";
 import { PushNotificationsToggle } from "@/components/pwa/PushNotificationsToggle";
+import { platformSupportMailto } from "@/lib/site-contact";
 
 function formatMemberSince(iso?: string): string | null {
   if (!iso) return null;
@@ -592,7 +593,7 @@ export default function FanAccountPage(): ReactElement {
               </li>
               <li>
                 <a
-                  href="mailto:hello@allaxs.com?subject=All%20AXS%20support"
+                  href={platformSupportMailto({ subject: "All AXS support" })}
                   className="font-medium text-foreground underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
                 >
                   Contact support
