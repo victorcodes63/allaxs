@@ -128,6 +128,9 @@ function AdminUsersPageContent() {
     preview: { matched: number; items: Array<{ email: string; name: string | null }> } | null;
     message: string | null;
   }>({ loading: false, preview: null, message: null });
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(searchInput), 250);
@@ -137,6 +140,11 @@ function AdminUsersPageContent() {
   useEffect(() => {
     setOffset(0);
   }, [roleFilter, statusFilter, debouncedSearch]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBulkMessage(null);
+  }, [roleFilter, statusFilter, debouncedSearch, offset]);
 
   const queryString = useMemo(() => {
     const sp = new URLSearchParams();
@@ -228,6 +236,102 @@ function AdminUsersPageContent() {
   const end = Math.min(offset + items.length, total);
   const hasPrev = offset > 0;
   const hasNext = offset + PAGE_SIZE < total;
+
+  const selectableItems = useMemo(
+    () =>
+      items.filter(
+        (row) =>
+          !(currentAdmin && currentAdmin.id === row.id) &&
+          !isClosedAccount(row),
+      ),
+    [items, currentAdmin],
+  );
+
+  const allPageSelected =
+    selectableItems.length > 0 &&
+    selectableItems.every((row) => selectedIds.has(row.id));
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAllOnPage = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (
+        selectableItems.length > 0 &&
+        selectableItems.every((row) => prev.has(row.id))
+      ) {
+        return new Set();
+      }
+      return new Set(selectableItems.map((row) => row.id));
+    });
+  }, [selectableItems]);
+
+  const runBulkAction = useCallback(
+    async (action: "suspend" | "reactivate" | "forceLogout") => {
+      const ids = [...selectedIds];
+      if (ids.length === 0) return;
+
+      const labels = {
+        suspend: "Suspend",
+        reactivate: "Reactivate",
+        forceLogout: "Force sign-out for",
+      } as const;
+      if (
+        !window.confirm(
+          `${labels[action]} ${ids.length} selected account${ids.length === 1 ? "" : "s"}?${
+            action === "suspend"
+              ? " Their sessions will be revoked immediately."
+              : action === "forceLogout"
+                ? " They will need to sign in again on every device."
+                : ""
+          }`,
+        )
+      ) {
+        return;
+      }
+
+      setBulkBusy(true);
+      setBulkMessage(null);
+      try {
+        const response = await axios.post<{
+          updated: number;
+          skipped: number;
+          failed: number;
+          requested: number;
+        }>("/api/admin/users/bulk-actions", { userIds: ids, action });
+        const { updated, skipped, failed, requested } = response.data;
+        const doneLabel =
+          action === "suspend"
+            ? "suspend"
+            : action === "reactivate"
+              ? "reactivate"
+              : "force sign-out";
+        setBulkMessage(
+          `Bulk ${doneLabel}: ${updated} updated` +
+            (skipped ? `, ${skipped} skipped` : "") +
+            (failed ? `, ${failed} failed` : "") +
+            ` of ${requested}.`,
+        );
+        setSelectedIds(new Set());
+        void load();
+      } catch (err) {
+        const message = isAxiosError(err)
+          ? (err.response?.data as { message?: string } | undefined)?.message ||
+            err.message
+          : "Bulk action failed.";
+        setBulkMessage(message);
+      } finally {
+        setBulkBusy(false);
+      }
+    },
+    [selectedIds, load],
+  );
 
   const onSaved = () => {
     setRolesTarget(null);
@@ -374,6 +478,12 @@ function AdminUsersPageContent() {
         </div>
       ) : null}
 
+      {bulkMessage ? (
+        <div className="rounded-[var(--radius-panel)] border border-border/80 bg-surface/80 px-4 py-3 text-sm text-foreground">
+          {bulkMessage}
+        </div>
+      ) : null}
+
       {loading ? (
         <div className="rounded-[var(--radius-panel)] border border-border bg-surface/70 p-10 text-center text-sm text-muted">
           Loading users…
@@ -387,55 +497,130 @@ function AdminUsersPageContent() {
             : "No users registered yet."}
         </div>
       ) : (
-        <ul className="space-y-3">
-          {items.map((row) => (
-            <AdminUserCard
-              key={row.id}
-              row={row}
-              isSelf={!!currentAdmin && currentAdmin.id === row.id}
-              onManageRoles={() =>
-                setRolesTarget({
-                  id: row.id,
-                  email: row.email,
-                  name: row.name,
-                  roles: row.roles,
-                })
-              }
-              onOpenAudit={() =>
-                setAuditTarget({
-                  id: row.id,
-                  email: row.email,
-                  name: row.name,
-                })
-              }
-              onPromote={() =>
-                setPendingAction({
-                  kind: "promote",
-                  user: toActionTarget(row),
-                })
-              }
-              onSuspend={() =>
-                setPendingAction({
-                  kind: "suspend",
-                  user: toActionTarget(row),
-                })
-              }
-              onReactivate={() =>
-                setPendingAction({
-                  kind: "reactivate",
-                  user: toActionTarget(row),
-                })
-              }
-              onForceLogout={() =>
-                setPendingAction({
-                  kind: "forceLogout",
-                  user: toActionTarget(row),
-                })
-              }
-            />
-          ))}
-        </ul>
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-panel)] border border-border/70 bg-surface/70 px-4 py-3">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
+              <input
+                type="checkbox"
+                checked={allPageSelected}
+                onChange={toggleSelectAllOnPage}
+                disabled={selectableItems.length === 0 || bulkBusy}
+                className="h-4 w-4 rounded border-border bg-surface text-primary focus:ring-primary/40"
+              />
+              Select page ({selectableItems.length} selectable)
+            </label>
+            {selectedIds.size > 0 ? (
+              <p className="text-xs tabular-nums text-muted">
+                {selectedIds.size} selected
+              </p>
+            ) : (
+              <p className="text-xs text-muted">
+                Select users to suspend, reactivate, or force sign-out
+              </p>
+            )}
+          </div>
+
+          <ul className="space-y-3">
+            {items.map((row) => {
+              const isSelf = !!currentAdmin && currentAdmin.id === row.id;
+              const selectable = !isSelf && !isClosedAccount(row);
+              return (
+                <AdminUserCard
+                  key={row.id}
+                  row={row}
+                  isSelf={isSelf}
+                  selected={selectedIds.has(row.id)}
+                  selectable={selectable}
+                  onToggleSelect={() => toggleSelected(row.id)}
+                  onManageRoles={() =>
+                    setRolesTarget({
+                      id: row.id,
+                      email: row.email,
+                      name: row.name,
+                      roles: row.roles,
+                    })
+                  }
+                  onOpenAudit={() =>
+                    setAuditTarget({
+                      id: row.id,
+                      email: row.email,
+                      name: row.name,
+                    })
+                  }
+                  onPromote={() =>
+                    setPendingAction({
+                      kind: "promote",
+                      user: toActionTarget(row),
+                    })
+                  }
+                  onSuspend={() =>
+                    setPendingAction({
+                      kind: "suspend",
+                      user: toActionTarget(row),
+                    })
+                  }
+                  onReactivate={() =>
+                    setPendingAction({
+                      kind: "reactivate",
+                      user: toActionTarget(row),
+                    })
+                  }
+                  onForceLogout={() =>
+                    setPendingAction({
+                      kind: "forceLogout",
+                      user: toActionTarget(row),
+                    })
+                  }
+                />
+              );
+            })}
+          </ul>
+        </>
       )}
+
+      {selectedIds.size > 0 ? (
+        <div className="sticky bottom-3 z-20 rounded-[var(--radius-panel)] border border-primary/40 bg-surface/95 px-4 py-3 shadow-lg backdrop-blur">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm font-medium text-foreground">
+              {selectedIds.size} user{selectedIds.size === 1 ? "" : "s"} selected
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void runBulkAction("suspend")}
+                className="rounded-[var(--radius-button)] border border-red-400/40 bg-red-500/15 px-3 py-2 text-xs font-medium text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+              >
+                Suspend selected
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void runBulkAction("reactivate")}
+                className="rounded-[var(--radius-button)] border border-primary/50 bg-primary/15 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/25 disabled:opacity-50"
+              >
+                Reactivate selected
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => void runBulkAction("forceLogout")}
+                className="rounded-[var(--radius-button)] border border-border/80 bg-surface px-3 py-2 text-xs font-medium text-foreground hover:border-primary/40 disabled:opacity-50"
+              >
+                Force sign-out
+              </button>
+              <button
+                type="button"
+                disabled={bulkBusy}
+                onClick={() => setSelectedIds(new Set())}
+                className="rounded-[var(--radius-button)] border border-transparent px-3 py-2 text-xs font-medium text-muted hover:text-foreground disabled:opacity-50"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {total > 0 ? (
         <nav
@@ -504,6 +689,9 @@ const ROW_ACTION_GHOST = `${ROW_ACTION_BASE} border border-transparent text-mute
 function AdminUserCard({
   row,
   isSelf,
+  selected,
+  selectable,
+  onToggleSelect,
   onManageRoles,
   onOpenAudit,
   onPromote,
@@ -513,6 +701,9 @@ function AdminUserCard({
 }: {
   row: AdminUserRow;
   isSelf: boolean;
+  selected: boolean;
+  selectable: boolean;
+  onToggleSelect: () => void;
   onManageRoles: () => void;
   onOpenAudit: () => void;
   onPromote: () => void;
@@ -528,8 +719,25 @@ function AdminUserCard({
   const statusClass = accountStatusChipClass(row);
 
   return (
-    <li className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-border bg-surface/85 p-4 transition-[border-color,box-shadow] hover:border-primary/30 sm:flex-row sm:items-start sm:p-5">
-      <div className="flex shrink-0 items-center justify-center">
+    <li
+      className={`flex flex-col gap-3 rounded-[var(--radius-panel)] border bg-surface/85 p-4 transition-[border-color,box-shadow] sm:flex-row sm:items-start sm:p-5 ${
+        selected
+          ? "border-primary/50 shadow-[0_0_0_1px_rgba(249,115,22,0.15)]"
+          : "border-border hover:border-primary/30"
+      }`}
+    >
+      <div className="flex shrink-0 items-center gap-3">
+        {selectable ? (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            aria-label={`Select ${display}`}
+            className="h-4 w-4 rounded border-border bg-surface text-primary focus:ring-primary/40"
+          />
+        ) : (
+          <span className="inline-block h-4 w-4" aria-hidden />
+        )}
         <span className="flex h-12 w-12 items-center justify-center rounded-full border border-border/80 bg-wash text-base font-semibold uppercase text-foreground/85">
           {userInitials({ name: row.name ?? undefined, email: row.email })}
         </span>

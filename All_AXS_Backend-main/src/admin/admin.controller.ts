@@ -30,7 +30,7 @@ import type { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Role, EventStatus, OrderStatus, UserStatus } from '../domain/enums';
 import { isClosedAccount } from '../users/account-status.util';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Event } from '../events/entities/event.entity';
 import { TicketType } from '../events/entities/ticket-type.entity';
 import { Order } from '../domain/order.entity';
@@ -1668,6 +1668,235 @@ export class AdminController {
         email: targetUser.email,
       },
       revokedSessions,
+    };
+  }
+
+  @Post('users/bulk-actions')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Apply suspend, reactivate, or force-logout to selected users (max 100)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['userIds', 'action'],
+      properties: {
+        userIds: { type: 'array', items: { type: 'string' } },
+        action: {
+          type: 'string',
+          enum: ['suspend', 'reactivate', 'forceLogout'],
+        },
+      },
+    },
+  })
+  async bulkUserActions(
+    @Body() body: { userIds?: string[]; action?: string },
+    @GetUser() user: CurrentUser,
+    @Req() request: Request,
+  ) {
+    const action = body?.action;
+    if (
+      action !== 'suspend' &&
+      action !== 'reactivate' &&
+      action !== 'forceLogout'
+    ) {
+      throw new BadRequestException(
+        'action must be one of: suspend, reactivate, forceLogout',
+      );
+    }
+
+    const rawIds = Array.isArray(body?.userIds) ? body.userIds : [];
+    const userIds = [
+      ...new Set(
+        rawIds
+          .filter((id): id is string => typeof id === 'string')
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    if (userIds.length === 0) {
+      throw new BadRequestException('Select at least one user.');
+    }
+    if (userIds.length > 100) {
+      throw new BadRequestException('You can act on at most 100 users at once.');
+    }
+
+    const targets = await this.userRepository.find({
+      where: { id: In(userIds) },
+    });
+    const byId = new Map(targets.map((t) => [t.id, t]));
+
+    const ipAddress =
+      request.ip ||
+      (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      (request.headers['x-real-ip'] as string) ||
+      null;
+    const userAgent = (request.headers['user-agent'] as string) || null;
+
+    const results: Array<{
+      id: string;
+      email?: string;
+      ok: boolean;
+      skipped?: boolean;
+      reason?: string;
+      revokedSessions?: number;
+    }> = [];
+
+    let updated = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const id of userIds) {
+      const target = byId.get(id);
+      if (!target) {
+        failed++;
+        results.push({ id, ok: false, reason: 'User not found' });
+        continue;
+      }
+
+      if (id === user.id && (action === 'suspend' || action === 'forceLogout')) {
+        skipped++;
+        results.push({
+          id,
+          email: target.email,
+          ok: false,
+          skipped: true,
+          reason:
+            action === 'suspend'
+              ? 'You cannot suspend your own account'
+              : 'Use the standard sign-out flow for your own account',
+        });
+        continue;
+      }
+
+      if (isClosedAccount(target) && action !== 'forceLogout') {
+        skipped++;
+        results.push({
+          id,
+          email: target.email,
+          ok: false,
+          skipped: true,
+          reason: 'Closed accounts cannot be suspended or reactivated here',
+        });
+        continue;
+      }
+
+      try {
+        if (action === 'forceLogout') {
+          const revokedSessions = await this.authService.forceSignOutUser(
+            target.id,
+            'Bulk force sign-out by admin',
+          );
+          await this.adminAuditService.logAction({
+            adminUserId: user.id,
+            action: 'FORCE_USER_LOGOUT',
+            resourceType: 'user',
+            resourceId: target.id,
+            metadata: {
+              targetUserEmail: target.email,
+              revokedSessions,
+              reason: 'Bulk force sign-out by admin',
+              bulk: true,
+            },
+            ipAddress,
+            userAgent,
+          });
+          updated++;
+          results.push({
+            id,
+            email: target.email,
+            ok: true,
+            revokedSessions,
+          });
+          continue;
+        }
+
+        const nextStatus =
+          action === 'suspend' ? UserStatus.SUSPENDED : UserStatus.ACTIVE;
+
+        if (target.status === nextStatus) {
+          skipped++;
+          results.push({
+            id,
+            email: target.email,
+            ok: true,
+            skipped: true,
+            reason: 'Already in that status',
+          });
+          continue;
+        }
+
+        const previousStatus = target.status;
+        target.status = nextStatus;
+        await this.userRepository.save(target);
+
+        let revokedSessions = 0;
+        if (nextStatus === UserStatus.SUSPENDED) {
+          revokedSessions = await this.authService.forceSignOutUser(
+            target.id,
+            'Account suspended by admin (bulk)',
+          );
+        }
+
+        await this.adminAuditService.logAction({
+          adminUserId: user.id,
+          action: 'UPDATE_USER_STATUS',
+          resourceType: 'user',
+          resourceId: target.id,
+          metadata: {
+            previousStatus,
+            newStatus: target.status,
+            targetUserEmail: target.email,
+            revokedSessions,
+            bulk: true,
+          },
+          ipAddress,
+          userAgent,
+        });
+
+        updated++;
+        results.push({
+          id,
+          email: target.email,
+          ok: true,
+          revokedSessions,
+        });
+      } catch (err) {
+        failed++;
+        results.push({
+          id,
+          email: target.email,
+          ok: false,
+          reason: (err as Error).message || 'Update failed',
+        });
+      }
+    }
+
+    await this.adminAuditService.logAction({
+      adminUserId: user.id,
+      action: 'BULK_USER_ACTIONS',
+      resourceType: 'user',
+      resourceId: 'bulk',
+      metadata: {
+        action,
+        requested: userIds.length,
+        updated,
+        skipped,
+        failed,
+      },
+      ipAddress,
+      userAgent,
+    });
+
+    return {
+      action,
+      requested: userIds.length,
+      updated,
+      skipped,
+      failed,
+      results,
     };
   }
 
