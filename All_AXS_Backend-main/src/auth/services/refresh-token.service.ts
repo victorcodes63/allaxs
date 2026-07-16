@@ -83,6 +83,15 @@ export class RefreshTokenService {
 
     // Check if already used (rotation attack detection)
     if (session.usedAt) {
+      const graceMs = 20_000;
+      const usedAgoMs = Date.now() - session.usedAt.getTime();
+      if (usedAgoMs <= graceMs) {
+        // Concurrent refresh from another tab or edge proxy — not a reuse attack.
+        throw new UnauthorizedException({
+          message: 'Session refresh already in progress. Please retry.',
+          code: 'refreshConcurrent',
+        });
+      }
       // Potential reuse attack - revoke all user sessions
       await this.revokeAllUserTokens(
         session.userId,

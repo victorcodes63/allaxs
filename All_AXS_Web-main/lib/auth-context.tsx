@@ -11,6 +11,10 @@ import {
 } from "react";
 import axios from "axios";
 import { normalizeWebUserRoles } from "@/lib/auth/hub-routing";
+import {
+  clearClientSession,
+  refreshSessionOnce,
+} from "@/lib/auth/session-refresh-client";
 
 export interface AuthUser {
   id: string;
@@ -96,10 +100,16 @@ async function fetchAuthUser(): Promise<AuthUser | null> {
     if (
       (error as { response?: { status?: number } }).response?.status === 401
     ) {
+      const refreshed = await refreshSessionOnce();
+      if (!refreshed) {
+        await clearClientSession();
+        return null;
+      }
       try {
-        const refreshResponse = await axios.post("/api/auth/refresh");
-        return coerce(refreshResponse.data?.user);
+        const retry = await axios.get("/api/auth/me");
+        return coerce(retry.data?.user);
       } catch {
+        await clearClientSession();
         return null;
       }
     }
@@ -160,6 +170,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  /** Proactive refresh ~3 min before the 15-minute access JWT expires. */
+  useEffect(() => {
+    if (!user) return;
+    const intervalMs = 12 * 60 * 1000;
+    const id = window.setInterval(() => {
+      void refreshSessionOnce().then((ok) => {
+        if (ok) void refresh();
+      });
+    }, intervalMs);
+    return () => window.clearInterval(id);
+  }, [user, refresh]);
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {

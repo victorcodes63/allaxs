@@ -10,6 +10,8 @@ import {
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
 import { validateSignInIntentAgainstDbRoles } from "@/lib/auth/intent-access";
+import { clearClientSession } from "@/lib/auth/session-refresh-client";
+import axios from "axios";
 
 /**
  * When a session already exists on entry-only routes (`/login`, `/register`),
@@ -17,7 +19,7 @@ import { validateSignInIntentAgainstDbRoles } from "@/lib/auth/intent-access";
  * (honours `next`, `intent`, organizer onboarding, etc.).
  */
 export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
-  const { user, loading } = useAuth();
+  const { user, loading, setUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -26,6 +28,13 @@ export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
     let cancelled = false;
     void (async () => {
       try {
+        const me = await axios.get("/api/auth/me");
+        if (cancelled || !me.data?.user) {
+          await clearClientSession();
+          setUser(null);
+          return;
+        }
+
         const intent = parseIntent(searchParams.get("intent")) ?? "attend";
         const snapshot = await fetchPostAuthSnapshot();
         if (cancelled) return;
@@ -53,13 +62,16 @@ export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
         });
         router.replace(path);
       } catch {
-        if (!cancelled) router.replace("/dashboard");
+        if (!cancelled) {
+          await clearClientSession();
+          setUser(null);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [loading, user, router, searchParams]);
+  }, [loading, user, router, searchParams, setUser]);
 
   if (loading) return "checking";
   if (user) return "handoff";

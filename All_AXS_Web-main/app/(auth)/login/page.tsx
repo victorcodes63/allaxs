@@ -33,7 +33,12 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { refresh: refreshAuth } = useAuth();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    if (searchParams.get("session") === "expired") {
+      return "Your session expired. Please sign in again.";
+    }
+    return null;
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileReset, setTurnstileReset] = useState(0);

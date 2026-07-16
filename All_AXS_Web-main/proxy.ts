@@ -9,6 +9,7 @@ import {
   PUBLIC_BROWSE_COOKIE,
   resolveGuestOnlyPublicRedirect,
 } from "@/lib/auth/guest-only-public-routes";
+import { clearAuthCookies } from "@/lib/server/clear-auth-cookies";
 
 // Helper to decode JWT without verification (just to check exp)
 function decodeJWT(token: string): { exp?: number } | null {
@@ -87,9 +88,11 @@ function redirectSignedInFromGuestPublic(
  * When the access JWT is missing or past `exp`, renew it using the httpOnly refresh cookie
  * so users stay signed in until they hit logout (refresh cookie lifetime).
  */
-async function tryRefreshAndContinue(request: NextRequest): Promise<NextResponse | null> {
+async function tryRefreshAndContinue(
+  request: NextRequest,
+): Promise<{ ok: true; response: NextResponse } | { ok: false }> {
   const refreshToken = request.cookies.get("refreshToken")?.value;
-  if (!refreshToken) return null;
+  if (!refreshToken) return { ok: false };
 
   const refreshUrl = new URL("/api/auth/refresh", request.url);
   let refreshRes: Response;
@@ -101,14 +104,14 @@ async function tryRefreshAndContinue(request: NextRequest): Promise<NextResponse
       },
     });
   } catch {
-    return null;
+    return { ok: false };
   }
 
-  if (!refreshRes.ok) return null;
+  if (!refreshRes.ok) return { ok: false as const };
 
   const res = NextResponse.next();
   forwardSetCookies(refreshRes, res);
-  return res;
+  return { ok: true as const, response: res };
 }
 
 function attachPublicBrowseCookie(response: NextResponse): NextResponse {
@@ -130,19 +133,17 @@ export async function proxy(request: NextRequest) {
   const accessToken = request.cookies.get("accessToken")?.value;
 
   if (isAuthEntryPath(pathname)) {
-    // Let the auth page load even when a session cookie exists. Client-side
-    // `useReplaceIfAuthenticated` uses role-aware routing (e.g. `/admin` for
-    // admins). A hard edge redirect to `/dashboard` here bypassed that and
-    // trapped every signed-in user on the attendee hub.
-    if (!accessTokenNeedsRotation(accessToken)) {
+    // Never refresh at the edge on auth pages — the client AuthProvider owns
+    // a single deduped refresh to avoid racing the proxy (which caused reuse
+    // detection logouts and "already signed in" redirect loops on /login).
+    if (accessTokenNeedsRotation(accessToken) && request.cookies.get("refreshToken")?.value) {
+      // Expired access with a refresh cookie: let the client refresh once.
       return NextResponse.next();
     }
-
-    const renewed = await tryRefreshAndContinue(request);
-    if (renewed) {
-      return renewed;
+    if (accessTokenNeedsRotation(accessToken) && !request.cookies.get("refreshToken")?.value) {
+      const res = NextResponse.next();
+      return clearAuthCookies(res);
     }
-
     return NextResponse.next();
   }
 
@@ -157,8 +158,8 @@ export async function proxy(request: NextRequest) {
 
     if (accessTokenNeedsRotation(accessToken)) {
       const renewed = await tryRefreshAndContinue(request);
-      if (renewed) {
-        return renewed;
+      if (renewed.ok) {
+        return attachPublicBrowseCookie(renewed.response);
       }
     }
 
@@ -168,12 +169,13 @@ export async function proxy(request: NextRequest) {
   if (isProtectedAppPath(pathname)) {
     if (accessTokenNeedsRotation(accessToken)) {
       const renewed = await tryRefreshAndContinue(request);
-      if (renewed) {
-        return clearPublicBrowseCookie(renewed);
+      if (renewed.ok) {
+        return clearPublicBrowseCookie(renewed.response);
       }
 
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", pathname);
+      loginUrl.searchParams.set("session", "expired");
       if (pathname.startsWith("/organizer")) {
         loginUrl.searchParams.set("intent", "host");
       } else if (
@@ -186,7 +188,9 @@ export async function proxy(request: NextRequest) {
       ) {
         loginUrl.searchParams.set("intent", "attend");
       }
-      return clearPublicBrowseCookie(NextResponse.redirect(loginUrl));
+      return clearAuthCookies(
+        clearPublicBrowseCookie(NextResponse.redirect(loginUrl)),
+      );
     }
 
     return clearPublicBrowseCookie(NextResponse.next());
