@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState, Suspense, useCallback } from "react";
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
 import { AuthCard } from "@/components/auth/AuthCard";
@@ -30,7 +30,6 @@ import { useAuth } from "@/lib/auth";
 const AUTH_SUBTITLE = "One account for fans and hosts.";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { refresh: refreshAuth, setUser } = useAuth();
   const [error, setError] = useState<string | null>(() => {
