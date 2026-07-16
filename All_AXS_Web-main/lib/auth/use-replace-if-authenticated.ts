@@ -10,7 +10,6 @@ import {
   resolvePostAuthRedirect,
 } from "@/lib/auth/post-auth-redirect";
 import { validateSignInIntentAgainstDbRoles } from "@/lib/auth/intent-access";
-import { clearClientSession } from "@/lib/auth/session-refresh-client";
 import axios from "axios";
 
 /**
@@ -30,7 +29,6 @@ export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
       try {
         const me = await axios.get("/api/auth/me");
         if (cancelled || !me.data?.user) {
-          await clearClientSession();
           setUser(null);
           return;
         }
@@ -63,7 +61,6 @@ export function useReplaceIfAuthenticated(): "checking" | "handoff" | "ready" {
         router.replace(path);
       } catch {
         if (!cancelled) {
-          await clearClientSession();
           setUser(null);
         }
       }

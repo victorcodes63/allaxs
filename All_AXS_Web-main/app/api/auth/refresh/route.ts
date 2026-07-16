@@ -2,11 +2,12 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { extractAuthTokens } from "@/lib/server/auth-tokens";
 import { clearAuthCookies } from "@/lib/server/clear-auth-cookies";
+import { setAuthCookiesOnResponse } from "@/lib/server/auth-cookies";
 import {
   getServerApiBaseUrl,
   upstreamUnreachableMessage,
 } from "@/lib/server/api-url";
-import { formatUpstreamErrorMessage } from "@/lib/server/format-upstream-error-message";
+import { formatUpstreamErrorMessage, extractUpstreamErrorCode } from "@/lib/server/format-upstream-error-message";
 
 /** Coalesce parallel refresh calls that share the same refresh cookie (multi-tab / proxy + client). */
 const refreshByToken = new Map<string, Promise<Response>>();
@@ -74,14 +75,15 @@ export async function POST() {
     }
 
     if (!response.ok) {
+      const code = extractUpstreamErrorCode(data);
       const res = NextResponse.json(
         {
           message: formatUpstreamErrorMessage(data) ?? "Token refresh failed",
-          code: typeof data.code === "string" ? data.code : undefined,
+          code: typeof code === "string" ? code : undefined,
         },
-        { status: response.status },
+        { status: code === "refreshConcurrent" ? 409 : response.status },
       );
-      if (response.status === 401) {
+      if (response.status === 401 && code !== "refreshConcurrent") {
         return clearAuthCookies(res);
       }
       return res;
@@ -90,26 +92,10 @@ export async function POST() {
     const { accessToken, refreshToken: newRefreshToken } = extractAuthTokens(data);
 
     const ok = NextResponse.json({ user: data.user });
-
-    if (accessToken) {
-      ok.cookies.set("accessToken", accessToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 15 * 60,
-      });
-    }
-
-    if (newRefreshToken) {
-      ok.cookies.set("refreshToken", newRefreshToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 7 * 24 * 60 * 60,
-      });
-    }
+    setAuthCookiesOnResponse(ok, {
+      accessToken,
+      refreshToken: newRefreshToken,
+    });
 
     return ok;
   } catch (error) {

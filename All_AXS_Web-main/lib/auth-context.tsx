@@ -12,7 +12,6 @@ import {
 import axios from "axios";
 import { normalizeWebUserRoles } from "@/lib/auth/hub-routing";
 import {
-  clearClientSession,
   refreshSessionOnce,
 } from "@/lib/auth/session-refresh-client";
 
@@ -59,7 +58,10 @@ function writeAuthBroadcast(message: AuthBroadcastMessage) {
   }
 }
 
-async function fetchAuthUser(): Promise<AuthUser | null> {
+async function fetchAuthUser(): Promise<{
+  user: AuthUser | null;
+  sessionDead: boolean;
+}> {
   const coerce = (raw: unknown): AuthUser | null => {
     if (!raw || typeof raw !== "object") return null;
     const o = raw as Record<string, unknown>;
@@ -95,25 +97,23 @@ async function fetchAuthUser(): Promise<AuthUser | null> {
 
   try {
     const response = await axios.get("/api/auth/me");
-    return coerce(response.data?.user);
+    return { user: coerce(response.data?.user), sessionDead: false };
   } catch (error) {
     if (
       (error as { response?: { status?: number } }).response?.status === 401
     ) {
       const refreshed = await refreshSessionOnce();
       if (!refreshed) {
-        await clearClientSession();
-        return null;
+        return { user: null, sessionDead: true };
       }
       try {
         const retry = await axios.get("/api/auth/me");
-        return coerce(retry.data?.user);
+        return { user: coerce(retry.data?.user), sessionDead: false };
       } catch {
-        await clearClientSession();
-        return null;
+        return { user: null, sessionDead: true };
       }
     }
-    return null;
+    return { user: null, sessionDead: false };
   }
 }
 
@@ -153,8 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const promise = (async () => {
       try {
-        const next = await fetchAuthUser();
-        setUser(next);
+        const { user: next, sessionDead } = await fetchAuthUser();
+        if (next !== null) {
+          setUser(next);
+        } else if (sessionDead) {
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }

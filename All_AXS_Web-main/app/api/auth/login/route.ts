@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import {
   authRateLimitResponse,
   checkAuthRouteRateLimit,
@@ -10,6 +9,7 @@ import {
   upstreamUnreachableMessage,
 } from "@/lib/server/api-url";
 import { extractAuthTokens } from "@/lib/server/auth-tokens";
+import { setAuthCookiesOnResponse } from "@/lib/server/auth-cookies";
 import {
   formatUpstreamErrorMessage,
   extractUpstreamErrorCode,
@@ -73,29 +73,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { accessToken, refreshToken } = extractAuthTokens(data);
-    const cookieStore = await cookies();
-
-    if (accessToken) {
-      cookieStore.set("accessToken", accessToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 15 * 60,
-      });
-    }
-
-    if (refreshToken) {
-      cookieStore.set("refreshToken", refreshToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        maxAge: 7 * 24 * 60 * 60,
-      });
-    }
-
-    return NextResponse.json({ user: data.user });
+    const res = NextResponse.json({ user: data.user });
+    setAuthCookiesOnResponse(res, { accessToken, refreshToken });
+    return res;
   } catch (error) {
     console.error("Login error:", error);
     const unreachable = upstreamUnreachableMessage(error, API_URL);

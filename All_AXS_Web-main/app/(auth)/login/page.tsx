@@ -32,7 +32,7 @@ const AUTH_SUBTITLE = "One account for fans and hosts.";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refresh: refreshAuth } = useAuth();
+  const { refresh: refreshAuth, setUser } = useAuth();
   const [error, setError] = useState<string | null>(() => {
     if (searchParams.get("session") === "expired") {
       return "Your session expired. Please sign in again.";
@@ -81,6 +81,18 @@ function LoginForm() {
       });
 
       if (response.status === 200) {
+        const loginUser = response.data?.user;
+        if (loginUser && typeof loginUser === "object") {
+          const u = loginUser as Record<string, unknown>;
+          setUser({
+            id: typeof u.id === "string" ? u.id : "",
+            email: typeof u.email === "string" ? u.email : "",
+            name: typeof u.name === "string" ? u.name : undefined,
+            roles: Array.isArray(u.roles)
+              ? u.roles.filter((r): r is string => typeof r === "string")
+              : undefined,
+          });
+        }
         await refreshAuth();
         const snapshot = await fetchPostAuthSnapshot();
         const roleCheck = validateSignInIntentAgainstDbRoles(intent, snapshot.roles);

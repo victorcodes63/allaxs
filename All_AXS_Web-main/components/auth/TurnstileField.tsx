@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 declare global {
   interface Window {
@@ -10,6 +10,7 @@ declare global {
         options: {
           sitekey: string;
           theme?: "light" | "dark" | "auto";
+          appearance?: "always" | "execute" | "interaction-only";
           callback: (token: string) => void;
           "expired-callback"?: () => void;
           "error-callback"?: () => void;
@@ -22,6 +23,20 @@ declare global {
 }
 
 const SCRIPT_ID = "cloudflare-turnstile-script";
+const READY_TIMEOUT_MS = 10_000;
+const STUCK_HINT_MS = 20_000;
+
+function waitForTurnstile(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + READY_TIMEOUT_MS;
+    const wait = () => {
+      if (window.turnstile) resolve();
+      else if (Date.now() > deadline) reject(new Error("Turnstile timeout"));
+      else setTimeout(wait, 50);
+    };
+    wait();
+  });
+}
 
 function loadTurnstileScript(): Promise<void> {
   if (typeof window === "undefined") {
@@ -30,17 +45,7 @@ function loadTurnstileScript(): Promise<void> {
   if (window.turnstile) return Promise.resolve();
 
   const existing = document.getElementById(SCRIPT_ID);
-  if (existing) {
-    return new Promise((resolve, reject) => {
-      const deadline = Date.now() + 10_000;
-      const wait = () => {
-        if (window.turnstile) resolve();
-        else if (Date.now() > deadline) reject(new Error("Turnstile timeout"));
-        else setTimeout(wait, 50);
-      };
-      wait();
-    });
-  }
+  if (existing) return waitForTurnstile();
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
@@ -48,7 +53,9 @@ function loadTurnstileScript(): Promise<void> {
     script.src =
       "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
     script.async = true;
-    script.onload = () => resolve();
+    script.onload = () => {
+      waitForTurnstile().then(resolve).catch(reject);
+    };
     script.onerror = () => reject(new Error("Turnstile failed to load"));
     document.head.appendChild(script);
   });
@@ -63,7 +70,7 @@ type TurnstileFieldProps = {
   onToken: (token: string) => void;
   onExpire?: () => void;
   onError?: () => void;
-  /** Increment to destroy and re-render the widget (e.g. after a failed submit). */
+  /** Increment to reset the widget in place (e.g. after a failed submit). */
   resetSignal?: number;
 };
 
@@ -75,41 +82,65 @@ export function TurnstileField({
 }: TurnstileFieldProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
+  const onTokenRef = useRef(onToken);
+  const onExpireRef = useRef(onExpire);
+  const onErrorRef = useRef(onError);
+  const [stuckHint, setStuckHint] = useState(false);
   const siteKey = getTurnstileSiteKey();
 
-  const stableOnToken = useCallback(
-    (token: string) => {
-      onToken(token);
-    },
-    [onToken],
-  );
+  onTokenRef.current = onToken;
+  onExpireRef.current = onExpire;
+  onErrorRef.current = onError;
 
   useEffect(() => {
     if (!siteKey || !containerRef.current) return;
 
     let cancelled = false;
+    let stuckTimer: ReturnType<typeof setTimeout> | undefined;
 
     void loadTurnstileScript()
       .then(() => {
         if (cancelled || !containerRef.current || !window.turnstile) return;
+
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           theme: "dark",
-          callback: stableOnToken,
-          "expired-callback": () => onExpire?.(),
-          "error-callback": () => onError?.(),
+          // Hide the widget unless Cloudflare needs user interaction — avoids
+          // an endless "Verifying…" spinner for most real users.
+          appearance: "interaction-only",
+          callback: (token) => {
+            setStuckHint(false);
+            onTokenRef.current(token);
+          },
+          "expired-callback": () => onExpireRef.current?.(),
+          "error-callback": () => {
+            setStuckHint(false);
+            onErrorRef.current?.();
+          },
         });
+
+        stuckTimer = setTimeout(() => setStuckHint(true), STUCK_HINT_MS);
       })
-      .catch(() => onError?.());
+      .catch(() => {
+        setStuckHint(true);
+        onErrorRef.current?.();
+      });
 
     return () => {
       cancelled = true;
+      if (stuckTimer) clearTimeout(stuckTimer);
       if (widgetIdRef.current && window.turnstile) {
         window.turnstile.remove(widgetIdRef.current);
         widgetIdRef.current = null;
       }
     };
-  }, [siteKey, stableOnToken, onExpire, onError, resetSignal]);
+  }, [siteKey]);
+
+  useEffect(() => {
+    if (resetSignal <= 0 || !widgetIdRef.current || !window.turnstile) return;
+    window.turnstile.reset(widgetIdRef.current);
+    setStuckHint(false);
+  }, [resetSignal]);
 
   if (!siteKey) {
     if (process.env.NODE_ENV === "production") {
@@ -123,5 +154,15 @@ export function TurnstileField({
     return null;
   }
 
-  return <div ref={containerRef} className="flex min-h-[65px] justify-center py-1" />;
+  return (
+    <div className="space-y-1">
+      <div ref={containerRef} className="flex min-h-0 justify-center py-1" />
+      {stuckHint ? (
+        <p className="text-center text-xs text-neutral-400">
+          Security check is taking longer than usual. Refresh the page or try disabling ad
+          blockers.
+        </p>
+      ) : null}
+    </div>
+  );
 }
